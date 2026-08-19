@@ -16,6 +16,8 @@ export interface User {
   note: string;
   department?: string;
   avatarColor?: string;
+  password?: string;
+  defaultPassword?: string;
 }
 
 export interface Material {

@@ -84,13 +84,13 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({
           </div>
 
           <p className="text-xs text-slate-300">
-            <strong>Ghi chú quyền hạn theo thiết kế:</strong> Quản lý toàn bộ danh mục vật tư mã DN_*, thiết lập định mức an toàn (Min/Max), đơn giá, xét duyệt hoặc từ chối phiếu xuất/nhập, xem toàn bộ báo cáo tổng hợp.
+            <strong>Ghi chú quyền hạn theo thiết kế:</strong> Quản lý toàn bộ danh mục vật tư, thiết lập định mức an toàn (Min/Max), đơn giá, xét duyệt hoặc từ chối phiếu xuất/nhập, xem toàn bộ báo cáo tổng hợp.
           </p>
 
           <div className="space-y-1.5 pt-2 border-t border-slate-800 text-xs text-slate-300">
             <div className="flex items-center gap-2 text-emerald-400">
               <CheckCircle2 className="w-4 h-4 shrink-0" />
-              <span>Thêm mới, sửa, xóa mã vật tư trong danh mục chuẩn DN_*</span>
+              <span>Thêm mới, sửa, xóa mã vật tư trong danh mục</span>
             </div>
             <div className="flex items-center gap-2 text-emerald-400">
               <CheckCircle2 className="w-4 h-4 shrink-0" />
@@ -249,7 +249,13 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({
                     <strong className="text-slate-200">{user.department}</strong>
                   </div>
                   <div className="text-[11px] text-slate-400">
-                    <span className="text-slate-500">Ghi chú quyền hạn: </span>
+                    <span className="text-slate-500">Mật khẩu đăng nhập: </span>
+                    <code className="text-amber-400 bg-slate-950 px-1.5 py-0.5 rounded border border-slate-800 font-mono text-[10px]">
+                      {user.defaultPassword || user.password || `${user.username}12345`}
+                    </code>
+                  </div>
+                  <div className="text-[11px] text-slate-400">
+                    <span className="text-slate-500">Ghi chú quyền: </span>
                     <span className="text-slate-300 italic">{user.note}</span>
                   </div>
                 </div>

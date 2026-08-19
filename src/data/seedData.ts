@@ -12,6 +12,8 @@ export const INITIAL_USERS: User[] = [
     note: 'Toàn quyền: duyệt phiếu, xem báo cáo, quản lý danh mục',
     department: 'Ban Giám Đốc / Điều Hành',
     avatarColor: 'bg-blue-600',
+    defaultPassword: 'duc.nguyen12345',
+    password: 'duc.nguyen12345',
   },
   {
     id: 'u-2',
@@ -24,6 +26,8 @@ export const INITIAL_USERS: User[] = [
     note: 'Toàn quyền: duyệt phiếu, xem báo cáo, quản lý danh mục',
     department: 'Phòng Quản Lý Kho & Vật Tư',
     avatarColor: 'bg-indigo-600',
+    defaultPassword: 'rin.nguyen12345',
+    password: 'rin.nguyen12345',
   },
   {
     id: 'u-3',
@@ -36,6 +40,8 @@ export const INITIAL_USERS: User[] = [
     note: 'Toàn quyền: duyệt phiếu, xem báo cáo, quản lý danh mục',
     department: 'Phòng Kế Hoạch & Kỹ Thuật',
     avatarColor: 'bg-emerald-600',
+    defaultPassword: 'hanh.nguyen12345',
+    password: 'hanh.nguyen12345',
   },
   {
     id: 'u-4',
@@ -48,6 +54,8 @@ export const INITIAL_USERS: User[] = [
     note: 'Toàn quyền: duyệt phiếu, xem báo cáo, quản lý danh mục',
     department: 'Phòng Quản Trị Hệ Thống',
     avatarColor: 'bg-purple-600',
+    defaultPassword: 'trinh.le12345',
+    password: 'trinh.le12345',
   },
   {
     id: 'u-5',
@@ -60,6 +68,8 @@ export const INITIAL_USERS: User[] = [
     note: 'Xem tồn kho được phân bổ, tạo đề nghị nhập/xuất',
     department: 'Tổ Thi Công Cơ Điện',
     avatarColor: 'bg-teal-600',
+    defaultPassword: 'ha.pham12345',
+    password: 'ha.pham12345',
   },
   {
     id: 'u-6',
@@ -72,6 +82,8 @@ export const INITIAL_USERS: User[] = [
     note: 'Xem tồn kho được phân bổ, tạo đề nghị nhập/xuất',
     department: 'Tổ Vận Hành & Bảo Trì',
     avatarColor: 'bg-amber-600',
+    defaultPassword: 'dung.nguyen12345',
+    password: 'dung.nguyen12345',
   },
   {
     id: 'u-7',
@@ -84,6 +96,8 @@ export const INITIAL_USERS: User[] = [
     note: 'Xem tồn kho được phân bổ, tạo đề nghị nhập/xuất',
     department: 'Tổ Thiết Bị Tự Động Hóa',
     avatarColor: 'bg-cyan-600',
+    defaultPassword: 'nhan.dao12345',
+    password: 'nhan.dao12345',
   },
   {
     id: 'u-8',
@@ -96,6 +110,8 @@ export const INITIAL_USERS: User[] = [
     note: 'Xem tồn kho được phân bổ, tạo đề nghị nhập/xuất',
     department: 'Đội Thi Công Công Trình A',
     avatarColor: 'bg-sky-600',
+    defaultPassword: 'quang.le12345',
+    password: 'quang.le12345',
   },
   {
     id: 'u-9',
@@ -108,6 +124,8 @@ export const INITIAL_USERS: User[] = [
     note: 'Toàn quyền: duyệt phiếu, xem báo cáo, quản lý danh mục',
     department: 'Ban Điều Hành & Quản Lý Tổng Thể',
     avatarColor: 'bg-rose-600',
+    defaultPassword: 'phuoc.vy12345',
+    password: 'phuoc.vy12345',
   },
   {
     id: 'u-10',
@@ -120,6 +138,8 @@ export const INITIAL_USERS: User[] = [
     note: 'Xem tồn kho được phân bổ, tạo đề nghị nhập/xuất',
     department: 'Tổ Cơ Khí Chế Tạo',
     avatarColor: 'bg-slate-600',
+    defaultPassword: 'chien.le12345',
+    password: 'chien.le12345',
   },
   {
     id: 'u-11',
@@ -132,6 +152,8 @@ export const INITIAL_USERS: User[] = [
     note: 'Xem tồn kho được phân bổ, tạo đề nghị nhập/xuất',
     department: 'Tổ Lắp Đặt Hệ Thống Điện',
     avatarColor: 'bg-orange-600',
+    defaultPassword: 'kich.nguyen12345',
+    password: 'kich.nguyen12345',
   },
   {
     id: 'u-12',
@@ -144,6 +166,8 @@ export const INITIAL_USERS: User[] = [
     note: 'Xem tồn kho được phân bổ, tạo đề nghị nhập/xuất',
     department: 'Tổ Bảo Dưỡng Đường Ống & Van',
     avatarColor: 'bg-violet-600',
+    defaultPassword: 'trong.le12345',
+    password: 'trong.le12345',
   },
   {
     id: 'u-13',
@@ -156,6 +180,8 @@ export const INITIAL_USERS: User[] = [
     note: 'Xem tồn kho được phân bổ, tạo đề nghị nhập/xuất',
     department: 'Tổ Kiểm Soát Chất Lượng',
     avatarColor: 'bg-green-600',
+    defaultPassword: 'thi.do12345',
+    password: 'thi.do12345',
   },
   {
     id: 'u-14',
@@ -168,6 +194,8 @@ export const INITIAL_USERS: User[] = [
     note: 'Toàn quyền: duyệt phiếu, xem báo cáo, quản lý danh mục',
     department: 'Phòng Kế Toán Vật Tư & Kho',
     avatarColor: 'bg-pink-600',
+    defaultPassword: 'vina.nguyen12345',
+    password: 'vina.nguyen12345',
   },
   {
     id: 'u-15',
@@ -180,6 +208,8 @@ export const INITIAL_USERS: User[] = [
     note: 'Xem tồn kho được phân bổ, tạo đề nghị nhập/xuất',
     department: 'Tổ Thi Công Đường Dây',
     avatarColor: 'bg-yellow-600',
+    defaultPassword: 'sen.nguyen12345',
+    password: 'sen.nguyen12345',
   },
   {
     id: 'u-16',
@@ -192,6 +222,8 @@ export const INITIAL_USERS: User[] = [
     note: 'Xem tồn kho được phân bổ, tạo đề nghị nhập/xuất',
     department: 'Tổ Vận Chuyển & Kho Vệ Tinh',
     avatarColor: 'bg-emerald-700',
+    defaultPassword: 'nam.pham12345',
+    password: 'nam.pham12345',
   },
   {
     id: 'u-17',
@@ -204,6 +236,8 @@ export const INITIAL_USERS: User[] = [
     note: 'Xem tồn kho được phân bổ, tạo đề nghị nhập/xuất',
     department: 'Tổ Kiểm Soát Đo Lường',
     avatarColor: 'bg-blue-700',
+    defaultPassword: 'tien.phan12345',
+    password: 'tien.phan12345',
   },
   {
     id: 'u-18',
@@ -216,6 +250,8 @@ export const INITIAL_USERS: User[] = [
     note: 'Xem tồn kho được phân bổ, tạo đề nghị nhập/xuất',
     department: 'Tổ Thi Công Xây Lắp Điện',
     avatarColor: 'bg-indigo-700',
+    defaultPassword: 'huynh.nguyen12345',
+    password: 'huynh.nguyen12345',
   },
   {
     id: 'u-19',
@@ -228,6 +264,8 @@ export const INITIAL_USERS: User[] = [
     note: 'Xem tồn kho được phân bổ, tạo đề nghị nhập/xuất',
     department: 'Tổ Khí Nén & Thủy Lực',
     avatarColor: 'bg-red-700',
+    defaultPassword: 'vuong.nguyen12345',
+    password: 'vuong.nguyen12345',
   },
   {
     id: 'u-20',
@@ -240,6 +278,8 @@ export const INITIAL_USERS: User[] = [
     note: 'Xem tồn kho được phân bổ, tạo đề nghị nhập/xuất',
     department: 'Tổ An Toàn & Bảo Hộ Lao Động',
     avatarColor: 'bg-teal-700',
+    defaultPassword: 'cong.pham12345',
+    password: 'cong.pham12345',
   },
   {
     id: 'u-21',
@@ -252,6 +292,8 @@ export const INITIAL_USERS: User[] = [
     note: 'Xem tồn kho được phân bổ, tạo đề nghị nhập/xuất',
     department: 'Tổ Hàn & Kết Cấu Kim Loại',
     avatarColor: 'bg-cyan-700',
+    defaultPassword: 'thong.huynh12345',
+    password: 'thong.huynh12345',
   },
   {
     id: 'u-22',
@@ -264,6 +306,8 @@ export const INITIAL_USERS: User[] = [
     note: 'Xem tồn kho được phân bổ, tạo đề nghị nhập/xuất',
     department: 'Tổ Thi Công Hạ Tầng Mạng & Tín Hiệu',
     avatarColor: 'bg-purple-700',
+    defaultPassword: 'toan.hoang12345',
+    password: 'toan.hoang12345',
   },
   {
     id: 'u-23',
@@ -276,6 +320,8 @@ export const INITIAL_USERS: User[] = [
     note: 'Xem tồn kho được phân bổ, tạo đề nghị nhập/xuất',
     department: 'Tổ Vận Hành Trạm Biến Áp',
     avatarColor: 'bg-amber-700',
+    defaultPassword: 'tuan.nguyen12345',
+    password: 'tuan.nguyen12345',
   },
   {
     id: 'u-24',
@@ -288,6 +334,8 @@ export const INITIAL_USERS: User[] = [
     note: 'Xem tồn kho được phân bổ, tạo đề nghị nhập/xuất',
     department: 'Tổ Thiết Bị Nâng Hạ & Cơ Giới',
     avatarColor: 'bg-emerald-800',
+    defaultPassword: 'hung.nguyen12345',
+    password: 'hung.nguyen12345',
   },
 ];
 
@@ -349,7 +397,7 @@ export const INITIAL_MATERIALS: Material[] = [
   },
   {
     id: 'mat-4',
-    code: 'DN_CB_00CADIVI_04',
+    code: 'DN_CC_00CADIVI_04',
     name: 'Cáp điện lực hạ thế CVV 4x25mm2 Cu/PVC/PVC',
     category: 'Dây & Cáp điện lực hạ thế',
     unit: 'Mét',
@@ -365,7 +413,7 @@ export const INITIAL_MATERIALS: Material[] = [
   },
   {
     id: 'mat-5',
-    code: 'DN_CB_00CXV_05',
+    code: 'DN_CC_00CXV_05',
     name: 'Cáp ngầm hạ thế CXV/DATA 3x120+1x70mm2',
     category: 'Dây & Cáp điện lực hạ thế',
     unit: 'Mét',
@@ -381,7 +429,7 @@ export const INITIAL_MATERIALS: Material[] = [
   },
   {
     id: 'mat-6',
-    code: 'DN_CB_00SGN_06',
+    code: 'DN_CC_00SGN_06',
     name: 'Cáp tín hiệu chống nhiễu RS485 2x1.5mm2',
     category: 'Dây & Cáp điện lực hạ thế',
     unit: 'Cuộn',
@@ -461,7 +509,7 @@ export const INITIAL_MATERIALS: Material[] = [
   },
   {
     id: 'mat-11',
-    code: 'DN_CB_00CUP_11',
+    code: 'DN_CC_00CUP_11',
     name: 'Thanh cái đồng đỏ Busbar tiếp địa 30x3mm Cu 99.9%',
     category: 'Dây & Cáp điện lực hạ thế',
     unit: 'Mét',
@@ -541,7 +589,7 @@ export const INITIAL_MATERIALS: Material[] = [
   },
   {
     id: 'mat-16',
-    code: 'DN_CB_00LUG_16',
+    code: 'DN_CC_00LUG_16',
     name: 'Đầu cos đồng đỏ đúc mạ thiếc SC 120-12 lỗ M12',
     category: 'Dây & Cáp điện lực hạ thế',
     unit: 'Hộp',
@@ -638,7 +686,7 @@ export const INITIAL_TRANSACTIONS: InventoryTransaction[] = [
     createdAt: '2026-08-05T09:15:00Z',
     items: [
       {
-        materialCode: 'DN_CB_00CXV_05',
+        materialCode: 'DN_CC_00CXV_05',
         materialName: 'Cáp ngầm hạ thế CXV/DATA 3x120+1x70mm2',
         unit: 'Mét',
         quantity: 80,
@@ -746,7 +794,7 @@ export const INITIAL_TRANSACTIONS: InventoryTransaction[] = [
         currentStockAtCreation: 120,
       },
       {
-        materialCode: 'DN_CB_00LUG_16',
+        materialCode: 'DN_CC_00LUG_16',
         materialName: 'Đầu cos đồng đỏ đúc mạ thiếc SC 120-12 lỗ M12',
         unit: 'Hộp',
         quantity: 20,

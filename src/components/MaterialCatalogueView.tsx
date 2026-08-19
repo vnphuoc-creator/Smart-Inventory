@@ -257,14 +257,13 @@ export const MaterialCatalogueView: React.FC<MaterialCatalogueViewProps> = ({
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2.5">
-            <h1 className="text-xl font-bold text-white tracking-tight">Danh Mục Vật Tư (Mã DN_*)</h1>
+            <h1 className="text-xl font-bold text-white tracking-tight">Danh Mục Vật Tư</h1>
             <span className="bg-blue-500/20 text-blue-300 border border-blue-500/30 text-xs px-2.5 py-0.5 rounded-full font-mono font-bold">
               {filteredMaterials.length} / {materials.length} mã
             </span>
           </div>
           <p className="text-xs text-slate-400 mt-1">
-            Quy tắc bắt buộc: Tất cả vật tư phải có mã bắt đầu bằng{' '}
-            <span className="text-amber-400 font-mono font-semibold">DN_</span> • Tự động tính Tồn = Đầu + Nhập - Xuất
+            Định mức tồn kho an toàn &bull; Tự động tính Tồn = Đầu + Nhập - Xuất
           </p>
         </div>
 
@@ -285,7 +284,7 @@ export const MaterialCatalogueView: React.FC<MaterialCatalogueViewProps> = ({
               className="bg-blue-600 hover:bg-blue-500 text-white px-3.5 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-sm shadow-blue-600/30"
             >
               <Plus className="w-4 h-4" />
-              <span>+ Thêm Vật Tư Mới (DN_*)</span>
+              <span>+ Thêm Vật Tư Mới</span>
             </button>
           ) : (
             <button
@@ -328,7 +327,7 @@ export const MaterialCatalogueView: React.FC<MaterialCatalogueViewProps> = ({
               type="text"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Tìm theo mã DN_*, tên, quy cách, vị trí..."
+              placeholder="Tìm theo mã vật tư, tên, quy cách, vị trí..."
               className="w-full bg-slate-800 border border-slate-700 rounded-xl pl-9 pr-8 py-2 text-xs text-white placeholder-slate-400 focus:outline-none focus:border-blue-500"
             />
             {searchTerm && (
@@ -379,7 +378,7 @@ export const MaterialCatalogueView: React.FC<MaterialCatalogueViewProps> = ({
               onChange={(e) => setSortBy(e.target.value as any)}
               className="flex-1 bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-500"
             >
-              <option value="code">Sắp xếp: Mã VT (DN_*)</option>
+              <option value="code">Sắp xếp: Mã vật tư</option>
               <option value="name">Sắp xếp: Tên vật tư</option>
               <option value="stock">Sắp xếp: Số lượng tồn</option>
               <option value="value">Sắp xếp: Giá trị tồn kho</option>
@@ -401,7 +400,7 @@ export const MaterialCatalogueView: React.FC<MaterialCatalogueViewProps> = ({
           <table className="w-full text-left text-xs text-slate-300">
             <thead className="bg-slate-850 border-b border-slate-800 text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
               <tr>
-                <th className="py-3.5 px-4">Mã Vật Tư (DN_*)</th>
+                <th className="py-3.5 px-4">Mã Vật Tư</th>
                 <th className="py-3.5 px-4 min-w-[220px]">Tên & Quy Cách Vật Tư</th>
                 <th className="py-3.5 px-3">Nhóm / Vị Trí</th>
                 <th className="py-3.5 px-3 text-center">ĐVT</th>

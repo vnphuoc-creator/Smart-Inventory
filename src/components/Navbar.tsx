@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Package,
   Layers,
@@ -10,17 +10,20 @@ import {
   Bell,
   ArrowRightLeft,
   ChevronDown,
+  LogOut,
 } from 'lucide-react';
 import { User } from '../types';
+import { AHTLogo } from './AHTLogo';
 
 interface NavbarProps {
   currentUser: User;
   allUsers: User[];
   onSelectUser: (user: User) => void;
   activeTab: string;
-  setActiveTab: (tab: string) => void;
+  onTabChange: (tab: string) => void;
   pendingApprovalsCount: number;
   onOpenAiSearch: () => void;
+  onLogout?: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -28,15 +31,16 @@ export const Navbar: React.FC<NavbarProps> = ({
   allUsers,
   onSelectUser,
   activeTab,
-  setActiveTab,
+  onTabChange,
   pendingApprovalsCount,
   onOpenAiSearch,
+  onLogout,
 }) => {
-  const [showUserDropdown, setShowUserDropdown] = React.useState(false);
+  const [showUserDropdown, setShowUserDropdown] = useState(false);
 
   const navItems = [
     { id: 'dashboard', label: 'Tổng Quan', icon: Layers },
-    { id: 'materials', label: 'Danh Mục Vật Tư (DN_*)', icon: Package },
+    { id: 'materials', label: 'Danh Mục Vật Tư', icon: Package },
     {
       id: 'transactions',
       label: 'Xuất - Nhập - Tồn',
@@ -45,7 +49,7 @@ export const Navbar: React.FC<NavbarProps> = ({
     },
     { id: 'ledger', label: 'Thẻ Kho & Báo Cáo NXT', icon: FileSpreadsheet },
     { id: 'users', label: 'Phân Quyền (24)', icon: Users },
-    { id: 'ai-assistant', label: 'Trợ Lý AI Kho', icon: Sparkles, highlight: true },
+    { id: 'ai', label: 'Trợ Lý AI Kho', icon: Sparkles, highlight: true },
   ];
 
   return (
@@ -53,44 +57,50 @@ export const Navbar: React.FC<NavbarProps> = ({
       {/* Top bar with branding, user switcher, and AI trigger */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
-          {/* Logo & App title */}
+          {/* Company Logo & App title */}
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-500 flex items-center justify-center shadow-lg shadow-blue-500/20 text-white font-black text-lg">
-              DN
+            <div className="p-1.5 bg-slate-800/80 border border-slate-700/60 rounded-xl shadow-sm">
+              <AHTLogo className="h-7 w-auto" />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <span className="font-bold text-lg tracking-tight text-white">Smart Inventory</span>
-                <span className="text-xs bg-blue-500/20 text-blue-300 border border-blue-500/30 px-2 py-0.5 rounded-full font-mono font-semibold">
-                  Mã DN_*
+                <span className="font-bold text-base sm:text-lg tracking-tight text-white">
+                  Quản Lý Kho Thông Minh
+                </span>
+                <span className="hidden sm:inline-block text-[11px] bg-blue-500/20 text-blue-300 border border-blue-500/30 px-2 py-0.5 rounded-full font-medium">
+                  AHT Corp
                 </span>
               </div>
-              <p className="text-xs text-slate-400">Hệ thống Quản lý Xuất - Nhập - Tồn Thông Minh</p>
+              <p className="text-[11px] text-slate-400">
+                Hệ thống Quản lý Xuất - Nhập - Tồn Vật tư
+              </p>
             </div>
           </div>
 
           {/* Center search button trigger */}
           <div className="hidden md:flex items-center">
             <button
+              type="button"
               id="btn-ai-search-quick"
               onClick={onOpenAiSearch}
-              className="flex items-center gap-2 bg-slate-800/90 hover:bg-slate-800 border border-slate-700/80 hover:border-blue-500/50 text-slate-300 hover:text-white px-4 py-2 rounded-xl text-sm transition-all duration-200 shadow-inner w-72 group"
+              className="flex items-center gap-2 bg-slate-800/90 hover:bg-slate-800 border border-slate-700/80 hover:border-blue-500/50 text-slate-300 hover:text-white px-4 py-2 rounded-xl text-sm transition-all duration-200 shadow-inner w-64 lg:w-72 group"
             >
               <Sparkles className="w-4 h-4 text-amber-400 group-hover:rotate-12 transition-transform" />
               <span className="flex-1 text-left truncate">Tìm kiếm ngôn ngữ tự nhiên...</span>
               <kbd className="text-[10px] bg-slate-900 text-slate-400 px-1.5 py-0.5 rounded border border-slate-700">
-                AI Search
+                AI
               </kbd>
             </button>
           </div>
 
           {/* Right section: Pending badge & Active User switcher */}
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3">
             {/* Quick Pending alert */}
             {currentUser.role === 'ADMIN' && pendingApprovalsCount > 0 && (
               <button
+                type="button"
                 id="btn-nav-pending-badge"
-                onClick={() => setActiveTab('transactions')}
+                onClick={() => onTabChange('transactions')}
                 className="relative p-2 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 transition-colors flex items-center gap-1.5 text-xs font-medium"
                 title={`${pendingApprovalsCount} phiếu chờ duyệt`}
               >
@@ -103,12 +113,13 @@ export const Navbar: React.FC<NavbarProps> = ({
             {/* Current user switch dropdown */}
             <div className="relative">
               <button
+                type="button"
                 id="btn-user-dropdown-toggle"
                 onClick={() => setShowUserDropdown(!showUserDropdown)}
-                className="flex items-center gap-2.5 bg-slate-800/90 hover:bg-slate-800 border border-slate-700 p-1.5 pr-3 rounded-xl transition-colors text-left"
+                className="flex items-center gap-2 bg-slate-800/90 hover:bg-slate-800 border border-slate-700 p-1.5 pr-2.5 rounded-xl transition-colors text-left"
               >
                 <div
-                  className={`w-8 h-8 rounded-lg ${
+                  className={`w-7 h-7 sm:w-8 sm:h-8 rounded-lg ${
                     currentUser.avatarColor || 'bg-blue-600'
                   } flex items-center justify-center text-white font-bold text-xs uppercase shadow-sm`}
                 >
@@ -120,7 +131,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 </div>
                 <div className="hidden sm:block text-left">
                   <div className="flex items-center gap-1.5">
-                    <span className="text-xs font-semibold text-white truncate max-w-[130px]">
+                    <span className="text-xs font-semibold text-white truncate max-w-[120px]">
                       {currentUser.fullName}
                     </span>
                     {currentUser.role === 'ADMIN' ? (
@@ -133,11 +144,11 @@ export const Navbar: React.FC<NavbarProps> = ({
                       </span>
                     )}
                   </div>
-                  <span className="text-[10px] text-slate-400 block truncate max-w-[140px]">
+                  <span className="text-[10px] text-slate-400 block truncate max-w-[130px]">
                     {currentUser.email}
                   </span>
                 </div>
-                <ChevronDown className="w-4 h-4 text-slate-400" />
+                <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
               </button>
 
               {/* Dropdown list */}
@@ -152,13 +163,12 @@ export const Navbar: React.FC<NavbarProps> = ({
                         Phân quyền chuẩn
                       </span>
                     </div>
-                    <p className="text-xs text-slate-300 mt-1 font-mono">
-                      Quyền hiện tại:{' '}
-                      <span className="text-amber-400 font-sans">{currentUser.note}</span>
+                    <p className="text-xs text-slate-300 mt-1">
+                      Quyền hiện tại: <span className="text-amber-400">{currentUser.note}</span>
                     </p>
                   </div>
 
-                  <div className="max-h-80 overflow-y-auto divide-y divide-slate-800">
+                  <div className="max-h-72 overflow-y-auto divide-y divide-slate-800">
                     {/* Admin section */}
                     <div className="px-3 py-1.5 bg-slate-950 text-[11px] font-semibold text-rose-400 uppercase tracking-wider">
                       Nhóm Quản Lý / Admin (Toàn quyền)
@@ -168,13 +178,16 @@ export const Navbar: React.FC<NavbarProps> = ({
                       .map((user) => (
                         <button
                           key={user.id}
+                          type="button"
                           id={`btn-select-user-${user.id}`}
                           onClick={() => {
                             onSelectUser(user);
                             setShowUserDropdown(false);
                           }}
                           className={`w-full text-left px-3 py-2.5 flex items-center gap-3 hover:bg-slate-800 transition-colors ${
-                            currentUser.id === user.id ? 'bg-blue-600/15 text-blue-200' : 'text-slate-300'
+                            currentUser.id === user.id
+                              ? 'bg-blue-600/15 text-blue-200'
+                              : 'text-slate-300'
                           }`}
                         >
                           <div
@@ -211,13 +224,16 @@ export const Navbar: React.FC<NavbarProps> = ({
                       .map((user) => (
                         <button
                           key={user.id}
+                          type="button"
                           id={`btn-select-user-${user.id}`}
                           onClick={() => {
                             onSelectUser(user);
                             setShowUserDropdown(false);
                           }}
                           className={`w-full text-left px-3 py-2 flex items-center gap-3 hover:bg-slate-800 transition-colors ${
-                            currentUser.id === user.id ? 'bg-blue-600/15 text-blue-200' : 'text-slate-300'
+                            currentUser.id === user.id
+                              ? 'bg-blue-600/15 text-blue-200'
+                              : 'text-slate-300'
                           }`}
                         >
                           <div
@@ -246,20 +262,46 @@ export const Navbar: React.FC<NavbarProps> = ({
                       ))}
                   </div>
 
-                  <div className="p-2.5 bg-slate-950 border-t border-slate-800 text-center">
+                  <div className="p-2.5 bg-slate-950 border-t border-slate-800 flex items-center justify-between">
                     <button
+                      type="button"
                       onClick={() => {
-                        setActiveTab('users');
+                        onTabChange('users');
                         setShowUserDropdown(false);
                       }}
                       className="text-xs text-blue-400 hover:text-blue-300 font-medium"
                     >
-                      Xem chi tiết bảng phân quyền 24 thành viên &rarr;
+                      Bảng phân quyền 24 NV &rarr;
                     </button>
+                    {onLogout && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowUserDropdown(false);
+                          onLogout();
+                        }}
+                        className="text-xs text-rose-400 hover:text-rose-300 font-medium flex items-center gap-1"
+                      >
+                        <LogOut className="w-3 h-3" /> Đăng xuất
+                      </button>
+                    )}
                   </div>
                 </div>
               )}
             </div>
+
+            {/* Direct logout icon button on desktop */}
+            {onLogout && (
+              <button
+                type="button"
+                id="btn-nav-logout"
+                onClick={onLogout}
+                title="Đăng xuất khỏi hệ thống"
+                className="p-2 rounded-xl bg-slate-800/80 hover:bg-rose-500/20 text-slate-400 hover:text-rose-400 border border-slate-700 hover:border-rose-500/30 transition-colors"
+              >
+                <LogOut className="w-4 h-4" />
+              </button>
+            )}
           </div>
         </div>
 
@@ -271,9 +313,10 @@ export const Navbar: React.FC<NavbarProps> = ({
             return (
               <button
                 key={item.id}
+                type="button"
                 id={`tab-${item.id}`}
-                onClick={() => setActiveTab(item.id)}
-                className={`flex items-center gap-2 py-3 px-4 text-xs sm:text-sm font-medium border-b-2 whitespace-nowrap transition-colors duration-150 ${
+                onClick={() => onTabChange(item.id)}
+                className={`flex items-center gap-2 py-3 px-4 text-xs sm:text-sm font-medium border-b-2 whitespace-nowrap transition-colors duration-150 cursor-pointer ${
                   isActive
                     ? 'border-blue-500 text-blue-400 bg-slate-800/40'
                     : 'border-transparent text-slate-400 hover:text-slate-200 hover:border-slate-700'
