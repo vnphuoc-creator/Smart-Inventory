@@ -8,33 +8,17 @@ import {
 } from '../types';
 
 /**
- * Validates that material code strictly starts with DN_
+ * Validates material code
  */
 export function validateMaterialCode(code: string): { isValid: boolean; error?: string; normalized: string } {
   if (!code || !code.trim()) {
     return { isValid: false, error: 'Mã vật tư không được để trống', normalized: '' };
   }
-  const trimmed = code.trim().toUpperCase();
-  if (!trimmed.startsWith('DN_')) {
+  const trimmed = code.trim().toUpperCase().replace(/\s+/g, '_');
+  if (trimmed.length < 3) {
     return {
       isValid: false,
-      error: 'Mã vật tư BẮT BUỘC phải bắt đầu bằng tiền tố "DN_" (ví dụ: DN_CC_00ACB_01, DN_CC_00MKC_02)',
-      normalized: trimmed,
-    };
-  }
-  if (trimmed.length < 5) {
-    return {
-      isValid: false,
-      error: 'Mã vật tư quá ngắn, vui lòng nhập mã chuẩn hóa (ví dụ: DN_VT_001)',
-      normalized: trimmed,
-    };
-  }
-  // Check valid characters
-  const validPattern = /^DN_[A-Z0-9_]+$/;
-  if (!validPattern.test(trimmed)) {
-    return {
-      isValid: false,
-      error: 'Mã vật tư chỉ bao gồm chữ in hoa, số và dấu gạch dưới sau tiền tố DN_',
+      error: 'Mã vật tư quá ngắn, vui lòng nhập mã chuẩn hóa (tối thiểu 3 ký tự)',
       normalized: trimmed,
     };
   }

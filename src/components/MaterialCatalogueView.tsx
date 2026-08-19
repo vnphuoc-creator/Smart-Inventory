@@ -19,6 +19,7 @@ import {
   ArrowDownRight,
   Eye,
   Info,
+  Archive,
 } from 'lucide-react';
 import {
   Material,
@@ -27,7 +28,8 @@ import {
   NaturalSearchFilters,
 } from '../types';
 import { formatVND, formatNumber, validateMaterialCode } from '../utils/inventoryEngine';
-import { MATERIAL_CATEGORIES } from '../data/seedData';
+import { MATERIAL_CATEGORIES, STANDARD_UNITS } from '../data/seedData';
+import { exportMaterialCatalogueToExcel } from '../utils/excelExporter';
 
 interface MaterialCatalogueViewProps {
   currentUser: User;
@@ -58,6 +60,7 @@ export const MaterialCatalogueView: React.FC<MaterialCatalogueViewProps> = ({
 }) => {
   const [searchTerm, setSearchTerm] = useState(appliedFilters?.searchKeyword || '');
   const [selectedCategory, setSelectedCategory] = useState(appliedFilters?.category || 'ALL');
+  const [selectedUnit, setSelectedUnit] = useState<string>('ALL');
   const [selectedStatus, setSelectedStatus] = useState(appliedFilters?.stockStatus || 'ALL');
   const [sortBy, setSortBy] = useState<'code' | 'name' | 'stock' | 'value'>('code');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
@@ -66,7 +69,7 @@ export const MaterialCatalogueView: React.FC<MaterialCatalogueViewProps> = ({
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingMaterial, setEditingMaterial] = useState<Material | null>(null);
   const [formData, setFormData] = useState<Partial<Material>>({
-    code: 'DN_',
+    code: '',
     name: '',
     category: MATERIAL_CATEGORIES[0],
     unit: 'Cái',
@@ -80,6 +83,13 @@ export const MaterialCatalogueView: React.FC<MaterialCatalogueViewProps> = ({
     notes: '',
   });
   const [codeError, setCodeError] = useState<string | null>(null);
+
+  // Available unique units in current database
+  const availableUnits = useMemo(() => {
+    const units = new Set<string>(materials.map((m) => m.unit).filter(Boolean));
+    STANDARD_UNITS.forEach((u) => units.add(u));
+    return Array.from(units);
+  }, [materials]);
 
   // Sync external filters
   React.useEffect(() => {
@@ -109,6 +119,11 @@ export const MaterialCatalogueView: React.FC<MaterialCatalogueViewProps> = ({
           return false;
         }
 
+        // Unit filter
+        if (selectedUnit !== 'ALL' && mat.unit.toLowerCase() !== selectedUnit.toLowerCase()) {
+          return false;
+        }
+
         // Status filter
         if (selectedStatus !== 'ALL') {
           if (selectedStatus === 'LOW_STOCK' && mat.stockStatus !== 'LOW_STOCK' && mat.stockStatus !== 'OUT_OF_STOCK') {
@@ -135,12 +150,12 @@ export const MaterialCatalogueView: React.FC<MaterialCatalogueViewProps> = ({
         else if (sortBy === 'value') cmp = a.totalValue - b.totalValue;
         return sortOrder === 'asc' ? cmp : -cmp;
       });
-  }, [calculatedStocks, searchTerm, selectedCategory, selectedStatus, sortBy, sortOrder]);
+  }, [calculatedStocks, searchTerm, selectedCategory, selectedUnit, selectedStatus, sortBy, sortOrder]);
 
   const handleOpenAdd = () => {
     setEditingMaterial(null);
     setFormData({
-      code: 'DN_',
+      code: '',
       name: '',
       category: MATERIAL_CATEGORIES[0],
       unit: 'Cái',
@@ -203,52 +218,8 @@ export const MaterialCatalogueView: React.FC<MaterialCatalogueViewProps> = ({
   };
 
   const handleExportCSV = () => {
-    const headers = [
-      'STT',
-      'Mã Vật Tư (DN_*)',
-      'Tên Vật Tư',
-      'Quy Cách Kỹ Thuật',
-      'Nhóm Ngành Hàng',
-      'ĐVT',
-      'Vị Trí Kho',
-      'Tồn Đầu Kỳ',
-      'Tổng Đã Nhập',
-      'Tổng Đã Xuất',
-      'Tồn Hiện Tại',
-      'Định Mức Min',
-      'Định Mức Max',
-      'Đơn Giá (VNĐ)',
-      'Giá Trị Tồn (VNĐ)',
-      'Trạng Thái',
-    ];
-
-    const rows = filteredMaterials.map((m, idx) => [
-      idx + 1,
-      m.code,
-      `"${m.name.replace(/"/g, '""')}"`,
-      `"${m.specification.replace(/"/g, '""')}"`,
-      `"${m.category}"`,
-      m.unit,
-      `"${m.location}"`,
-      m.initialStock,
-      m.totalImported,
-      m.totalExported,
-      m.currentStock,
-      m.minStock,
-      m.maxStock,
-      m.unitPrice,
-      m.totalValue,
-      m.stockStatus,
-    ]);
-
-    const csvContent = 'data:text/csv;charset=utf-8,\uFEFF' + [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement('a');
-    link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `Danh_Muc_Vat_Tu_DN_${new Date().toISOString().slice(0, 10)}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    // Export with high-grade corporate excel styling
+    exportMaterialCatalogueToExcel(filteredMaterials);
   };
 
   return (
@@ -267,14 +238,27 @@ export const MaterialCatalogueView: React.FC<MaterialCatalogueViewProps> = ({
           </p>
         </div>
 
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex items-center gap-2 shrink-0 flex-wrap sm:flex-nowrap">
+          {/* Download Full Source ZIP button */}
+          <a
+            href="/quan-ly-kho-aht-dien-nuoc.zip"
+            download="quan-ly-kho-aht-dien-nuoc.zip"
+            id="btn-download-source-zip"
+            className="bg-indigo-900/60 hover:bg-indigo-800 text-indigo-200 hover:text-white border border-indigo-700/60 px-3 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-sm"
+            title="Tải về file nén ZIP đầy đủ toàn bộ mã nguồn"
+          >
+            <Archive className="w-4 h-4 text-indigo-400" />
+            <span>Tải File ZIP Mã Nguồn</span>
+          </a>
+
           <button
             id="btn-export-materials-csv"
             onClick={handleExportCSV}
             className="bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 px-3 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors"
+            title="Xuất file Excel báo cáo danh mục và định mức vật tư chuẩn AHT"
           >
             <Download className="w-4 h-4 text-emerald-400" />
-            <span>Xuất Excel / CSV</span>
+            <span>Xuất Excel Danh Mục</span>
           </button>
 
           {currentUser.role === 'ADMIN' ? (
@@ -319,9 +303,9 @@ export const MaterialCatalogueView: React.FC<MaterialCatalogueViewProps> = ({
 
       {/* Filter and search toolbar */}
       <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-3">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
           {/* Keyword Search */}
-          <div className="relative">
+          <div className="relative lg:col-span-2">
             <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
             <input
               type="text"
@@ -356,6 +340,22 @@ export const MaterialCatalogueView: React.FC<MaterialCatalogueViewProps> = ({
             </select>
           </div>
 
+          {/* Unit Filter Dropdown */}
+          <div>
+            <select
+              value={selectedUnit}
+              onChange={(e) => setSelectedUnit(e.target.value)}
+              className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-500"
+            >
+              <option value="ALL">Tất cả đơn vị tính (ĐVT)</option>
+              {availableUnits.map((u) => (
+                <option key={u} value={u}>
+                  ĐVT: {u}
+                </option>
+              ))}
+            </select>
+          </div>
+
           {/* Stock Alert Status Dropdown */}
           <div>
             <select
@@ -364,19 +364,38 @@ export const MaterialCatalogueView: React.FC<MaterialCatalogueViewProps> = ({
               className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-500"
             >
               <option value="ALL">Tất cả trạng thái tồn</option>
-              <option value="LOW_STOCK">⚠️ Cảnh báo thiếu / Sắp hết (&le; Min)</option>
-              <option value="OUT_OF_STOCK">🚫 Đã hết hàng (Tồn = 0)</option>
-              <option value="OPTIMAL">✅ Tồn kho an toàn / Tối ưu</option>
-              <option value="OVER_STOCK">📦 Tồn cao vượt mức (&ge; Max)</option>
+              <option value="LOW_STOCK">⚠️ Dưới định mức tối thiểu</option>
+              <option value="OUT_OF_STOCK">🚫 Hết hàng (Tồn = 0)</option>
+              <option value="OPTIMAL">✅ Tồn kho an toàn</option>
+              <option value="OVER_STOCK">📦 Vượt định mức tối đa</option>
             </select>
           </div>
+        </div>
 
-          {/* Sort Control */}
+        {/* Sort and Quick Unit Filter Bar */}
+        <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-800 text-xs">
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span className="text-[11px] text-slate-400 font-medium mr-1">Lọc nhanh ĐVT:</span>
+            {['ALL', 'Cái', 'Mét', 'Bộ', 'Cây', 'Cuộn', 'Hộp', 'Bình', 'Kg', 'Lít', 'Bao', 'Can', 'Thùng'].map((u) => (
+              <button
+                key={u}
+                onClick={() => setSelectedUnit(u)}
+                className={`px-2 py-0.5 rounded-lg text-[11px] font-medium transition-colors ${
+                  selectedUnit === u
+                    ? 'bg-blue-600 text-white font-bold'
+                    : 'bg-slate-800 hover:bg-slate-700 text-slate-300'
+                }`}
+              >
+                {u === 'ALL' ? 'Tất cả' : u}
+              </button>
+            ))}
+          </div>
+
           <div className="flex items-center gap-2">
             <select
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value as any)}
-              className="flex-1 bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-500"
+              className="bg-slate-800 border border-slate-700 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-blue-500"
             >
               <option value="code">Sắp xếp: Mã vật tư</option>
               <option value="name">Sắp xếp: Tên vật tư</option>
@@ -385,10 +404,10 @@ export const MaterialCatalogueView: React.FC<MaterialCatalogueViewProps> = ({
             </select>
             <button
               onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
-              className="p-2 bg-slate-800 border border-slate-700 rounded-xl text-slate-300 hover:text-white"
+              className="p-1.5 bg-slate-800 border border-slate-700 rounded-xl text-slate-300 hover:text-white"
               title="Đảo chiều sắp xếp"
             >
-              <ArrowUpDown className="w-4 h-4" />
+              <ArrowUpDown className="w-3.5 h-3.5" />
             </button>
           </div>
         </div>
@@ -609,8 +628,8 @@ export const MaterialCatalogueView: React.FC<MaterialCatalogueViewProps> = ({
                   <h3 className="text-sm font-bold text-white">
                     {editingMaterial ? 'Chỉnh Sửa Vật Tư' : 'Thêm Vật Tư Mới Vào Danh Mục'}
                   </h3>
-                  <p className="text-[11px] text-slate-400 font-mono">
-                    Mã BẮT BUỘC bắt đầu bằng tiền tố "DN_"
+                  <p className="text-[11px] text-slate-400">
+                    Nhập mã và thông tin chi tiết vật tư
                   </p>
                 </div>
               </div>
@@ -627,7 +646,7 @@ export const MaterialCatalogueView: React.FC<MaterialCatalogueViewProps> = ({
               {/* Material Code */}
               <div>
                 <label className="block text-slate-300 font-medium mb-1">
-                  Mã Vật Tư <span className="text-rose-400">* (Bắt đầu bằng DN_)</span>
+                  Mã Vật Tư <span className="text-rose-400">*</span>
                 </label>
                 <input
                   type="text"
@@ -636,7 +655,7 @@ export const MaterialCatalogueView: React.FC<MaterialCatalogueViewProps> = ({
                     setFormData({ ...formData, code: e.target.value.toUpperCase() });
                     setCodeError(null);
                   }}
-                  placeholder="Ví dụ: DN_CC_00ACB_01, DN_CC_00MKC_02"
+                  placeholder="Ví dụ: VT_001, O25_01, MKC_02"
                   className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2.5 text-white font-mono text-sm uppercase focus:outline-none focus:border-blue-500"
                   required
                 />
@@ -677,15 +696,42 @@ export const MaterialCatalogueView: React.FC<MaterialCatalogueViewProps> = ({
 
                 {/* Unit */}
                 <div>
-                  <label className="block text-slate-300 font-medium mb-1">Đơn Vị Tính (ĐVT)</label>
-                  <input
-                    type="text"
-                    value={formData.unit}
-                    onChange={(e) => setFormData({ ...formData, unit: e.target.value })}
-                    placeholder="Bộ, Cái, Mét, Cuộn, Cây, Hộp..."
-                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-blue-500"
-                    required
-                  />
+                  <label className="block text-slate-300 font-medium mb-1">
+                    Đơn Vị Tính (ĐVT) <span className="text-rose-400">*</span>
+                  </label>
+                  <div className="space-y-1.5">
+                    <input
+                      type="text"
+                      list="unit-options-list"
+                      value={formData.unit}
+                      onChange={(e) => setFormData({ ...formData, unit: e.target.value })}
+                      placeholder="Chọn hoặc nhập ĐVT (Cái, Mét, Bộ...)"
+                      className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-blue-500"
+                      required
+                    />
+                    <datalist id="unit-options-list">
+                      {STANDARD_UNITS.map((u) => (
+                        <option key={u} value={u} />
+                      ))}
+                    </datalist>
+                    {/* Quick unit suggestion chips */}
+                    <div className="flex flex-wrap gap-1 pt-1">
+                      {['Cái', 'Mét', 'Bộ', 'Cây', 'Cuộn', 'Hộp', 'Bình', 'Kg', 'Lít', 'Bao', 'Can', 'Thùng'].map((u) => (
+                        <button
+                          key={u}
+                          type="button"
+                          onClick={() => setFormData({ ...formData, unit: u })}
+                          className={`text-[10px] px-1.5 py-0.5 rounded border transition-colors ${
+                            formData.unit === u
+                              ? 'bg-blue-600 border-blue-500 text-white font-bold'
+                              : 'bg-slate-800 hover:bg-slate-700 border-slate-700 text-slate-300'
+                          }`}
+                        >
+                          {u}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                 </div>
               </div>
 

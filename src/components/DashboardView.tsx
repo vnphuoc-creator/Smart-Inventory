@@ -189,10 +189,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </div>
           <div className="mt-2 flex items-baseline gap-2">
             <span className="text-2xl font-bold text-white tracking-tight">{totalMaterialCount}</span>
-            <span className="text-[11px] text-blue-400 font-mono">mã DN_*</span>
+            <span className="text-[11px] text-blue-400 font-medium">mặt hàng</span>
           </div>
           <p className="text-[11px] text-slate-400 mt-1 flex items-center justify-between">
-            <span>100% mã chuẩn hóa</span>
+            <span>100% dữ liệu chuẩn hóa</span>
             <ChevronRight className="w-3.5 h-3.5 text-slate-500 group-hover:translate-x-1 transition-transform" />
           </p>
         </div>
@@ -533,7 +533,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           {lowStockItems.length === 0 ? (
             <div className="text-center py-10 text-slate-400 text-xs my-auto">
               <Boxes className="w-8 h-8 text-emerald-500 mx-auto mb-2 opacity-60" />
-              Tuyệt vời! Toàn bộ vật tư mã DN_* đều duy trì trên mức an toàn.
+              Tuyệt vời! Toàn bộ vật tư đều duy trì trên mức an toàn.
             </div>
           ) : (
             <div className="space-y-3 flex-1 overflow-y-auto max-h-[320px] pr-1">

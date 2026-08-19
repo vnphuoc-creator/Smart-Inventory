@@ -125,7 +125,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ users, onLogin }) => {
             Quản Lý Kho Thông Minh
           </h1>
           <p className="mt-1.5 text-sm text-slate-400">
-            Hệ thống Quản lý Vật tư Xuất - Nhập - Tồn AHT
+            Hệ thống Quản lý Vật tư Xuất - Nhập - Tồn
           </p>
         </div>
 

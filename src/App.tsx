@@ -28,36 +28,42 @@ import {
 } from 'lucide-react';
 
 export function App() {
-  // Global State
-  const [users] = useState<User[]>(INITIAL_USERS);
+  // Global User State with localStorage persistence
+  const [users, setUsers] = useState<User[]>(() => {
+    const saved = localStorage.getItem('smart_users_v6');
+    if (saved) {
+      try {
+        const parsed: User[] = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      } catch {
+        return INITIAL_USERS;
+      }
+    }
+    return INITIAL_USERS;
+  });
 
   // Authentication State
   const [currentUser, setCurrentUser] = useState<User | null>(() => {
     const savedUserId = localStorage.getItem('smart_auth_user_id');
     if (savedUserId) {
-      const found = INITIAL_USERS.find((u) => u.id === savedUserId);
+      const found = users.find((u) => u.id === savedUserId);
       if (found) return found;
     }
     // Default to the first admin if not set
-    return INITIAL_USERS.find((u) => u.role === 'ADMIN') || INITIAL_USERS[0];
+    return users.find((u) => u.role === 'ADMIN') || users[0];
   });
 
+  // Sync users to localStorage
+  React.useEffect(() => {
+    localStorage.setItem('smart_users_v6', JSON.stringify(users));
+  }, [users]);
+
   const [materials, setMaterials] = useState<Material[]>(() => {
-    const saved = localStorage.getItem('smart_materials_v3');
+    const saved = localStorage.getItem('smart_materials_v6');
     if (saved) {
       try {
         const parsed: Material[] = JSON.parse(saved);
-        // Ensure no legacy codes
-        const hasLegacy = parsed.some(
-          (m) =>
-            m.code.startsWith('DN_PL') ||
-            m.code.startsWith('DN_TD') ||
-            m.code.startsWith('DN_DL') ||
-            m.code.startsWith('DN_VT') ||
-            m.code.startsWith('DN_BH') ||
-            m.code.startsWith('DN_CB')
-        );
-        if (!hasLegacy && parsed.length > 0) return parsed;
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
       } catch {
         return INITIAL_MATERIALS;
       }
@@ -66,22 +72,11 @@ export function App() {
   });
 
   const [transactions, setTransactions] = useState<InventoryTransaction[]>(() => {
-    const saved = localStorage.getItem('smart_transactions_v3');
+    const saved = localStorage.getItem('smart_transactions_v6');
     if (saved) {
       try {
         const parsed: InventoryTransaction[] = JSON.parse(saved);
-        const hasLegacy = parsed.some((t) =>
-          t.items.some(
-            (i) =>
-              i.materialCode.startsWith('DN_PL') ||
-              i.materialCode.startsWith('DN_TD') ||
-              i.materialCode.startsWith('DN_DL') ||
-              i.materialCode.startsWith('DN_VT') ||
-              i.materialCode.startsWith('DN_BH') ||
-              i.materialCode.startsWith('DN_CB')
-          )
-        );
-        if (!hasLegacy && parsed.length > 0) return parsed;
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
       } catch {
         return INITIAL_TRANSACTIONS;
       }
@@ -110,11 +105,11 @@ export function App() {
 
   // Sync to local storage
   React.useEffect(() => {
-    localStorage.setItem('smart_materials_v3', JSON.stringify(materials));
+    localStorage.setItem('smart_materials_v6', JSON.stringify(materials));
   }, [materials]);
 
   React.useEffect(() => {
-    localStorage.setItem('smart_transactions_v3', JSON.stringify(transactions));
+    localStorage.setItem('smart_transactions_v6', JSON.stringify(transactions));
   }, [transactions]);
 
   // Real-time calculated stocks calculation
@@ -255,6 +250,20 @@ export function App() {
     setFilterExplanation(null);
   };
 
+  // User Management Handlers
+  const handleUpdateUser = (updatedUser: User) => {
+    setUsers((prev) => prev.map((u) => (u.id === updatedUser.id ? updatedUser : u)));
+    if (currentUser?.id === updatedUser.id) {
+      setCurrentUser(updatedUser);
+    }
+    showToast(`Đã cập nhật phân quyền cho: ${updatedUser.fullName}!`);
+  };
+
+  const handleAddUser = (newUser: User) => {
+    setUsers((prev) => [...prev, newUser]);
+    showToast(`Đã tạo tài khoản nhân sự mới: ${newUser.fullName}!`);
+  };
+
   // If not logged in, display LoginView
   if (!currentUser) {
     return <LoginView users={users} onLogin={handleLogin} />;
@@ -349,6 +358,8 @@ export function App() {
               localStorage.setItem('smart_auth_user_id', u.id);
               showToast(`Đã chuyển phiên làm việc sang: ${u.fullName}`);
             }}
+            onUpdateUser={handleUpdateUser}
+            onAddUser={handleAddUser}
           />
         )}
 

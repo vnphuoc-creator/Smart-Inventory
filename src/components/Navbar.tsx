@@ -48,31 +48,28 @@ export const Navbar: React.FC<NavbarProps> = ({
       badge: pendingApprovalsCount > 0 ? pendingApprovalsCount : undefined,
     },
     { id: 'ledger', label: 'Thẻ Kho & Báo Cáo NXT', icon: FileSpreadsheet },
-    { id: 'users', label: 'Phân Quyền (24)', icon: Users },
+    ...(currentUser.role === 'ADMIN'
+      ? [{ id: 'users', label: 'Phân Quyền', icon: Users }]
+      : []),
     { id: 'ai', label: 'Trợ Lý AI Kho', icon: Sparkles, highlight: true },
   ];
 
   return (
-    <header className="bg-slate-900 border-b border-slate-800 text-white sticky top-0 z-40 shadow-md">
+    <header className="bg-gradient-to-r from-[#0d215b] via-[#102a72] to-[#0f1d4a] border-b border-blue-900/50 text-white sticky top-0 z-40 shadow-lg">
       {/* Top bar with branding, user switcher, and AI trigger */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           {/* Company Logo & App title */}
           <div className="flex items-center gap-3">
-            <div className="p-1.5 bg-slate-800/80 border border-slate-700/60 rounded-xl shadow-sm">
-              <AHTLogo className="h-7 w-auto" />
-            </div>
+            <AHTLogo className="h-9 w-auto" showPlane={true} />
             <div>
               <div className="flex items-center gap-2">
-                <span className="font-bold text-base sm:text-lg tracking-tight text-white">
+                <span className="font-bold text-base sm:text-lg tracking-tight text-white drop-shadow-sm">
                   Quản Lý Kho Thông Minh
                 </span>
-                <span className="hidden sm:inline-block text-[11px] bg-blue-500/20 text-blue-300 border border-blue-500/30 px-2 py-0.5 rounded-full font-medium">
-                  AHT Corp
-                </span>
               </div>
-              <p className="text-[11px] text-slate-400">
-                Hệ thống Quản lý Xuất - Nhập - Tồn Vật tư
+              <p className="text-[11px] text-blue-200/80">
+                Hệ thống Quản lý Xuất - Nhập - Tồn Vật tư Đội Điện Nước
               </p>
             </div>
           </div>
@@ -263,16 +260,20 @@ export const Navbar: React.FC<NavbarProps> = ({
                   </div>
 
                   <div className="p-2.5 bg-slate-950 border-t border-slate-800 flex items-center justify-between">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        onTabChange('users');
-                        setShowUserDropdown(false);
-                      }}
-                      className="text-xs text-blue-400 hover:text-blue-300 font-medium"
-                    >
-                      Bảng phân quyền 24 NV &rarr;
-                    </button>
+                    {currentUser.role === 'ADMIN' ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          onTabChange('users');
+                          setShowUserDropdown(false);
+                        }}
+                        className="text-xs text-blue-400 hover:text-blue-300 font-medium"
+                      >
+                        Bảng phân quyền &rarr;
+                      </button>
+                    ) : (
+                      <span className="text-[11px] text-slate-500">Quyền nhân viên</span>
+                    )}
                     {onLogout && (
                       <button
                         type="button"
