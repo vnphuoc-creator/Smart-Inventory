@@ -291,13 +291,14 @@ export const StockLedgerView: React.FC<StockLedgerViewProps> = ({
                 </button>
               </div>
 
-              {/* Action Buttons: Export to Excel (.xlsx) & Print */}
+              {/* Action Buttons: Export to Excel (.xlsx) & In / Xuất PDF */}
               <div className="flex items-center gap-2 shrink-0">
                 <button
                   type="button"
                   id="btn-export-official-excel"
                   onClick={handleExportExcel}
-                  className="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition-all shadow-md shadow-emerald-600/20"
+                  className="bg-emerald-600 hover:bg-emerald-500 text-white px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all shadow-md shadow-emerald-600/20"
+                  title="Xuất bảng tính Excel đầy đủ công thức và mẫu biểu"
                 >
                   <Download className="w-4 h-4" />
                   <span>Xuất File Excel (.xlsx)</span>
@@ -305,11 +306,13 @@ export const StockLedgerView: React.FC<StockLedgerViewProps> = ({
 
                 <button
                   type="button"
+                  id="btn-print-pdf-official"
                   onClick={handlePrint}
-                  className="bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 px-3.5 py-2 rounded-xl text-xs font-medium flex items-center gap-1.5 transition-colors"
+                  className="bg-blue-600 hover:bg-blue-500 text-white px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all shadow-md shadow-blue-600/20"
+                  title="In trực tiếp hoặc chọn 'Lưu dưới dạng PDF' khổ A4 Ngang"
                 >
                   <Printer className="w-4 h-4" />
-                  <span className="hidden sm:inline">In Báo Cáo</span>
+                  <span>In / Xuất PDF (A4 Ngang)</span>
                 </button>
               </div>
             </div>
@@ -383,12 +386,12 @@ export const StockLedgerView: React.FC<StockLedgerViewProps> = ({
             </div>
           </div>
 
-          {/* Official Spreadsheet Template Preview (Matching image.png exactly) */}
-          <div className="bg-slate-900 border border-slate-700/80 rounded-2xl shadow-xl overflow-hidden">
+          {/* Official Spreadsheet Template Preview (Matching official AHT layout) */}
+          <div className="printable-area bg-slate-900 border border-slate-700/80 rounded-2xl shadow-xl overflow-hidden">
             {/* Spreadsheet Official Top Header */}
             <div className="p-6 bg-slate-950/80 border-b border-slate-800 space-y-1 text-center sm:text-left">
               <div className="text-xs sm:text-sm font-black tracking-wide text-slate-200 uppercase">
-                ĐƠN VỊ: CÔNG TY CỔ PHẦN ĐẦU TƯ KHAI THÁC NHÀ GA QUỐC TẾ ĐÀ NẴNG
+                ĐƠN VỊ: CÔNG TY CỔ PHẦN ĐẦU TƯ KHAI THÁC NHÀ GA QUỐC TẾ ĐÀ NẴNG (AHT)
               </div>
               <div className="text-[11px] sm:text-xs text-slate-400">
                 Địa chỉ: Cảng hàng không quốc tế Đà Nẵng, Phường Hòa Cường, Thành phố Đà Nẵng, Việt Nam
@@ -396,7 +399,7 @@ export const StockLedgerView: React.FC<StockLedgerViewProps> = ({
 
               <div className="pt-4 pb-2 text-center">
                 <h2 className="text-lg sm:text-xl font-black text-white uppercase tracking-wider">
-                  TỔNG HỢP NHẬP - XUẤT - TỒN
+                  BÁO CÁO TỔNG HỢP NHẬP - XUẤT - TỒN
                 </h2>
                 <p className="text-xs italic text-slate-400 mt-0.5">
                   Từ ngày {formatDisplayDate(startDate)} đến ngày {formatDisplayDate(endDate)}
@@ -409,7 +412,7 @@ export const StockLedgerView: React.FC<StockLedgerViewProps> = ({
 
             {/* Official Multi-Header Table */}
             <div className="overflow-x-auto">
-              <table className="w-full text-xs text-left border-collapse min-w-[1000px]">
+              <table className="printable-table w-full text-xs text-left border-collapse min-w-[1000px]">
                 <thead>
                   {/* Row 1 Header */}
                   <tr className="bg-slate-850 text-slate-300 font-bold border-b border-slate-700 text-center">
@@ -562,20 +565,74 @@ export const StockLedgerView: React.FC<StockLedgerViewProps> = ({
               </table>
             </div>
 
+            {/* Official Report Signature Block (For PDF & Print export) */}
+            <div className="p-6 bg-slate-950/60 border-t border-slate-800 print-signatures">
+              <div className="text-right text-xs italic text-slate-400 mb-4">
+                Đà Nẵng, ngày {new Date().getDate()} tháng {new Date().getMonth() + 1} năm {new Date().getFullYear()}
+              </div>
+
+              <div className="grid grid-cols-4 gap-4 text-center text-xs">
+                {/* 1. Người lập biểu */}
+                <div className="space-y-1">
+                  <div className="font-bold text-slate-200 uppercase">NGƯỜI LẬP BIỂU</div>
+                  <div className="text-[11px] text-slate-400 italic">(Ký, ghi rõ họ tên)</div>
+                  <div className="h-16 flex items-end justify-center font-medium text-slate-300">
+                    Phạm Hà
+                  </div>
+                </div>
+
+                {/* 2. Thủ kho */}
+                <div className="space-y-1">
+                  <div className="font-bold text-slate-200 uppercase">THỦ KHO</div>
+                  <div className="text-[11px] text-slate-400 italic">(Ký, ghi rõ họ tên)</div>
+                  <div className="h-16 flex items-end justify-center font-medium text-slate-300">
+                    Nguyễn Đức Linh Rin
+                  </div>
+                </div>
+
+                {/* 3. Kế toán trưởng */}
+                <div className="space-y-1">
+                  <div className="font-bold text-slate-200 uppercase">KẾ TOÁN TRƯỞNG</div>
+                  <div className="text-[11px] text-slate-400 italic">(Ký, ghi rõ họ tên)</div>
+                  <div className="h-16 flex items-end justify-center font-medium text-slate-300">
+                    Nguyễn Hữu Hạnh
+                  </div>
+                </div>
+
+                {/* 4. Trưởng đội Điện Nước */}
+                <div className="space-y-1">
+                  <div className="font-bold text-slate-200 uppercase">TRƯỞNG ĐỘI ĐIỆN NƯỚC</div>
+                  <div className="text-[11px] text-slate-400 italic">(Ký, đóng dấu)</div>
+                  <div className="h-16 flex items-end justify-center font-medium text-slate-300">
+                    Nguyễn Văn Đức
+                  </div>
+                </div>
+              </div>
+            </div>
+
             {/* Table bottom pagination / export summary footer */}
-            <div className="p-3 bg-slate-950 border-t border-slate-800 flex flex-col sm:flex-row items-center justify-between text-xs text-slate-400 gap-2">
+            <div className="no-print p-3 bg-slate-950 border-t border-slate-800 flex flex-col sm:flex-row items-center justify-between text-xs text-slate-400 gap-2">
               <div>
                 Hiển thị <strong>{filteredReportData.length}</strong> / {materials.length} mặt hàng
                 trong kỳ từ <strong>{formatDisplayDate(startDate)}</strong> đến{' '}
                 <strong>{formatDisplayDate(endDate)}</strong>
               </div>
-              <button
-                type="button"
-                onClick={handleExportExcel}
-                className="text-emerald-400 hover:text-emerald-300 font-bold flex items-center gap-1 text-xs"
-              >
-                <Download className="w-3.5 h-3.5" /> Tải xuống bảng tính Excel hoàn chỉnh (.xlsx)
-              </button>
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={handlePrint}
+                  className="text-blue-400 hover:text-blue-300 font-bold flex items-center gap-1 text-xs"
+                >
+                  <Printer className="w-3.5 h-3.5" /> In / Xuất PDF
+                </button>
+                <button
+                  type="button"
+                  onClick={handleExportExcel}
+                  className="text-emerald-400 hover:text-emerald-300 font-bold flex items-center gap-1 text-xs"
+                >
+                  <Download className="w-3.5 h-3.5" /> Tải xuống bảng tính Excel (.xlsx)
+                </button>
+              </div>
             </div>
           </div>
         </div>

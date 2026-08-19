@@ -694,43 +694,54 @@ export const MaterialCatalogueView: React.FC<MaterialCatalogueViewProps> = ({
                   </select>
                 </div>
 
-                {/* Unit */}
+                {/* Unit Dropdown */}
                 <div>
                   <label className="block text-slate-300 font-medium mb-1">
                     Đơn Vị Tính (ĐVT) <span className="text-rose-400">*</span>
                   </label>
-                  <div className="space-y-1.5">
-                    <input
-                      type="text"
-                      list="unit-options-list"
-                      value={formData.unit}
-                      onChange={(e) => setFormData({ ...formData, unit: e.target.value })}
-                      placeholder="Chọn hoặc nhập ĐVT (Cái, Mét, Bộ...)"
-                      className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-blue-500"
+                  <div className="space-y-2">
+                    <select
+                      value={
+                        STANDARD_UNITS.includes(formData.unit)
+                          ? formData.unit
+                          : formData.unit
+                          ? '__CUSTOM__'
+                          : ''
+                      }
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        if (val === '__CUSTOM__') {
+                          setFormData({ ...formData, unit: '' });
+                        } else {
+                          setFormData({ ...formData, unit: val });
+                        }
+                      }}
+                      className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-blue-500 text-sm font-medium"
                       required
-                    />
-                    <datalist id="unit-options-list">
+                    >
+                      <option value="" disabled>
+                        -- Chọn đơn vị tính (Xả mũi tên để chọn) --
+                      </option>
                       {STANDARD_UNITS.map((u) => (
-                        <option key={u} value={u} />
-                      ))}
-                    </datalist>
-                    {/* Quick unit suggestion chips */}
-                    <div className="flex flex-wrap gap-1 pt-1">
-                      {['Cái', 'Mét', 'Bộ', 'Cây', 'Cuộn', 'Hộp', 'Bình', 'Kg', 'Lít', 'Bao', 'Can', 'Thùng'].map((u) => (
-                        <button
-                          key={u}
-                          type="button"
-                          onClick={() => setFormData({ ...formData, unit: u })}
-                          className={`text-[10px] px-1.5 py-0.5 rounded border transition-colors ${
-                            formData.unit === u
-                              ? 'bg-blue-600 border-blue-500 text-white font-bold'
-                              : 'bg-slate-800 hover:bg-slate-700 border-slate-700 text-slate-300'
-                          }`}
-                        >
+                        <option key={u} value={u}>
                           {u}
-                        </button>
+                        </option>
                       ))}
-                    </div>
+                      <option value="__CUSTOM__">+ Nhập đơn vị tính khác...</option>
+                    </select>
+
+                    {/* If custom unit is selected or not in STANDARD_UNITS */}
+                    {(!STANDARD_UNITS.includes(formData.unit) || formData.unit === '') && (
+                      <input
+                        type="text"
+                        value={formData.unit}
+                        onChange={(e) => setFormData({ ...formData, unit: e.target.value })}
+                        placeholder="Nhập tên đơn vị tính khác (ví dụ: mét dài, thanh 6m...)"
+                        className="w-full bg-slate-800/90 border border-blue-500/60 rounded-xl px-3 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-400"
+                        required
+                        autoFocus
+                      />
+                    )}
                   </div>
                 </div>
               </div>

@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { Sidebar } from './components/Sidebar';
 import { Navbar } from './components/Navbar';
 import { DashboardView } from './components/DashboardView';
 import { MaterialCatalogueView } from './components/MaterialCatalogueView';
@@ -86,6 +87,7 @@ export function App() {
 
   // Navigation & Modal State
   const [activeTab, setActiveTab] = useState<string>('dashboard');
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [isSmartSearchOpen, setIsSmartSearchOpen] = useState(false);
   const [appliedFilters, setAppliedFilters] = useState<NaturalSearchFilters | null>(null);
   const [filterExplanation, setFilterExplanation] = useState<string | null>(null);
@@ -273,8 +275,8 @@ export function App() {
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col antialiased selection:bg-blue-600 selection:text-white font-sans">
-      {/* Top Navbar with Logo, Search, User dropdown, and Tab switching */}
-      <Navbar
+      {/* Vertical Sidebar Navigation (Fixed on left for lg screens) */}
+      <Sidebar
         currentUser={currentUser}
         allUsers={users}
         onSelectUser={(u) => {
@@ -289,91 +291,116 @@ export function App() {
           setTransactionStatusFilterPreset(undefined);
         }}
         pendingApprovalsCount={pendingApprovalsCount}
-        onOpenAiSearch={() => setIsSmartSearchOpen(true)}
         onLogout={handleLogout}
+        isOpenMobile={isMobileSidebarOpen}
+        onToggleMobile={() => setIsMobileSidebarOpen(!isMobileSidebarOpen)}
       />
 
-      {/* Main Content Area */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 pt-6">
-        {activeTab === 'dashboard' && (
-          <DashboardView
-            currentUser={currentUser}
-            calculatedStocks={calculatedStocks}
-            transactions={transactions}
-            onNavigateTab={handleDashboardNavigate}
-            onOpenCreateTransaction={handleOpenCreateTransaction}
-            onApproveTransaction={handleApproveTransaction}
-            onRejectTransaction={handleRejectTransaction}
-            onOpenStockCard={handleOpenStockCard}
-          />
-        )}
+      {/* Main Content Column with Header Bar */}
+      <div className="lg:pl-72 flex flex-col min-h-screen">
+        {/* Top Header Bar */}
+        <Navbar
+          currentUser={currentUser}
+          allUsers={users}
+          onSelectUser={(u) => {
+            setCurrentUser(u);
+            localStorage.setItem('smart_auth_user_id', u.id);
+            showToast(`Đã chuyển sang tài khoản: ${u.fullName} (${u.role === 'ADMIN' ? 'Quản lý' : 'Nhân viên'})`);
+          }}
+          activeTab={activeTab}
+          onTabChange={(tab) => {
+            setActiveTab(tab);
+            setPreselectedMaterialCode(undefined);
+            setTransactionStatusFilterPreset(undefined);
+          }}
+          pendingApprovalsCount={pendingApprovalsCount}
+          onOpenAiSearch={() => setIsSmartSearchOpen(true)}
+          onLogout={handleLogout}
+          onToggleSidebar={() => setIsMobileSidebarOpen(!isMobileSidebarOpen)}
+        />
 
-        {activeTab === 'materials' && (
-          <MaterialCatalogueView
-            currentUser={currentUser}
-            allUsers={users}
-            materials={materials}
-            calculatedStocks={calculatedStocks}
-            onSaveMaterial={handleSaveMaterial}
-            onDeleteMaterial={handleDeleteMaterial}
-            onOpenStockCard={handleOpenStockCard}
-            onOpenCreateTransaction={handleOpenCreateTransaction}
-            appliedFilters={appliedFilters}
-            filterExplanation={filterExplanation}
-            onClearFilters={handleClearFilters}
-          />
-        )}
+        {/* Main View Area */}
+        <main className="flex-1 w-full max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-5">
+          {activeTab === 'dashboard' && (
+            <DashboardView
+              currentUser={currentUser}
+              calculatedStocks={calculatedStocks}
+              transactions={transactions}
+              onNavigateTab={handleDashboardNavigate}
+              onOpenCreateTransaction={handleOpenCreateTransaction}
+              onApproveTransaction={handleApproveTransaction}
+              onRejectTransaction={handleRejectTransaction}
+              onOpenStockCard={handleOpenStockCard}
+            />
+          )}
 
-        {activeTab === 'transactions' && (
-          <TransactionManagementView
-            currentUser={currentUser}
-            allUsers={users}
-            materials={materials}
-            calculatedStocks={calculatedStocks}
-            transactions={transactions}
-            onCreateTransaction={handleCreateTransaction}
-            onApproveTransaction={handleApproveTransaction}
-            onRejectTransaction={handleRejectTransaction}
-            initialType={transactionTypePreset}
-            initialStatusFilter={transactionStatusFilterPreset}
-            preselectedMaterialCode={preselectedMaterialCode}
-          />
-        )}
+          {activeTab === 'materials' && (
+            <MaterialCatalogueView
+              currentUser={currentUser}
+              allUsers={users}
+              materials={materials}
+              calculatedStocks={calculatedStocks}
+              onSaveMaterial={handleSaveMaterial}
+              onDeleteMaterial={handleDeleteMaterial}
+              onOpenStockCard={handleOpenStockCard}
+              onOpenCreateTransaction={handleOpenCreateTransaction}
+              appliedFilters={appliedFilters}
+              filterExplanation={filterExplanation}
+              onClearFilters={handleClearFilters}
+            />
+          )}
 
-        {activeTab === 'ledger' && (
-          <StockLedgerView
-            materials={materials}
-            calculatedStocks={calculatedStocks}
-            transactions={transactions}
-            initialMaterialCode={preselectedMaterialCode}
-          />
-        )}
+          {activeTab === 'transactions' && (
+            <TransactionManagementView
+              currentUser={currentUser}
+              allUsers={users}
+              materials={materials}
+              calculatedStocks={calculatedStocks}
+              transactions={transactions}
+              onCreateTransaction={handleCreateTransaction}
+              onApproveTransaction={handleApproveTransaction}
+              onRejectTransaction={handleRejectTransaction}
+              initialType={transactionTypePreset}
+              initialStatusFilter={transactionStatusFilterPreset}
+              preselectedMaterialCode={preselectedMaterialCode}
+            />
+          )}
 
-        {activeTab === 'users' && (
-          <UserManagementView
-            currentUser={currentUser}
-            allUsers={users}
-            onSelectUser={(u) => {
-              setCurrentUser(u);
-              localStorage.setItem('smart_auth_user_id', u.id);
-              showToast(`Đã chuyển phiên làm việc sang: ${u.fullName}`);
-            }}
-            onUpdateUser={handleUpdateUser}
-            onAddUser={handleAddUser}
-          />
-        )}
+          {activeTab === 'ledger' && (
+            <StockLedgerView
+              materials={materials}
+              calculatedStocks={calculatedStocks}
+              transactions={transactions}
+              initialMaterialCode={preselectedMaterialCode}
+            />
+          )}
 
-        {activeTab === 'ai' && (
-          <AiAssistantView
-            currentUser={currentUser}
-            materials={materials}
-            calculatedStocks={calculatedStocks}
-            transactions={transactions}
-            onOpenCreateTransaction={handleOpenCreateTransaction}
-            onOpenStockCard={handleOpenStockCard}
-          />
-        )}
-      </main>
+          {activeTab === 'users' && (
+            <UserManagementView
+              currentUser={currentUser}
+              allUsers={users}
+              onSelectUser={(u) => {
+                setCurrentUser(u);
+                localStorage.setItem('smart_auth_user_id', u.id);
+                showToast(`Đã chuyển phiên làm việc sang: ${u.fullName}`);
+              }}
+              onUpdateUser={handleUpdateUser}
+              onAddUser={handleAddUser}
+            />
+          )}
+
+          {activeTab === 'ai' && (
+            <AiAssistantView
+              currentUser={currentUser}
+              materials={materials}
+              calculatedStocks={calculatedStocks}
+              transactions={transactions}
+              onOpenCreateTransaction={handleOpenCreateTransaction}
+              onOpenStockCard={handleOpenStockCard}
+            />
+          )}
+        </main>
+      </div>
 
       {/* Natural Language AI Search Modal */}
       <SmartSearchBar

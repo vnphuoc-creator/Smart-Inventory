@@ -14,7 +14,6 @@ export interface User {
   role: UserRole;
   roleName: 'Quản lý' | 'Nhân viên';
   note: string;
-  department?: string;
   avatarColor?: string;
   password?: string;
   defaultPassword?: string;

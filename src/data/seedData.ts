@@ -367,6 +367,13 @@ export const STANDARD_UNITS: string[] = [
   'Lô',
   'Gói',
   'Khối',
+  'Túi',
+  'Vỉ',
+  'Thẻ',
+  'Cuốn',
+  'Tập',
+  'Viên',
+  'Đoạn',
 ];
 
 export const INITIAL_TRANSACTIONS: InventoryTransaction[] = [
