@@ -1,0 +1,6 @@
+{
+  "name": "Quản Lý Vật Tư Thông Minh",
+  "description": "Hệ thống quản lý vật tư Xuất - Nhập - Tồn thông minh với tự động tính tồn kho, tìm kiếm ngôn ngữ tự nhiên và phân quyền Admin/Nhân viên",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
