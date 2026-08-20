@@ -16,6 +16,7 @@ import {
 import {
   CalculatedMaterialStock,
   InventoryTransaction,
+  PurchaseProposal,
   User,
   Material,
 } from '../types';
@@ -26,6 +27,7 @@ interface AiAssistantViewProps {
   materials: Material[];
   calculatedStocks: CalculatedMaterialStock[];
   transactions: InventoryTransaction[];
+  proposals?: PurchaseProposal[];
   onOpenCreateTransaction: (type: 'IMPORT' | 'EXPORT', preselectedCode?: string) => void;
   onOpenStockCard: (code: string) => void;
 }
@@ -42,6 +44,7 @@ export const AiAssistantView: React.FC<AiAssistantViewProps> = ({
   materials,
   calculatedStocks,
   transactions,
+  proposals = [],
   onOpenCreateTransaction,
   onOpenStockCard,
 }) => {
@@ -53,7 +56,7 @@ export const AiAssistantView: React.FC<AiAssistantViewProps> = ({
     {
       id: 'welcome',
       sender: 'AI',
-      text: `Xin chào **${currentUser.fullName}**! Tôi là Trợ Lý AI Quản Lý Vật Tư Kho (sử dụng mô hình Gemini 3.7 Flash). Bạn có thể hỏi tôi bất kỳ thông tin nào về tình trạng tồn kho, mã vật tư chuẩn \`DN_*\`, gợi ý đặt hàng bổ sung, hoặc phân tích chi phí tồn đọng.`,
+      text: `Xin chào **${currentUser.fullName}**! Tôi là Trợ Lý AI Quản Lý Vật Tư Kho (Gemini 3.7 Flash). Bạn có thể hỏi tôi về tồn kho vật tư mã chuẩn \`DN_*\`, đối chiếu tiến độ các **Tờ trình mua sắm**, phát hiện nguy cơ thiếu hụt, hoặc tư vấn lập phiếu nhập/xuất kho.`,
       timestamp: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
     },
   ]);
@@ -98,6 +101,12 @@ export const AiAssistantView: React.FC<AiAssistantViewProps> = ({
           title: t.title,
           status: t.status,
           totalQty: t.totalQuantity,
+        })),
+        proposalsSummary: proposals.map((p) => ({
+          number: p.proposalNumber,
+          title: p.title,
+          status: p.status,
+          itemsCount: p.items.length,
         })),
       };
 
@@ -147,20 +156,29 @@ export const AiAssistantView: React.FC<AiAssistantViewProps> = ({
         body: JSON.stringify({
           query: q,
           materialsSummary: JSON.stringify(
-            calculatedStocks.map((s) => ({
+            calculatedStocks.slice(0, 80).map((s) => ({
               code: s.code,
               name: s.name,
               current: s.currentStock,
               min: s.minStock,
-              max: s.maxStock,
               unit: s.unit,
-              location: s.location,
               status: s.stockStatus,
             }))
           ),
           transactionsSummary: `Tổng số phiếu: ${transactions.length}. Phiếu chờ duyệt: ${
             transactions.filter((t) => t.status === 'PENDING').length
           }`,
+          proposalsSummary: JSON.stringify(
+            proposals.map((p) => ({
+              number: p.proposalNumber,
+              title: p.title,
+              items: p.items.map((i) => ({
+                code: i.materialCode,
+                name: i.materialName,
+                requested: i.requestedQuantity,
+              })),
+            }))
+          ),
         }),
       });
 
@@ -196,10 +214,10 @@ export const AiAssistantView: React.FC<AiAssistantViewProps> = ({
   };
 
   const samplePrompts = [
+    'Tờ trình 17-DNCT/PKT và 26-DNCT/PKT đã nhập đủ số lượng chưa?',
     'Phân tích các mã vật tư sắp hết hàng và gợi ý số lượng cần đặt ngay',
-    'Nhóm thiết bị nào đang chiếm giá trị tồn kho lớn nhất?',
-    'Kiểm tra mã vật tư DN_CC_00ACB_01 và DN_CC_00MKC_02 còn bao nhiêu',
-    'Tư vấn tối ưu mức tồn kho an toàn cho nhóm Dây & Cáp điện',
+    'Tờ trình 31-DNCT/PKT còn thiếu những thiết bị nào cần nhập bổ sung?',
+    'Kiểm tra mã vật tư DN_CC_00ACB_01 và DN_CS_EXIT_2MAT_PCCC còn bao nhiêu',
   ];
 
   return (

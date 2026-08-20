@@ -53,12 +53,44 @@ export interface TransactionItem {
   notes?: string;
 }
 
+export interface ProposalItem {
+  materialCode: string;
+  materialName: string;
+  unit: string;
+  requestedQuantity: number;
+  unitPrice?: number;
+  notes?: string;
+}
+
+export interface PurchaseProposal {
+  id: string;
+  proposalNumber: string; // e.g. "17-DNCT/PKT", "26-DNCT/PKT", "31-DNCT/PKT", "08-DNCT/PKT"
+  title: string; // Tiêu đề / Nội dung tờ trình
+  date: string; // YYYY-MM-DD
+  creatorName: string;
+  creatorEmail: string;
+  department: string;
+  status: 'PENDING_APPROVAL' | 'APPROVED' | 'COMPLETED' | 'PARTIALLY_IMPORTED';
+  attachmentUrl?: string; // Data URL or Image/PDF link
+  attachmentName?: string;
+  attachmentType?: 'image' | 'pdf' | 'document';
+  items: ProposalItem[];
+  notes?: string;
+  createdAt: string;
+}
+
 export interface InventoryTransaction {
   id: string;
   code: string; // Mã chứng từ: PN-2026-..., PX-2026-..., DN-2026-...
   type: TransactionType;
   title: string;
   proposalNumber?: string; // Số tờ trình phê duyệt nhập/xuất (e.g. 17-DNCT/PKT, 26-DNCT/PKT, 21-DNCT/PKT)
+  proposalAttachmentUrl?: string; // Ảnh/File tờ trình đính kèm
+  proposalAttachmentName?: string;
+  proposalAttachmentType?: 'image' | 'pdf' | 'document';
+  attachmentUrl?: string; // Tương thích đính kèm
+  attachmentName?: string;
+  attachmentType?: 'image' | 'pdf' | 'document';
   date: string; // YYYY-MM-DD
   creatorEmail: string;
   creatorName: string;

@@ -14,11 +14,13 @@ import {
   INITIAL_USERS,
   INITIAL_MATERIALS,
   INITIAL_TRANSACTIONS,
+  INITIAL_PROPOSALS,
 } from './data/seedData';
 import {
   User,
   Material,
   InventoryTransaction,
+  PurchaseProposal,
   NaturalSearchFilters,
 } from './types';
 import { calculateAllMaterialStocks } from './utils/inventoryEngine';
@@ -61,14 +63,14 @@ export function App() {
   }, [users]);
 
   const [materials, setMaterials] = useState<Material[]>(() => {
-    const saved = localStorage.getItem('smart_materials_v8');
+    const saved = localStorage.getItem('smart_materials_v9');
     if (saved) {
       try {
         const parsed: Material[] = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length >= INITIAL_MATERIALS.length) {
           return parsed;
         }
-        // Merge missing materials so user gets the full 600+ materials catalog
+        // Merge missing materials so user gets the full 630+ materials catalog
         const existingCodes = new Set(parsed.map((p) => p.code));
         const missing = INITIAL_MATERIALS.filter((m) => !existingCodes.has(m.code));
         const merged = [...parsed, ...missing];
@@ -80,6 +82,19 @@ export function App() {
       }
     }
     return INITIAL_MATERIALS;
+  });
+
+  const [proposals, setProposals] = useState<PurchaseProposal[]>(() => {
+    const saved = localStorage.getItem('smart_proposals_v2');
+    if (saved) {
+      try {
+        const parsed: PurchaseProposal[] = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      } catch {
+        return INITIAL_PROPOSALS;
+      }
+    }
+    return INITIAL_PROPOSALS;
   });
 
   const [transactions, setTransactions] = useState<InventoryTransaction[]>(() => {
@@ -117,17 +132,40 @@ export function App() {
 
   // Sync to local storage
   React.useEffect(() => {
-    localStorage.setItem('smart_materials_v8', JSON.stringify(materials));
+    localStorage.setItem('smart_materials_v9', JSON.stringify(materials));
   }, [materials]);
 
   React.useEffect(() => {
     localStorage.setItem('smart_transactions_v6', JSON.stringify(transactions));
   }, [transactions]);
 
+  React.useEffect(() => {
+    localStorage.setItem('smart_proposals_v2', JSON.stringify(proposals));
+  }, [proposals]);
+
   // Real-time calculated stocks calculation
   const calculatedStocks = useMemo(() => {
     return calculateAllMaterialStocks(materials, transactions);
   }, [materials, transactions]);
+
+  // Handler: Update or Add Proposal
+  const handleUpdateProposal = (updatedProposal: PurchaseProposal) => {
+    setProposals((prev) => {
+      const idx = prev.findIndex((p) => p.id === updatedProposal.id || p.proposalNumber === updatedProposal.proposalNumber);
+      if (idx >= 0) {
+        const next = [...prev];
+        next[idx] = updatedProposal;
+        return next;
+      }
+      return [updatedProposal, ...prev];
+    });
+    showToast(`Đã cập nhật Tờ trình "${updatedProposal.proposalNumber}".`);
+  };
+
+  const handleCreateProposal = (newProposal: PurchaseProposal) => {
+    setProposals((prev) => [newProposal, ...prev]);
+    showToast(`Đã thêm mới Tờ trình "${newProposal.proposalNumber}".`);
+  };
 
   // Login handler
   const handleLogin = (user: User) => {
@@ -367,6 +405,9 @@ export function App() {
               materials={materials}
               calculatedStocks={calculatedStocks}
               transactions={transactions}
+              proposals={proposals}
+              onUpdateProposal={handleUpdateProposal}
+              onCreateProposal={handleCreateProposal}
               onCreateTransaction={handleCreateTransaction}
               onApproveTransaction={handleApproveTransaction}
               onRejectTransaction={handleRejectTransaction}
@@ -422,6 +463,7 @@ export function App() {
               materials={materials}
               calculatedStocks={calculatedStocks}
               transactions={transactions}
+              proposals={proposals}
               onOpenCreateTransaction={handleOpenCreateTransaction}
               onOpenStockCard={handleOpenStockCard}
             />

@@ -19,6 +19,10 @@ import {
   X,
   PlusCircle,
   FileSpreadsheet,
+  FileCheck,
+  Upload,
+  Image as ImageIcon,
+  Sparkles,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import {
@@ -29,9 +33,11 @@ import {
   Material,
   CalculatedMaterialStock,
   User,
+  PurchaseProposal,
 } from '../types';
 import { formatVND, formatNumber, formatDisplayDate } from '../utils/inventoryEngine';
 import { AHTLogo } from './AHTLogo';
+import { ProposalReconciliationView } from './ProposalReconciliationView';
 
 interface TransactionManagementViewProps {
   currentUser: User;
@@ -39,9 +45,12 @@ interface TransactionManagementViewProps {
   materials: Material[];
   calculatedStocks: CalculatedMaterialStock[];
   transactions: InventoryTransaction[];
+  proposals?: PurchaseProposal[];
   onCreateTransaction: (transaction: InventoryTransaction) => void;
   onApproveTransaction: (txId: string, note?: string) => void;
   onRejectTransaction: (txId: string, note?: string) => void;
+  onUpdateProposal?: (proposal: PurchaseProposal) => void;
+  onCreateProposal?: (proposal: PurchaseProposal) => void;
   initialType?: 'IMPORT' | 'EXPORT';
   initialStatusFilter?: string;
   preselectedMaterialCode?: string;
@@ -53,18 +62,22 @@ export const TransactionManagementView: React.FC<TransactionManagementViewProps>
   materials,
   calculatedStocks,
   transactions,
+  proposals = [],
   onCreateTransaction,
   onApproveTransaction,
   onRejectTransaction,
+  onUpdateProposal,
+  onCreateProposal,
   initialType,
   initialStatusFilter,
   preselectedMaterialCode,
 }) => {
-  const [activeTab, setActiveTab] = useState<'ALL' | 'PENDING' | 'IMPORT' | 'EXPORT'>(
+  const [activeTab, setActiveTab] = useState<'ALL' | 'PENDING' | 'IMPORT' | 'EXPORT' | 'PROPOSALS'>(
     initialStatusFilter === 'PENDING' ? 'PENDING' : 'ALL'
   );
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedTxForView, setSelectedTxForView] = useState<InventoryTransaction | null>(null);
+  const [lightboxImage, setLightboxImage] = useState<string | null>(null);
 
   // Approval Modal state
   const [approvingTx, setApprovingTx] = useState<InventoryTransaction | null>(null);
@@ -81,6 +94,8 @@ export const TransactionManagementView: React.FC<TransactionManagementViewProps>
   const [formWarehouse, setFormWarehouse] = useState('Kho Tổng');
   const [formReason, setFormReason] = useState('');
   const [formDate, setFormDate] = useState(new Date().toISOString().split('T')[0]);
+  const [formAttachmentName, setFormAttachmentName] = useState('');
+  const [formAttachmentUrl, setFormAttachmentUrl] = useState('');
   const [formItems, setFormItems] = useState<
     Array<{
       materialCode: string;
@@ -135,6 +150,8 @@ export const TransactionManagementView: React.FC<TransactionManagementViewProps>
         : 'Cấp phát vật tư thi công hạ tầng theo Tờ trình'
     );
     setFormDate(new Date().toISOString().split('T')[0]);
+    setFormAttachmentName('');
+    setFormAttachmentUrl('');
 
     const defaultMat = materials[0];
     setFormItems([
@@ -146,6 +163,128 @@ export const TransactionManagementView: React.FC<TransactionManagementViewProps>
       },
     ]);
     setIsCreateModalOpen(true);
+  };
+
+  // Helper: Start import directly from a Proposal
+  const handleStartImportForProposal = (
+    proposal: PurchaseProposal,
+    missingItems: Array<{ materialCode: string; missingQty: number; unitPrice: number }>
+  ) => {
+    setFormType('IMPORT');
+    setFormProposalNumber(proposal.proposalNumber);
+    setFormTitle(`Phiếu nhập kho theo Tờ trình ${proposal.proposalNumber}`);
+    setFormPartner('Công ty Cổ Phần Ống Nhựa & Thiết Bị Điện Nước');
+    setFormWarehouse('Kho Tổng');
+    setFormReason(`Nhập vật tư theo Tờ trình ${proposal.proposalNumber} đã được Quản lý phê duyệt`);
+    setFormDate(new Date().toISOString().split('T')[0]);
+    setFormAttachmentName(proposal.attachmentName || '');
+    setFormAttachmentUrl(proposal.attachmentUrl || '');
+
+    if (missingItems && missingItems.length > 0) {
+      setFormItems(
+        missingItems.map((item) => ({
+          materialCode: item.materialCode,
+          quantity: item.missingQty,
+          unitPrice: item.unitPrice,
+          notes: `Nhập bổ sung theo Tờ trình ${proposal.proposalNumber}`,
+        }))
+      );
+    } else {
+      setFormItems(
+        proposal.items.map((item) => ({
+          materialCode: item.materialCode,
+          quantity: item.requestedQuantity,
+          unitPrice: item.unitPrice || 0,
+          notes: `Nhập theo Tờ trình ${proposal.proposalNumber}`,
+        }))
+      );
+    }
+    setIsCreateModalOpen(true);
+  };
+
+  // Helper: Live proposal match check in Create Modal
+  const matchedProposal = useMemo(() => {
+    if (!formProposalNumber.trim()) return null;
+    return proposals.find(
+      (p) => p.proposalNumber.trim().toLowerCase() === formProposalNumber.trim().toLowerCase()
+    );
+  }, [proposals, formProposalNumber]);
+
+  // Check how much is already imported for this matched proposal
+  const matchedProposalProgress = useMemo(() => {
+    if (!matchedProposal) return null;
+    const relatedTxs = transactions.filter(
+      (tx) =>
+        tx.type === 'IMPORT' &&
+        tx.status !== 'REJECTED' &&
+        tx.proposalNumber &&
+        tx.proposalNumber.trim().toLowerCase() === matchedProposal.proposalNumber.trim().toLowerCase()
+    );
+
+    const importedMap = new Map<string, number>();
+    relatedTxs.forEach((tx) => {
+      tx.items.forEach((item) => {
+        const current = importedMap.get(item.materialCode) || 0;
+        importedMap.set(item.materialCode, current + (Number(item.quantity) || 0));
+      });
+    });
+
+    let totalReq = 0;
+    let totalImp = 0;
+    const missing: Array<{ materialCode: string; missingQty: number; unitPrice: number; name: string }> = [];
+
+    matchedProposal.items.forEach((item) => {
+      const imp = importedMap.get(item.materialCode) || 0;
+      const req = Number(item.requestedQuantity) || 0;
+      totalReq += req;
+      totalImp += Math.min(req, imp);
+      if (imp < req) {
+        missing.push({
+          materialCode: item.materialCode,
+          missingQty: req - imp,
+          unitPrice: item.unitPrice || 0,
+          name: item.materialName,
+        });
+      }
+    });
+
+    const percent = totalReq > 0 ? Math.min(100, Math.round((totalImp / totalReq) * 100)) : 100;
+    const isComplete = percent >= 100 && missing.length === 0;
+
+    return {
+      totalReq,
+      totalImp,
+      percent,
+      isComplete,
+      missing,
+      txCount: relatedTxs.length,
+    };
+  }, [matchedProposal, transactions]);
+
+  // Auto-fill missing items from matched proposal
+  const handleAutoFillMissingItems = () => {
+    if (!matchedProposalProgress || matchedProposalProgress.missing.length === 0) return;
+    setFormItems(
+      matchedProposalProgress.missing.map((m) => ({
+        materialCode: m.materialCode,
+        quantity: m.missingQty,
+        unitPrice: m.unitPrice,
+        notes: `Nhập bổ sung phần còn thiếu theo Tờ trình ${formProposalNumber}`,
+      }))
+    );
+  };
+
+  // Handle file upload for attachment
+  const handleTransactionFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setFormAttachmentName(file.name);
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        setFormAttachmentUrl(event.target?.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
   };
 
   const handleAddItemRow = () => {
@@ -243,6 +382,9 @@ export const TransactionManagementView: React.FC<TransactionManagementViewProps>
       totalQuantity: totalQty,
       totalAmount: totalAmt,
       reason: formReason,
+      attachmentName: formAttachmentName || undefined,
+      attachmentUrl: formAttachmentUrl || undefined,
+      attachmentType: formAttachmentName.endsWith('.pdf') ? 'pdf' : 'image',
       ...(isAutoApprove && {
         approverEmail: currentUser.email,
         approverName: currentUser.fullName,
@@ -350,7 +492,7 @@ export const TransactionManagementView: React.FC<TransactionManagementViewProps>
       <div className="bg-slate-900 border border-slate-800 rounded-2xl p-3 sm:p-4 space-y-3">
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
           {/* Status/Type Tabs */}
-          <div className="flex items-center gap-1 bg-slate-800/80 p-1 rounded-xl overflow-x-auto no-scrollbar">
+          <div className="flex items-center gap-1.5 bg-slate-800/80 p-1 rounded-xl overflow-x-auto no-scrollbar">
             <button
               onClick={() => setActiveTab('ALL')}
               className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors whitespace-nowrap ${
@@ -400,32 +542,57 @@ export const TransactionManagementView: React.FC<TransactionManagementViewProps>
               <ArrowUpRight className="w-3.5 h-3.5 text-amber-400" />
               <span>Phiếu Xuất (PX)</span>
             </button>
+            <button
+              id="tab-proposals-reconciliation"
+              onClick={() => setActiveTab('PROPOSALS')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors flex items-center gap-1.5 whitespace-nowrap ${
+                activeTab === 'PROPOSALS'
+                  ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-600/30'
+                  : 'text-indigo-300 hover:text-white bg-indigo-950/40 border border-indigo-700/50'
+              }`}
+            >
+              <FileCheck className="w-3.5 h-3.5 text-indigo-400" />
+              <span>Đối Chiếu Tờ Trình ({proposals.length})</span>
+            </button>
           </div>
 
           {/* Search Box */}
-          <div className="relative w-full sm:w-72">
-            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Tìm theo mã phiếu, vật tư, đối tác..."
-              className="w-full bg-slate-800 border border-slate-700 rounded-xl pl-9 pr-8 py-1.5 text-xs text-white placeholder-slate-400 focus:outline-none focus:border-blue-500"
-            />
-            {searchQuery && (
-              <button
-                onClick={() => setSearchQuery('')}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white"
-              >
-                <X className="w-3.5 h-3.5" />
-              </button>
-            )}
-          </div>
+          {activeTab !== 'PROPOSALS' && (
+            <div className="relative w-full sm:w-72">
+              <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Tìm theo mã phiếu, vật tư, đối tác..."
+                className="w-full bg-slate-800 border border-slate-700 rounded-xl pl-9 pr-8 py-1.5 text-xs text-white placeholder-slate-400 focus:outline-none focus:border-blue-500"
+              />
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Transactions List Table */}
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-sm">
+      {/* Content: Proposal Reconciliation View or Transactions Table */}
+      {activeTab === 'PROPOSALS' ? (
+        <ProposalReconciliationView
+          currentUser={currentUser}
+          materials={materials}
+          transactions={transactions}
+          proposals={proposals}
+          onStartImportForProposal={handleStartImportForProposal}
+          onUpdateProposal={onUpdateProposal}
+          onCreateProposal={onCreateProposal}
+        />
+      ) : (
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-sm">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs text-slate-300">
             <thead className="bg-slate-850 border-b border-slate-800 text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
@@ -579,6 +746,7 @@ export const TransactionManagementView: React.FC<TransactionManagementViewProps>
           </table>
         </div>
       </div>
+      )}
 
       {/* Modal: Create Transaction / Voucher */}
       {isCreateModalOpen && (
@@ -709,31 +877,80 @@ export const TransactionManagementView: React.FC<TransactionManagementViewProps>
               {/* Proposal Number (Số Tờ Trình) & Reason */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-slate-300 font-medium mb-1">
-                    Số Tờ Trình (X-N-T Theo Tờ Trình)
-                  </label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-slate-300 font-medium">
+                      Số Tờ Trình Đề Xuất (X-N-T Theo Tờ Trình)
+                    </label>
+                    {proposals.length > 0 && (
+                      <span className="text-[10px] text-indigo-400 font-mono">
+                        {proposals.length} tờ trình có sẵn
+                      </span>
+                    )}
+                  </div>
                   <div className="space-y-1.5">
-                    <input
-                      type="text"
-                      value={formProposalNumber}
-                      onChange={(e) => setFormProposalNumber(e.target.value)}
-                      placeholder="Ví dụ: 17-DNCT/PKT, 26-DNCT/PKT, 21-DNCT/PKT..."
-                      className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2 text-white font-mono focus:outline-none focus:border-blue-500"
-                    />
+                    <div className="flex gap-1.5">
+                      <input
+                        type="text"
+                        value={formProposalNumber}
+                        onChange={(e) => setFormProposalNumber(e.target.value)}
+                        placeholder="Ví dụ: 17-DNCT/PKT, 26-DNCT/PKT, 21-DNCT/PKT..."
+                        className="flex-1 bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2 text-white font-mono focus:outline-none focus:border-blue-500 text-xs"
+                      />
+                      {proposals.length > 0 && (
+                        <select
+                          onChange={(e) => {
+                            if (e.target.value) {
+                              setFormProposalNumber(e.target.value);
+                              const p = proposals.find((prop) => prop.proposalNumber === e.target.value);
+                              if (p) {
+                                if (p.attachmentName) setFormAttachmentName(p.attachmentName);
+                                if (p.attachmentUrl) setFormAttachmentUrl(p.attachmentUrl);
+                              }
+                            }
+                          }}
+                          className="bg-slate-800 border border-slate-700 rounded-xl px-2 py-2 text-slate-300 text-xs focus:outline-none focus:border-indigo-500"
+                          defaultValue=""
+                        >
+                          <option value="" disabled>
+                            -- Chọn Tờ Trình --
+                          </option>
+                          {proposals.map((p) => (
+                            <option key={p.id} value={p.proposalNumber}>
+                              {p.proposalNumber} ({p.title.slice(0, 24)}...)
+                            </option>
+                          ))}
+                        </select>
+                      )}
+                    </div>
+
+                    {/* Quick suggestion tags */}
                     <div className="flex items-center gap-1.5 flex-wrap">
                       <span className="text-[10px] text-slate-400">Chọn nhanh:</span>
-                      {['17-DNCT/PKT', '21-DNCT/PKT', '26-DNCT/PKT', '09-DNCT/PKT', '35-DNCT/PKT'].map(
-                        (num) => (
-                          <button
-                            key={num}
-                            type="button"
-                            onClick={() => setFormProposalNumber(num)}
-                            className="text-[10px] bg-slate-800 hover:bg-slate-700 text-blue-300 border border-slate-700 px-2 py-0.5 rounded font-mono transition-colors"
-                          >
-                            {num}
-                          </button>
-                        )
-                      )}
+                      {proposals.length > 0
+                        ? proposals.slice(0, 4).map((p) => (
+                            <button
+                              key={p.id}
+                              type="button"
+                              onClick={() => {
+                                setFormProposalNumber(p.proposalNumber);
+                                if (p.attachmentName) setFormAttachmentName(p.attachmentName);
+                                if (p.attachmentUrl) setFormAttachmentUrl(p.attachmentUrl);
+                              }}
+                              className="text-[10px] bg-indigo-950/60 hover:bg-indigo-900/80 text-indigo-300 border border-indigo-700/60 px-2 py-0.5 rounded font-mono transition-colors"
+                            >
+                              {p.proposalNumber}
+                            </button>
+                          ))
+                        : ['17-DNCT/PKT', '21-DNCT/PKT', '26-DNCT/PKT', '09-DNCT/PKT'].map((num) => (
+                            <button
+                              key={num}
+                              type="button"
+                              onClick={() => setFormProposalNumber(num)}
+                              className="text-[10px] bg-slate-800 hover:bg-slate-700 text-blue-300 border border-slate-700 px-2 py-0.5 rounded font-mono transition-colors"
+                            >
+                              {num}
+                            </button>
+                          ))}
                     </div>
                   </div>
                 </div>
@@ -749,6 +966,124 @@ export const TransactionManagementView: React.FC<TransactionManagementViewProps>
                   />
                 </div>
               </div>
+
+              {/* Proposal Document / Image Attachment (Optional - "phần import này không bắt buộc") */}
+              <div className="bg-slate-850 p-3.5 rounded-xl border border-slate-800 space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
+                    <FileText className="w-3.5 h-3.5 text-blue-400" />
+                    File hoặc Ảnh Tờ Trình Đính Kèm{' '}
+                    <span className="text-slate-500 font-normal text-[11px]">(Không bắt buộc)</span>
+                  </label>
+                  {formAttachmentUrl && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setFormAttachmentName('');
+                        setFormAttachmentUrl('');
+                      }}
+                      className="text-[11px] text-rose-400 hover:underline flex items-center gap-1"
+                    >
+                      <Trash2 className="w-3 h-3" /> Xóa tệp đính kèm
+                    </button>
+                  )}
+                </div>
+
+                {formAttachmentUrl ? (
+                  <div className="flex items-center justify-between p-2 bg-slate-800/80 rounded-lg border border-slate-700">
+                    <div className="flex items-center gap-2 overflow-hidden">
+                      {formAttachmentUrl.startsWith('data:image') || formAttachmentUrl.includes('images.unsplash') ? (
+                        <img
+                          src={formAttachmentUrl}
+                          alt="Đính kèm"
+                          className="w-9 h-9 object-cover rounded border border-slate-600 cursor-pointer"
+                          onClick={() => setLightboxImage(formAttachmentUrl)}
+                        />
+                      ) : (
+                        <div className="w-9 h-9 rounded bg-blue-900/40 border border-blue-600 flex items-center justify-center text-blue-400">
+                          <FileText className="w-4 h-4" />
+                        </div>
+                      )}
+                      <div className="truncate">
+                        <div className="text-xs font-medium text-slate-200 truncate max-w-xs">
+                          {formAttachmentName || 'Tờ trình đính kèm'}
+                        </div>
+                        <div className="text-[10px] text-emerald-400 flex items-center gap-1">
+                          <CheckCircle2 className="w-3 h-3" /> Đã sẵn sàng lưu cùng phiếu
+                        </div>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setLightboxImage(formAttachmentUrl)}
+                      className="px-2.5 py-1 bg-slate-700 hover:bg-slate-600 text-slate-200 text-[11px] font-medium rounded transition-colors shrink-0"
+                    >
+                      Xem phóng to
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-3">
+                    <label className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-750 border border-dashed border-slate-700 rounded-xl cursor-pointer text-slate-400 hover:text-slate-200 text-xs transition-colors">
+                      <Upload className="w-4 h-4 text-blue-400" />
+                      <span>Chọn ảnh hoặc file PDF tờ trình (Tùy chọn)</span>
+                      <input
+                        type="file"
+                        accept="image/*,.pdf"
+                        onChange={handleTransactionFileUpload}
+                        className="hidden"
+                      />
+                    </label>
+                  </div>
+                )}
+              </div>
+
+              {/* Real-time Proposal Reconciliation Banner */}
+              {formType === 'IMPORT' && matchedProposal && matchedProposalProgress && (
+                <div
+                  className={`p-3 rounded-xl border text-xs ${
+                    matchedProposalProgress.isComplete
+                      ? 'bg-emerald-950/40 border-emerald-700/60 text-emerald-300'
+                      : 'bg-indigo-950/40 border-indigo-700/60 text-indigo-200'
+                  }`}
+                >
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      {matchedProposalProgress.isComplete ? (
+                        <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                      ) : (
+                        <Clock className="w-4 h-4 text-indigo-400 shrink-0" />
+                      )}
+                      <div>
+                        <div className="font-semibold text-white">
+                          Đối chiếu với Tờ trình: {matchedProposal.proposalNumber} - {matchedProposal.title}
+                        </div>
+                        <div className="text-[11px] opacity-90 mt-0.5">
+                          {matchedProposalProgress.isComplete ? (
+                            <span className="text-emerald-300 font-medium">
+                              ✔ Tờ trình này đã nhập đủ 100% số lượng ({matchedProposalProgress.totalImp}/{matchedProposalProgress.totalReq} vật tư qua {matchedProposalProgress.txCount} lần nhập).
+                            </span>
+                          ) : (
+                            <span>
+                              Tiến độ: <strong>{matchedProposalProgress.percent}%</strong> ({matchedProposalProgress.totalImp}/{matchedProposalProgress.totalReq} vật tư). Còn thiếu {matchedProposalProgress.missing.length} mặt hàng.
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {!matchedProposalProgress.isComplete && matchedProposalProgress.missing.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={handleAutoFillMissingItems}
+                        className="bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-[11px] px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5 shrink-0 shadow-sm"
+                      >
+                        <Sparkles className="w-3 h-3 text-amber-300" />
+                        Nạp các vật tư còn thiếu ({matchedProposalProgress.missing.length})
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
 
               {/* Items Table Section */}
               <div className="space-y-2 pt-2">
@@ -1192,6 +1527,47 @@ export const TransactionManagementView: React.FC<TransactionManagementViewProps>
               >
                 Từ Chối Phiếu
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Lightbox Image Viewer */}
+      {lightboxImage && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-md animate-in fade-in duration-150"
+          onClick={() => setLightboxImage(null)}
+        >
+          <div
+            className="relative max-w-4xl max-h-[90vh] bg-slate-900 border border-slate-700 rounded-2xl overflow-hidden shadow-2xl p-2"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between p-2 border-b border-slate-800">
+              <span className="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
+                <FileText className="w-4 h-4 text-blue-400" />
+                Tài Liệu / Ảnh Tờ Trình Đính Kèm
+              </span>
+              <button
+                onClick={() => setLightboxImage(null)}
+                className="p-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="p-3 flex items-center justify-center overflow-auto max-h-[80vh]">
+              {lightboxImage.startsWith('data:image') || lightboxImage.includes('images.unsplash') ? (
+                <img
+                  src={lightboxImage}
+                  alt="Ảnh tờ trình phóng to"
+                  className="max-w-full max-h-[75vh] object-contain rounded-lg shadow-md"
+                />
+              ) : (
+                <iframe
+                  src={lightboxImage}
+                  title="Tài liệu tờ trình"
+                  className="w-full h-[75vh] rounded-lg"
+                />
+              )}
             </div>
           </div>
         </div>
