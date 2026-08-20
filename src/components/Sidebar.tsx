@@ -55,7 +55,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       id: 'materials',
       label: 'Danh Mục Vật Tư',
       icon: Package,
-      description: 'Định mức & quy cách (95 mã DN)',
+      description: 'Định mức & quy cách (>600 mã DN)',
     },
     {
       id: 'transactions',
@@ -82,14 +82,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
             badgeColor: 'bg-blue-600/30 text-blue-300 border border-blue-500/40',
             description: 'Quản lý tài khoản',
           },
+          {
+            id: 'settings',
+            label: 'Cài Đặt Hệ Thống',
+            icon: Settings,
+            badge: 'Admin',
+            badgeColor: 'bg-emerald-600/30 text-emerald-300 border border-emerald-500/40',
+            description: 'Logo, ĐVT, Mật khẩu & Import',
+          },
         ]
       : []),
-    {
-      id: 'settings',
-      label: 'Cài Đặt Hệ Thống',
-      icon: Settings,
-      description: 'Logo, ĐVT & Tùy chỉnh',
-    },
     {
       id: 'ai',
       label: 'Trợ Lý AI Kho',

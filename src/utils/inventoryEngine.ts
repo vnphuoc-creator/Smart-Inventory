@@ -338,3 +338,19 @@ export function parseNaturalLanguageQuery(
     explanation: reasons.length > 0 ? reasons.join(' • ') : `Tìm kiếm "${rawQuery}"`,
   };
 }
+
+/**
+ * Formats YYYY-MM-DD or ISO string to DD/MM/YYYY
+ */
+export function formatDisplayDate(dateStr?: string): string {
+  if (!dateStr) return new Date().toLocaleDateString('vi-VN');
+  const parts = dateStr.split('-');
+  if (parts.length === 3) {
+    const year = parts[0];
+    const month = parts[1].padStart(2, '0');
+    const day = parts[2].slice(0, 2).padStart(2, '0');
+    return `${day}/${month}/${year}`;
+  }
+  return dateStr;
+}
+

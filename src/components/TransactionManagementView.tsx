@@ -30,7 +30,7 @@ import {
   CalculatedMaterialStock,
   User,
 } from '../types';
-import { formatVND, formatNumber } from '../utils/inventoryEngine';
+import { formatVND, formatNumber, formatDisplayDate } from '../utils/inventoryEngine';
 import { AHTLogo } from './AHTLogo';
 
 interface TransactionManagementViewProps {
@@ -978,14 +978,13 @@ export const TransactionManagementView: React.FC<TransactionManagementViewProps>
                       CÔNG TY CỔ PHẦN ĐẦU TƯ KHAI THÁC NHÀ GA QUỐC TẾ ĐÀ NẴNG
                     </h4>
                     <p className="text-xs font-semibold text-slate-700">Đội Điện Nước Công Trình (DOIDNCT)</p>
-                    <p className="text-[11px] text-slate-500 font-mono">Hệ thống danh mục mã chuẩn DN_*</p>
                   </div>
                 </div>
                 <div className="text-right shrink-0">
                   <div className="text-xs font-bold text-slate-700 font-mono">Mẫu số: 01-VT</div>
                   <div className="text-[11px] text-slate-500">Ban hành theo Thông tư 99/2025/TT-BTC</div>
                   <div className="text-xs font-bold text-blue-800 mt-1 font-mono">Số: {selectedTxForView.code}</div>
-                  {selectedTxForView.proposalNumber && (
+                  {selectedTxForView.type === 'IMPORT' && selectedTxForView.proposalNumber && (
                     <div className="text-[11px] font-semibold text-slate-700 font-mono mt-0.5">
                       Tờ trình: {selectedTxForView.proposalNumber}
                     </div>
@@ -997,30 +996,43 @@ export const TransactionManagementView: React.FC<TransactionManagementViewProps>
                 <h2 className="text-xl font-bold uppercase text-slate-900">
                   {selectedTxForView.type === 'IMPORT' ? 'PHIẾU NHẬP KHO' : 'PHIẾU XUẤT KHO'}
                 </h2>
-                <p className="text-xs text-slate-600 italic">Ngày {selectedTxForView.date}</p>
+                <p className="text-xs text-slate-600 italic">Ngày {formatDisplayDate(selectedTxForView.date)}</p>
               </div>
 
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 text-xs text-slate-800 bg-slate-50 p-3.5 rounded-lg border border-slate-200">
-                <div>
-                  <strong>Người lập phiếu:</strong> {selectedTxForView.creatorName}
+              {selectedTxForView.type === 'IMPORT' ? (
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 text-xs text-slate-800 bg-slate-50 p-3.5 rounded-lg border border-slate-200">
+                  <div>
+                    <strong>Người lập phiếu:</strong> {selectedTxForView.creatorName}
+                  </div>
+                  <div>
+                    <strong>Số tờ trình:</strong>{' '}
+                    <span className="font-mono font-semibold text-blue-900">
+                      {selectedTxForView.proposalNumber || 'Theo kế hoạch'}
+                    </span>
+                  </div>
+                  <div>
+                    <strong>Kho thực hiện:</strong> {selectedTxForView.warehouse}
+                  </div>
+                  <div>
+                    <strong>Nhà cung cấp:</strong> {selectedTxForView.partner}
+                  </div>
+                  <div className="sm:col-span-2">
+                    <strong>Lý do:</strong> {selectedTxForView.reason || 'Theo nhu cầu công việc'}
+                  </div>
                 </div>
-                <div>
-                  <strong>Số tờ trình:</strong>{' '}
-                  <span className="font-mono font-semibold text-blue-900">
-                    {selectedTxForView.proposalNumber || 'Theo kế hoạch'}
-                  </span>
+              ) : (
+                <div className="grid grid-cols-2 sm:grid-cols-2 gap-2.5 text-xs text-slate-800 bg-slate-50 p-3.5 rounded-lg border border-slate-200">
+                  <div>
+                    <strong>Người lập phiếu:</strong> {selectedTxForView.creatorName}
+                  </div>
+                  <div>
+                    <strong>Kho thực hiện:</strong> {selectedTxForView.warehouse}
+                  </div>
+                  <div className="sm:col-span-2">
+                    <strong>Lý do xuất:</strong> {selectedTxForView.reason || 'Theo nhu cầu bảo trì, sửa chữa công trình'}
+                  </div>
                 </div>
-                <div>
-                  <strong>Kho thực hiện:</strong> {selectedTxForView.warehouse}
-                </div>
-                <div>
-                  <strong>{selectedTxForView.type === 'IMPORT' ? 'Nhà cung cấp:' : 'Đơn vị nhận:'}</strong>{' '}
-                  {selectedTxForView.partner}
-                </div>
-                <div className="sm:col-span-2">
-                  <strong>Lý do:</strong> {selectedTxForView.reason || 'Theo nhu cầu công việc'}
-                </div>
-              </div>
+              )}
 
               {/* Items Table */}
               <table className="w-full border-collapse border border-slate-300 text-xs mt-3">
@@ -1076,14 +1088,12 @@ export const TransactionManagementView: React.FC<TransactionManagementViewProps>
                   <div className="font-bold uppercase tracking-wider text-slate-900">NGƯỜI LẬP PHIẾU</div>
                   <div className="text-[10px] text-slate-500 italic mt-0.5">(Ký, họ tên)</div>
                   <div className="h-20 w-48 border-b border-dashed border-slate-300 mt-2"></div>
-                  <div className="mt-2 font-medium text-slate-700 text-[11px]">(Ký và ghi rõ họ tên)</div>
                 </div>
 
                 <div className="flex flex-col items-center">
                   <div className="font-bold uppercase tracking-wider text-slate-900">QUẢN LÝ / PHÊ DUYỆT</div>
                   <div className="text-[10px] text-slate-500 italic mt-0.5">(Ký, đóng dấu)</div>
                   <div className="h-20 w-48 border-b border-dashed border-slate-300 mt-2"></div>
-                  <div className="mt-2 font-medium text-slate-700 text-[11px]">(Ký, đóng dấu duyệt)</div>
                 </div>
               </div>
             </div>

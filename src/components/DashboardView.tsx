@@ -130,24 +130,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 .join('')}
             </div>
             <div>
-              <div className="flex items-center gap-2 flex-wrap">
-                <h1 className="text-base sm:text-lg font-bold text-white">
-                  Xin chào, {currentUser.fullName}
-                </h1>
-                {currentUser.role === 'ADMIN' ? (
-                  <span className="text-xs bg-rose-500/20 text-rose-300 border border-rose-500/40 px-2.5 py-0.5 rounded-full font-semibold">
-                    Vai trò: Quản lý (Admin)
-                  </span>
-                ) : (
-                  <span className="text-xs bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 px-2.5 py-0.5 rounded-full font-semibold">
-                    Vai trò: Nhân viên
-                  </span>
-                )}
-              </div>
+              <h1 className="text-base sm:text-lg font-bold text-white">
+                Xin chào, {currentUser.fullName}
+              </h1>
               <p className="text-xs text-slate-300 mt-0.5">
-                <span className="text-slate-400">Quyền hạn: </span>
-                <strong className="text-amber-300 font-normal">{currentUser.note}</strong>
-                {currentUser.department && ` • Phòng ban: ${currentUser.department}`}
+                Hệ thống Quản lý Vật tư Kho Đội Điện Nước Công Trình (DOIDNCT) - Cảng HKQT Đà Nẵng
               </p>
             </div>
           </div>

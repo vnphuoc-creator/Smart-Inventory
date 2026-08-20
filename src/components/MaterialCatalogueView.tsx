@@ -239,18 +239,6 @@ export const MaterialCatalogueView: React.FC<MaterialCatalogueViewProps> = ({
         </div>
 
         <div className="flex items-center gap-2 shrink-0 flex-wrap sm:flex-nowrap">
-          {/* Download Full Source ZIP button */}
-          <a
-            href="/quan-ly-kho-aht-dien-nuoc.zip"
-            download="quan-ly-kho-aht-dien-nuoc.zip"
-            id="btn-download-source-zip"
-            className="bg-indigo-900/60 hover:bg-indigo-800 text-indigo-200 hover:text-white border border-indigo-700/60 px-3 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-sm"
-            title="Tải về file nén ZIP đầy đủ toàn bộ mã nguồn"
-          >
-            <Archive className="w-4 h-4 text-indigo-400" />
-            <span>Tải File ZIP Mã Nguồn</span>
-          </a>
-
           <button
             id="btn-export-materials-csv"
             onClick={handleExportCSV}
