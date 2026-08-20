@@ -11,7 +11,7 @@ interface AHTLogoProps {
 export const AHTLogo: React.FC<AHTLogoProps> = ({
   className = 'h-8',
   showPlane = true,
-  allowUpload = true,
+  allowUpload = false,
   size = 'md',
 }) => {
   const [customLogo, setCustomLogo] = useState<string | null>(() => {

@@ -28,9 +28,14 @@ export function calculateDateRangeReportData(
   materials: Material[],
   transactions: InventoryTransaction[],
   startDate: string,
-  endDate: string
+  endDate: string,
+  proposalNumber?: string
 ): DetailedStockReportItem[] {
-  const approvedTx = transactions.filter((t) => t.status === 'APPROVED');
+  let approvedTx = transactions.filter((t) => t.status === 'APPROVED');
+
+  if (proposalNumber && proposalNumber !== 'ALL') {
+    approvedTx = approvedTx.filter((t) => t.proposalNumber === proposalNumber);
+  }
 
   return materials.map((mat) => {
     let openingQty = mat.initialStock;
@@ -133,7 +138,8 @@ export function exportToOfficialExcel(
   items: DetailedStockReportItem[],
   startDate: string,
   endDate: string,
-  warehouseName = 'DOIDNCT: Đội Điện nước công trình-DOIDNCT'
+  warehouseName = 'DOIDNCT: Đội Điện nước công trình-DOIDNCT',
+  proposalNumber?: string
 ) {
   // Format dates to DD/MM/YYYY
   const formatVNDate = (dStr: string) => {
@@ -175,17 +181,23 @@ export function exportToOfficialExcel(
   const aoa: any[][] = [];
 
   // Row 1 (Index 0): Company Name
-  aoa.push(['ĐƠN VỊ: CÔNG TY CỔ PHẦN ĐẦU TƯ KHAI THÁC NHÀ GA QUỐC TẾ ĐÀ NẴNG (AHT)']);
-  // Row 2 (Index 1): Department & Address
-  aoa.push(['ĐỘI ĐIỆN NƯỚC CÔNG TRÌNH - Cảng hàng không quốc tế Đà Nẵng, TP. Đà Nẵng, Việt Nam']);
+  aoa.push(['CÔNG TY CỔ PHẦN ĐẦU TƯ KHAI THÁC NHÀ GA QUỐC TẾ ĐÀ NẴNG (AHT)']);
+  // Row 2 (Index 1): Department
+  aoa.push(['ĐỘI ĐIỆN NƯỚC CÔNG TRÌNH - DOIDNCT']);
   // Row 3 (Index 2): Blank
   aoa.push([]);
   // Row 4 (Index 3): Title
-  aoa.push(['', '', '', '', 'BÁO CÁO TỔNG HỢP NHẬP - XUẤT - TỒN VẬT TƯ']);
+  aoa.push(['', '', '', '', 'BÁO CÁO TỔNG HỢP NHẬP - XUẤT - TỒN']);
   // Row 5 (Index 4): Period Date Range
   aoa.push(['', '', '', '', `Từ ngày ${fromDateStr} đến ngày ${toDateStr}`]);
-  // Row 6 (Index 5): Warehouse
-  aoa.push(['', '', '', '', `Kho hàng: ${warehouseName}`]);
+  // Row 6 (Index 5): Warehouse & Proposal Number
+  aoa.push([
+    '',
+    '',
+    '',
+    '',
+    `Kho hàng: ${warehouseName}${proposalNumber && proposalNumber !== 'ALL' ? ` | Tờ trình: ${proposalNumber}` : ''}`,
+  ]);
   // Row 7 (Index 6): Blank
   aoa.push([]);
 
@@ -303,28 +315,28 @@ export function exportToOfficialExcel(
 
   // Blank lines before signature
   aoa.push([]);
-  aoa.push(['', '', '', '', '', '', '', '', reportDateStr]);
+  aoa.push(['', '', '', '', '', '', '', '', '', reportDateStr]);
   aoa.push([]);
-  // Signatures Row 1
+  // Signatures Row 1 - ONLY 2 Columns
   aoa.push([
     'NGƯỜI LẬP BIỂU',
     '',
-    'THỦ KHO',
     '',
     '',
-    'KẾ TOÁN TRƯỞNG',
     '',
     '',
-    'TRƯỞNG ĐỘI ĐIỆN NƯỚC',
+    '',
+    '',
+    'QUẢN LÝ / PHÊ DUYỆT',
   ]);
   // Signatures Note
   aoa.push([
-    '(Ký, ghi rõ họ tên)',
-    '',
-    '(Ký, ghi rõ họ tên)',
+    '(Ký, họ tên)',
     '',
     '',
-    '(Ký, ghi rõ họ tên)',
+    '',
+    '',
+    '',
     '',
     '',
     '(Ký, đóng dấu)',

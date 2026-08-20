@@ -9,12 +9,12 @@ import {
   LogOut,
   ChevronRight,
   User as UserIcon,
-  Archive,
   Menu,
   X,
   Building2,
   CheckCircle2,
   AlertCircle,
+  Settings,
 } from 'lucide-react';
 import { User } from '../types';
 import { AHTLogo } from './AHTLogo';
@@ -55,7 +55,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       id: 'materials',
       label: 'Danh Mục Vật Tư',
       icon: Package,
-      description: 'Định mức & quy cách',
+      description: 'Định mức & quy cách (95 mã DN)',
     },
     {
       id: 'transactions',
@@ -63,20 +63,20 @@ export const Sidebar: React.FC<SidebarProps> = ({
       icon: ArrowLeftRight,
       badge: pendingApprovalsCount > 0 ? `${pendingApprovalsCount}` : undefined,
       badgeColor: 'bg-amber-500 text-slate-950 font-bold',
-      description: 'Lập & duyệt phiếu',
+      description: 'Lập & duyệt theo Tờ trình',
     },
     {
       id: 'ledger',
       label: 'Thẻ Kho & Báo Cáo NXT',
       icon: FileSpreadsheet,
-      description: 'Mẫu biểu AHT & PDF',
+      description: 'Mẫu TT 99/2025/TT-BTC & PDF',
     },
     // ADMIN ONLY: Completely hidden if not ADMIN!
     ...(currentUser.role === 'ADMIN'
       ? [
           {
             id: 'users',
-            label: 'Phân Quyền Quản Trị',
+            label: 'Phân Quyền Người Dùng',
             icon: ShieldCheck,
             badge: 'Admin',
             badgeColor: 'bg-blue-600/30 text-blue-300 border border-blue-500/40',
@@ -85,12 +85,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
         ]
       : []),
     {
+      id: 'settings',
+      label: 'Cài Đặt Hệ Thống',
+      icon: Settings,
+      description: 'Logo, ĐVT & Tùy chỉnh',
+    },
+    {
       id: 'ai',
       label: 'Trợ Lý AI Kho',
       icon: Sparkles,
       badge: 'AI',
       badgeColor: 'bg-gradient-to-r from-purple-500 to-indigo-500 text-white font-bold',
-      description: 'Truy vấn thông minh',
+      description: 'Truy vấn & Phân tích',
     },
   ];
 
@@ -113,7 +119,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {/* Top Brand / Logo Header */}
         <div className="p-4 sm:p-5 border-b border-slate-800 flex flex-col gap-3 bg-slate-950/60">
           <div className="flex items-center justify-between">
-            <AHTLogo className="h-9" allowUpload={true} />
+            <AHTLogo className="h-9" allowUpload={false} />
             <button
               onClick={onToggleMobile}
               className="lg:hidden text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800"
@@ -189,31 +195,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
           })}
         </nav>
 
-        {/* Quick Source ZIP Download */}
-        <div className="px-3 py-2 border-t border-slate-800">
-          <a
-            href="/quan-ly-kho-aht-dien-nuoc.zip"
-            download="quan-ly-kho-aht-dien-nuoc.zip"
-            className="w-full bg-indigo-950/60 hover:bg-indigo-900/80 text-indigo-200 hover:text-white border border-indigo-800/50 px-3 py-2 rounded-xl text-xs font-semibold flex items-center justify-between transition-colors shadow-sm"
-            title="Tải về file ZIP chứa toàn bộ mã nguồn hệ thống"
-          >
-            <div className="flex items-center gap-2">
-              <Archive className="w-4 h-4 text-indigo-400 shrink-0" />
-              <span>Tải File ZIP Toàn Bộ</span>
-            </div>
-            <span className="text-[10px] bg-indigo-800/60 px-1.5 py-0.5 rounded text-indigo-300 font-mono">
-              .ZIP
-            </span>
-          </a>
-        </div>
-
         {/* Bottom User Profile & Switcher */}
         <div className="p-3 border-t border-slate-800 bg-slate-950/60 relative">
           <div className="flex items-center justify-between gap-2 p-2 rounded-xl bg-slate-800/60 border border-slate-700/60">
             <div
               onClick={() => setIsUserSwitcherOpen(!isUserSwitcherOpen)}
               className="flex items-center gap-2.5 min-w-0 cursor-pointer flex-1"
-              title="Nhấp để đổi tài khoản nhân viên / quản trị"
+              title="Nhấp để chuyển đổi tài khoản người dùng"
             >
               <div className="w-8 h-8 rounded-lg bg-blue-600/30 border border-blue-500/40 text-blue-300 font-bold flex items-center justify-center text-xs shrink-0">
                 {currentUser.fullName
@@ -223,17 +211,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   .join('')}
               </div>
               <div className="truncate min-w-0">
-                <div className="text-xs font-bold text-white truncate">{currentUser.fullName}</div>
-                <div className="flex items-center gap-1 text-[10px]">
-                  <span
-                    className={`font-semibold ${
-                      currentUser.role === 'ADMIN' ? 'text-amber-400' : 'text-emerald-400'
-                    }`}
-                  >
-                    {currentUser.role === 'ADMIN' ? 'Quản lý' : 'Kỹ thuật viên'}
-                  </span>
-                  <span className="text-slate-400">&bull;</span>
-                  <span className="text-slate-400">Đổi</span>
+                <div className="text-xs font-bold text-white truncate">Xin chào, {currentUser.fullName}</div>
+                <div className="text-[10px] text-slate-400 truncate">
+                  Nhấp để đổi tài khoản
                 </div>
               </div>
             </div>
@@ -252,9 +232,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <div className="absolute bottom-full left-3 right-3 mb-2 bg-slate-900 border border-slate-700 rounded-2xl p-2 shadow-2xl space-y-1 z-50">
               <div className="px-2.5 py-1.5 text-[11px] font-bold text-slate-400 uppercase tracking-wider border-b border-slate-800 flex justify-between items-center">
                 <span>Chuyển Tài Khoản</span>
-                <span className="text-[10px] text-blue-400 font-normal">Chế độ Demo</span>
+                <span className="text-[10px] text-blue-400 font-normal">24 người dùng</span>
               </div>
-              <div className="max-h-48 overflow-y-auto space-y-1 py-1">
+              <div className="max-h-56 overflow-y-auto space-y-1 py-1">
                 {allUsers.map((u) => (
                   <button
                     key={u.id}
@@ -269,18 +249,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     }`}
                   >
                     <div className="truncate">
-                      <div className="truncate">{u.fullName}</div>
+                      <div className="truncate font-medium">{u.fullName}</div>
                       <div className="text-[10px] text-slate-400 truncate">{u.email}</div>
                     </div>
-                    <span
-                      className={`text-[9px] px-1.5 py-0.5 rounded font-mono ${
-                        u.role === 'ADMIN'
-                          ? 'bg-amber-500/20 text-amber-300'
-                          : 'bg-emerald-500/20 text-emerald-300'
-                      }`}
-                    >
-                      {u.role}
-                    </span>
                   </button>
                 ))}
               </div>

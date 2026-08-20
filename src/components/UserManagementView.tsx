@@ -56,7 +56,6 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({
   const [newUsername, setNewUsername] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [newRole, setNewRole] = useState<'ADMIN' | 'STAFF'>('STAFF');
-  const [newDept, setNewDept] = useState('Đội Điện nước công trình');
   const [newNote, setNewNote] = useState('');
 
   const adminCount = allUsers.filter((u) => u.role === 'ADMIN').length;
@@ -68,9 +67,8 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({
       const q = searchTerm.toLowerCase().trim();
       const matchName = u.fullName.toLowerCase().includes(q);
       const matchEmail = u.email.toLowerCase().includes(q);
-      const matchDept = u.department?.toLowerCase().includes(q) || false;
       const matchNote = u.note?.toLowerCase().includes(q) || false;
-      if (!matchName && !matchEmail && !matchDept && !matchNote) return false;
+      if (!matchName && !matchEmail && !matchNote) return false;
     }
     return true;
   });
@@ -167,7 +165,6 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({
       email: newEmail.trim(),
       role: newRole,
       roleName: newRole === 'ADMIN' ? 'Quản lý' : 'Nhân viên',
-      department: newDept.trim() || 'Đội Điện nước công trình',
       note:
         newNote.trim() ||
         (newRole === 'ADMIN'
@@ -403,7 +400,7 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({
             type="text"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            placeholder="Tìm theo tên, email, phòng ban..."
+            placeholder="Tìm theo tên, email..."
             className="w-full bg-slate-800 border border-slate-700 rounded-xl pl-9 pr-3 py-1.5 text-xs text-white placeholder-slate-400 focus:outline-none focus:border-blue-500"
           />
         </div>
@@ -456,11 +453,6 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({
                 </div>
 
                 <div className="mt-3 pt-3 border-t border-slate-800 text-xs space-y-1.5">
-                  <div className="flex items-center gap-1.5 text-slate-400">
-                    <Building className="w-3.5 h-3.5 text-slate-500 shrink-0" />
-                    <span>Phòng ban:</span>
-                    <strong className="text-slate-200">{user.department}</strong>
-                  </div>
                   <div className="text-[11px] text-slate-400">
                     <span className="text-slate-500">Mật khẩu đăng nhập: </span>
                     <code className="text-amber-400 bg-slate-950 px-1.5 py-0.5 rounded border border-slate-800 font-mono text-[10px]">
@@ -665,18 +657,6 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({
               </div>
 
               <div>
-                <label className="block text-slate-400 mb-1">Phòng ban</label>
-                <input
-                  type="text"
-                  value={editingUser.department || ''}
-                  onChange={(e) =>
-                    setEditingUser({ ...editingUser, department: e.target.value })
-                  }
-                  className="w-full bg-slate-800 border border-slate-700 text-white rounded-xl px-3 py-2 focus:outline-none focus:border-blue-500"
-                />
-              </div>
-
-              <div>
                 <label className="block text-slate-400 mb-1">Ghi chú quyền hạn</label>
                 <textarea
                   rows={2}
@@ -784,16 +764,6 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({
                   <option value="STAFF">Nhân viên (Staff)</option>
                   <option value="ADMIN">Quản lý (Admin)</option>
                 </select>
-              </div>
-
-              <div>
-                <label className="block text-slate-400 mb-1">Phòng ban</label>
-                <input
-                  type="text"
-                  value={newDept}
-                  onChange={(e) => setNewDept(e.target.value)}
-                  className="w-full bg-slate-800 border border-slate-700 text-white rounded-xl px-3 py-2 focus:outline-none focus:border-blue-500"
-                />
               </div>
 
               <div>

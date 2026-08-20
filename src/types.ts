@@ -49,6 +49,7 @@ export interface TransactionItem {
   unitPrice: number;
   totalAmount: number;
   currentStockAtCreation: number;
+  proposalNumber?: string; // Số tờ trình cụ thể (e.g. 17-DNCT/PKT, 26-DNCT/PKT, 21-DNCT/PKT...)
   notes?: string;
 }
 
@@ -57,6 +58,7 @@ export interface InventoryTransaction {
   code: string; // Mã chứng từ: PN-2026-..., PX-2026-..., DN-2026-...
   type: TransactionType;
   title: string;
+  proposalNumber?: string; // Số tờ trình phê duyệt nhập/xuất (e.g. 17-DNCT/PKT, 26-DNCT/PKT, 21-DNCT/PKT)
   date: string; // YYYY-MM-DD
   creatorEmail: string;
   creatorName: string;

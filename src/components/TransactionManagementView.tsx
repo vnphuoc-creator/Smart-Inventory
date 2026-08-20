@@ -31,6 +31,7 @@ import {
   User,
 } from '../types';
 import { formatVND, formatNumber } from '../utils/inventoryEngine';
+import { AHTLogo } from './AHTLogo';
 
 interface TransactionManagementViewProps {
   currentUser: User;
@@ -74,6 +75,7 @@ export const TransactionManagementView: React.FC<TransactionManagementViewProps>
   // Create Modal state
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [formType, setFormType] = useState<TransactionType>(initialType || 'EXPORT');
+  const [formProposalNumber, setFormProposalNumber] = useState('17-DNCT/PKT');
   const [formTitle, setFormTitle] = useState('');
   const [formPartner, setFormPartner] = useState('');
   const [formWarehouse, setFormWarehouse] = useState('Kho Tổng');
@@ -94,6 +96,7 @@ export const TransactionManagementView: React.FC<TransactionManagementViewProps>
       const mat = materials.find((m) => m.code === preselectedMaterialCode);
       if (mat) {
         setFormType(initialType || 'EXPORT');
+        setFormProposalNumber('17-DNCT/PKT');
         setFormTitle(
           initialType === 'IMPORT'
             ? `Đề xuất nhập bổ sung ${mat.name}`
@@ -114,21 +117,22 @@ export const TransactionManagementView: React.FC<TransactionManagementViewProps>
 
   const openNewTransactionModal = (type: TransactionType = 'EXPORT') => {
     setFormType(type);
+    setFormProposalNumber(type === 'IMPORT' ? '17-DNCT/PKT' : '21-DNCT/PKT');
     setFormTitle(
       type === 'IMPORT'
-        ? 'Phiếu đề nghị nhập kho vật tư dự án mới'
-        : 'Phiếu đề nghị xuất vật tư phục vụ thi công'
+        ? 'Phiếu đề nghị nhập kho vật tư theo Tờ trình'
+        : 'Phiếu đề nghị xuất vật tư theo Tờ trình'
     );
     setFormPartner(
       type === 'IMPORT'
-        ? 'Công ty Cổ Phần Thiết Bị Điện Sài Gòn'
-        : 'Công trình Nhà máy Sản Xuất Giai Đoạn 2'
+        ? 'Công ty Cổ Phần Ống Nhựa & Thiết Bị Điện Nước'
+        : 'Tổ Thi Công Lắp Đặt Điện Công Trình'
     );
     setFormWarehouse('Kho Tổng');
     setFormReason(
       type === 'IMPORT'
-        ? 'Bổ sung vật tư theo kế hoạch tuần'
-        : 'Cấp phát vật tư cho đội thi công theo thiết kế'
+        ? 'Nhập kho phục vụ công tác bảo trì theo Tờ trình'
+        : 'Cấp phát vật tư thi công hạ tầng theo Tờ trình'
     );
     setFormDate(new Date().toISOString().split('T')[0]);
 
@@ -207,6 +211,7 @@ export const TransactionManagementView: React.FC<TransactionManagementViewProps>
         totalAmount: qty * price,
         currentStockAtCreation: matStock?.currentStock || 0,
         notes: item.notes,
+        proposalNumber: formProposalNumber.trim() || undefined,
       };
     });
 
@@ -224,6 +229,7 @@ export const TransactionManagementView: React.FC<TransactionManagementViewProps>
     const newTx: InventoryTransaction = {
       id: `tx-${Date.now()}`,
       code,
+      proposalNumber: formProposalNumber.trim() || undefined,
       type: formType,
       title: formTitle.trim() || `${formType === 'IMPORT' ? 'Phiếu Nhập' : 'Phiếu Xuất'} ${code}`,
       date: formDate,
@@ -285,13 +291,14 @@ export const TransactionManagementView: React.FC<TransactionManagementViewProps>
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase().trim();
         const matchCode = tx.code.toLowerCase().includes(q);
+        const matchProposal = tx.proposalNumber ? tx.proposalNumber.toLowerCase().includes(q) : false;
         const matchTitle = tx.title.toLowerCase().includes(q);
         const matchPartner = tx.partner.toLowerCase().includes(q);
         const matchCreator = tx.creatorName.toLowerCase().includes(q);
         const matchItems = tx.items.some(
           (i) => i.materialCode.toLowerCase().includes(q) || i.materialName.toLowerCase().includes(q)
         );
-        if (!matchCode && !matchTitle && !matchPartner && !matchCreator && !matchItems) {
+        if (!matchCode && !matchProposal && !matchTitle && !matchPartner && !matchCreator && !matchItems) {
           return false;
         }
       }
@@ -424,8 +431,9 @@ export const TransactionManagementView: React.FC<TransactionManagementViewProps>
             <thead className="bg-slate-850 border-b border-slate-800 text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
               <tr>
                 <th className="py-3.5 px-4">Mã Chứng Từ</th>
+                <th className="py-3.5 px-3">Số Tờ Trình</th>
                 <th className="py-3.5 px-3">Loại Phiếu</th>
-                <th className="py-3.5 px-4 min-w-[240px]">Diễn Giải / Tên Phiếu</th>
+                <th className="py-3.5 px-4 min-w-[220px]">Diễn Giải / Tên Phiếu</th>
                 <th className="py-3.5 px-3">Đối Tác / Đơn Vị Nhận</th>
                 <th className="py-3.5 px-3">Ngày Lập</th>
                 <th className="py-3.5 px-3">Người Lập</th>
@@ -440,7 +448,7 @@ export const TransactionManagementView: React.FC<TransactionManagementViewProps>
             <tbody className="divide-y divide-slate-800">
               {filteredTransactions.length === 0 ? (
                 <tr>
-                  <td colSpan={10} className="py-12 text-center text-slate-400">
+                  <td colSpan={11} className="py-12 text-center text-slate-400">
                     <FileText className="w-8 h-8 text-slate-600 mx-auto mb-2 opacity-50" />
                     Không tìm thấy chứng từ nào phù hợp.
                   </td>
@@ -453,6 +461,17 @@ export const TransactionManagementView: React.FC<TransactionManagementViewProps>
                       <span className="bg-slate-800 px-2 py-0.5 rounded text-[11px] border border-slate-700">
                         {tx.code}
                       </span>
+                    </td>
+
+                    {/* Proposal Number */}
+                    <td className="py-3 px-3">
+                      {tx.proposalNumber ? (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-mono font-bold bg-blue-950/70 text-blue-300 border border-blue-700/60 shadow-sm">
+                          {tx.proposalNumber}
+                        </span>
+                      ) : (
+                        <span className="text-slate-500 text-[11px]">-</span>
+                      )}
                     </td>
 
                     {/* Type */}
@@ -486,12 +505,9 @@ export const TransactionManagementView: React.FC<TransactionManagementViewProps>
                       {tx.date}
                     </td>
 
-                    {/* Creator */}
+                    {/* Creator (No email) */}
                     <td className="py-3 px-3">
                       <div className="text-white text-[11px] font-medium">{tx.creatorName}</div>
-                      <div className="text-[10px] text-slate-400 truncate max-w-[120px] font-mono">
-                        {tx.creatorEmail}
-                      </div>
                     </td>
 
                     {/* Quantity */}
@@ -690,16 +706,48 @@ export const TransactionManagementView: React.FC<TransactionManagementViewProps>
                 </div>
               </div>
 
-              {/* Reason */}
-              <div>
-                <label className="block text-slate-300 font-medium mb-1">Lý Do Nhập / Xuất</label>
-                <input
-                  type="text"
-                  value={formReason}
-                  onChange={(e) => setFormReason(e.target.value)}
-                  placeholder="Mục đích sử dụng, căn cứ lệnh điều động hoặc hợp đồng..."
-                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2 text-white focus:outline-none focus:border-blue-500"
-                />
+              {/* Proposal Number (Số Tờ Trình) & Reason */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-slate-300 font-medium mb-1">
+                    Số Tờ Trình (X-N-T Theo Tờ Trình)
+                  </label>
+                  <div className="space-y-1.5">
+                    <input
+                      type="text"
+                      value={formProposalNumber}
+                      onChange={(e) => setFormProposalNumber(e.target.value)}
+                      placeholder="Ví dụ: 17-DNCT/PKT, 26-DNCT/PKT, 21-DNCT/PKT..."
+                      className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2 text-white font-mono focus:outline-none focus:border-blue-500"
+                    />
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="text-[10px] text-slate-400">Chọn nhanh:</span>
+                      {['17-DNCT/PKT', '21-DNCT/PKT', '26-DNCT/PKT', '09-DNCT/PKT', '35-DNCT/PKT'].map(
+                        (num) => (
+                          <button
+                            key={num}
+                            type="button"
+                            onClick={() => setFormProposalNumber(num)}
+                            className="text-[10px] bg-slate-800 hover:bg-slate-700 text-blue-300 border border-slate-700 px-2 py-0.5 rounded font-mono transition-colors"
+                          >
+                            {num}
+                          </button>
+                        )
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-slate-300 font-medium mb-1">Lý Do Nhập / Xuất</label>
+                  <input
+                    type="text"
+                    value={formReason}
+                    onChange={(e) => setFormReason(e.target.value)}
+                    placeholder="Mục đích sử dụng, căn cứ lệnh điều động hoặc hợp đồng..."
+                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2 text-white focus:outline-none focus:border-blue-500"
+                  />
+                </div>
               </div>
 
               {/* Items Table Section */}
@@ -923,15 +971,25 @@ export const TransactionManagementView: React.FC<TransactionManagementViewProps>
             {/* Voucher Document Print Body */}
             <div className="p-6 overflow-y-auto bg-white text-slate-900 print:p-0 font-sans space-y-4">
               <div className="flex justify-between items-start border-b border-slate-300 pb-4">
-                <div>
-                  <h4 className="font-black text-sm text-blue-900 tracking-wider">CÔNG TY CỔ PHẦN SMART INVENTORY</h4>
-                  <p className="text-xs text-slate-600">Ban Quản Lý Kho & Vật Tư Công Nghiệp</p>
-                  <p className="text-xs text-slate-500 font-mono">Hệ thống danh mục mã chuẩn DN_*</p>
+                <div className="flex items-center gap-3">
+                  <AHTLogo className="h-10" showPlane={false} allowUpload={false} />
+                  <div>
+                    <h4 className="font-bold text-xs sm:text-sm text-blue-950 uppercase tracking-tight">
+                      CÔNG TY CỔ PHẦN ĐẦU TƯ KHAI THÁC NHÀ GA QUỐC TẾ ĐÀ NẴNG
+                    </h4>
+                    <p className="text-xs font-semibold text-slate-700">Đội Điện Nước Công Trình (DOIDNCT)</p>
+                    <p className="text-[11px] text-slate-500 font-mono">Hệ thống danh mục mã chuẩn DN_*</p>
+                  </div>
                 </div>
-                <div className="text-right">
+                <div className="text-right shrink-0">
                   <div className="text-xs font-bold text-slate-700 font-mono">Mẫu số: 01-VT</div>
-                  <div className="text-xs text-slate-500">Ban hành theo TT 200/2014/TT-BTC</div>
+                  <div className="text-[11px] text-slate-500">Ban hành theo Thông tư 99/2025/TT-BTC</div>
                   <div className="text-xs font-bold text-blue-800 mt-1 font-mono">Số: {selectedTxForView.code}</div>
+                  {selectedTxForView.proposalNumber && (
+                    <div className="text-[11px] font-semibold text-slate-700 font-mono mt-0.5">
+                      Tờ trình: {selectedTxForView.proposalNumber}
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -942,18 +1000,24 @@ export const TransactionManagementView: React.FC<TransactionManagementViewProps>
                 <p className="text-xs text-slate-600 italic">Ngày {selectedTxForView.date}</p>
               </div>
 
-              <div className="grid grid-cols-2 gap-2 text-xs text-slate-800 bg-slate-50 p-3 rounded-lg border border-slate-200">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 text-xs text-slate-800 bg-slate-50 p-3.5 rounded-lg border border-slate-200">
                 <div>
-                  <strong>Người lập phiếu:</strong> {selectedTxForView.creatorName} ({selectedTxForView.creatorEmail})
+                  <strong>Người lập phiếu:</strong> {selectedTxForView.creatorName}
                 </div>
                 <div>
-                  <strong>Kho:</strong> {selectedTxForView.warehouse}
+                  <strong>Số tờ trình:</strong>{' '}
+                  <span className="font-mono font-semibold text-blue-900">
+                    {selectedTxForView.proposalNumber || 'Theo kế hoạch'}
+                  </span>
+                </div>
+                <div>
+                  <strong>Kho thực hiện:</strong> {selectedTxForView.warehouse}
                 </div>
                 <div>
                   <strong>{selectedTxForView.type === 'IMPORT' ? 'Nhà cung cấp:' : 'Đơn vị nhận:'}</strong>{' '}
                   {selectedTxForView.partner}
                 </div>
-                <div>
+                <div className="sm:col-span-2">
                   <strong>Lý do:</strong> {selectedTxForView.reason || 'Theo nhu cầu công việc'}
                 </div>
               </div>
@@ -1006,34 +1070,20 @@ export const TransactionManagementView: React.FC<TransactionManagementViewProps>
                 </tbody>
               </table>
 
-              {/* Signatures */}
-              <div className="grid grid-cols-4 gap-4 text-center text-xs pt-8 mt-4 border-t border-slate-200">
-                <div>
-                  <div className="font-bold">Người Lập Phiếu</div>
-                  <div className="text-[10px] text-slate-500 italic">(Ký, họ tên)</div>
-                  <div className="mt-8 font-semibold text-slate-900">{selectedTxForView.creatorName}</div>
+              {/* Signatures: ONLY 2 Columns as requested */}
+              <div className="grid grid-cols-2 gap-8 text-center text-xs pt-8 mt-6 border-t border-slate-200">
+                <div className="flex flex-col items-center">
+                  <div className="font-bold uppercase tracking-wider text-slate-900">NGƯỜI LẬP PHIẾU</div>
+                  <div className="text-[10px] text-slate-500 italic mt-0.5">(Ký, họ tên)</div>
+                  <div className="h-20 w-48 border-b border-dashed border-slate-300 mt-2"></div>
+                  <div className="mt-2 font-medium text-slate-700 text-[11px]">(Ký và ghi rõ họ tên)</div>
                 </div>
-                <div>
-                  <div className="font-bold">Người Giao / Nhận</div>
-                  <div className="text-[10px] text-slate-500 italic">(Ký, họ tên)</div>
-                  <div className="mt-8 font-semibold text-slate-700">{selectedTxForView.partner}</div>
-                </div>
-                <div>
-                  <div className="font-bold">Thủ Kho</div>
-                  <div className="text-[10px] text-slate-500 italic">(Ký, họ tên)</div>
-                  <div className="mt-8 font-semibold text-slate-700">Nguyễn Văn Tuấn</div>
-                </div>
-                <div>
-                  <div className="font-bold">Quản Lý / Phê Duyệt</div>
-                  <div className="text-[10px] text-slate-500 italic">(Ký, đóng dấu)</div>
-                  <div className="mt-8 font-semibold text-blue-900">
-                    {selectedTxForView.approverName || 'Chờ phê duyệt'}
-                  </div>
-                  {selectedTxForView.approvalDate && (
-                    <div className="text-[10px] text-emerald-700 font-medium">
-                      Đã duyệt ngày {selectedTxForView.approvalDate}
-                    </div>
-                  )}
+
+                <div className="flex flex-col items-center">
+                  <div className="font-bold uppercase tracking-wider text-slate-900">QUẢN LÝ / PHÊ DUYỆT</div>
+                  <div className="text-[10px] text-slate-500 italic mt-0.5">(Ký, đóng dấu)</div>
+                  <div className="h-20 w-48 border-b border-dashed border-slate-300 mt-2"></div>
+                  <div className="mt-2 font-medium text-slate-700 text-[11px]">(Ký, đóng dấu duyệt)</div>
                 </div>
               </div>
             </div>

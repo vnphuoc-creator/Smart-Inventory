@@ -43,6 +43,7 @@ import {
   DetailedStockReportItem,
 } from '../utils/excelExporter';
 import { MATERIAL_CATEGORIES } from '../data/seedData';
+import { AHTLogo } from './AHTLogo';
 
 interface StockLedgerViewProps {
   materials: Material[];
@@ -63,12 +64,25 @@ export const StockLedgerView: React.FC<StockLedgerViewProps> = ({
   );
 
   // Date Range Filters for Report
-  const [datePreset, setDatePreset] = useState<'TODAY' | 'WEEK' | 'MONTH' | 'YEAR' | 'CUSTOM'>('YEAR');
+  const [datePreset, setDatePreset] = useState<'TODAY' | 'WEEK' | 'MONTH' | 'AUG2026' | 'YEAR' | 'CUSTOM'>('YEAR');
   const [startDate, setStartDate] = useState('2026-01-01');
-  const [endDate, setEndDate] = useState('2026-08-19');
+  const [endDate, setEndDate] = useState('2026-12-31');
   const [warehouseName, setWarehouseName] = useState('DOIDNCT: Đội Điện nước công trình-DOIDNCT');
+  const [selectedProposalNumber, setSelectedProposalNumber] = useState<string>('ALL');
+  const [onlyMovement, setOnlyMovement] = useState<boolean>(false);
   const [reportCategory, setReportCategory] = useState('ALL');
   const [searchFilter, setSearchFilter] = useState('');
+
+  // Extract all proposal numbers from transactions
+  const availableProposalNumbers = useMemo(() => {
+    const set = new Set<string>();
+    transactions.forEach((t) => {
+      if (t.proposalNumber && t.proposalNumber.trim()) {
+        set.add(t.proposalNumber.trim());
+      }
+    });
+    return Array.from(set).sort();
+  }, [transactions]);
 
   // Update if initial code changes
   React.useEffect(() => {
@@ -78,7 +92,7 @@ export const StockLedgerView: React.FC<StockLedgerViewProps> = ({
   }, [initialMaterialCode]);
 
   // Handle Preset Date selection
-  const handleSelectPreset = (preset: 'TODAY' | 'WEEK' | 'MONTH' | 'YEAR') => {
+  const handleSelectPreset = (preset: 'TODAY' | 'WEEK' | 'MONTH' | 'AUG2026' | 'YEAR') => {
     setDatePreset(preset);
     const now = new Date();
     const pad = (n: number) => n.toString().padStart(2, '0');
@@ -103,20 +117,37 @@ export const StockLedgerView: React.FC<StockLedgerViewProps> = ({
       const last = new Date(y, m + 1, 0);
       setStartDate(`${y}-${pad(m + 1)}-${pad(first.getDate())}`);
       setEndDate(`${y}-${pad(m + 1)}-${pad(last.getDate())}`);
+    } else if (preset === 'AUG2026') {
+      setStartDate('2026-08-01');
+      setEndDate('2026-08-31');
     } else if (preset === 'YEAR') {
       setStartDate('2026-01-01');
       setEndDate('2026-12-31');
     }
   };
 
-  // Calculate detailed Report Data according to active Date Range
+  // Calculate detailed Report Data according to active Date Range & Proposal Number
   const fullReportData = useMemo(() => {
-    return calculateDateRangeReportData(materials, transactions, startDate, endDate);
-  }, [materials, transactions, startDate, endDate]);
+    return calculateDateRangeReportData(
+      materials,
+      transactions,
+      startDate,
+      endDate,
+      selectedProposalNumber
+    );
+  }, [materials, transactions, startDate, endDate, selectedProposalNumber]);
 
-  // Filter report data by category and search
+  // Count items with movement in current filtered range
+  const movementCount = useMemo(() => {
+    return fullReportData.filter((item) => item.importQty > 0 || item.exportQty > 0).length;
+  }, [fullReportData]);
+
+  // Filter report data by category, search, and onlyMovement toggle
   const filteredReportData = useMemo(() => {
     return fullReportData.filter((item) => {
+      if (onlyMovement && item.importQty === 0 && item.exportQty === 0) {
+        return false;
+      }
       if (reportCategory !== 'ALL' && item.category !== reportCategory) return false;
       if (searchFilter.trim()) {
         const q = searchFilter.toLowerCase().trim();
@@ -126,7 +157,7 @@ export const StockLedgerView: React.FC<StockLedgerViewProps> = ({
       }
       return true;
     });
-  }, [fullReportData, reportCategory, searchFilter]);
+  }, [fullReportData, onlyMovement, reportCategory, searchFilter]);
 
   // Totals for summary row
   const reportTotals = useMemo(() => {
@@ -188,7 +219,13 @@ export const StockLedgerView: React.FC<StockLedgerViewProps> = ({
 
   // Export to Excel handler
   const handleExportExcel = () => {
-    exportToOfficialExcel(filteredReportData, startDate, endDate, warehouseName);
+    exportToOfficialExcel(
+      filteredReportData,
+      startDate,
+      endDate,
+      warehouseName,
+      selectedProposalNumber
+    );
   };
 
   // Print Report Handler
@@ -240,39 +277,28 @@ export const StockLedgerView: React.FC<StockLedgerViewProps> = ({
           {/* Controls: Date Range (Tuần/Tháng/Năm/Tùy chọn), Kho hàng, Export button */}
           <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-5 space-y-4 shadow-sm">
             <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-              {/* Preset buttons */}
+              {/* Preset buttons & Filters */}
               <div className="flex flex-wrap items-center gap-2">
                 <span className="text-xs font-semibold text-slate-400 mr-1 flex items-center gap-1">
-                  <Calendar className="w-3.5 h-3.5 text-blue-400" /> Khoảng thời gian:
+                  <Calendar className="w-3.5 h-3.5 text-blue-400" /> Kỳ báo cáo:
                 </span>
                 <button
                   type="button"
-                  onClick={() => handleSelectPreset('TODAY')}
-                  className={`px-3 py-1 rounded-lg text-xs font-medium transition-colors ${
-                    datePreset === 'TODAY'
-                      ? 'bg-blue-600 text-white'
+                  onClick={() => handleSelectPreset('AUG2026')}
+                  className={`px-3 py-1 rounded-lg text-xs font-semibold transition-colors ${
+                    datePreset === 'AUG2026'
+                      ? 'bg-blue-600 text-white shadow-sm'
                       : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
                   }`}
                 >
-                  Hôm nay
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleSelectPreset('WEEK')}
-                  className={`px-3 py-1 rounded-lg text-xs font-medium transition-colors ${
-                    datePreset === 'WEEK'
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
-                  }`}
-                >
-                  Tuần này
+                  Tháng 8/2026
                 </button>
                 <button
                   type="button"
                   onClick={() => handleSelectPreset('MONTH')}
                   className={`px-3 py-1 rounded-lg text-xs font-medium transition-colors ${
                     datePreset === 'MONTH'
-                      ? 'bg-blue-600 text-white'
+                      ? 'bg-blue-600 text-white shadow-sm'
                       : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
                   }`}
                 >
@@ -280,10 +306,21 @@ export const StockLedgerView: React.FC<StockLedgerViewProps> = ({
                 </button>
                 <button
                   type="button"
+                  onClick={() => handleSelectPreset('WEEK')}
+                  className={`px-3 py-1 rounded-lg text-xs font-medium transition-colors ${
+                    datePreset === 'WEEK'
+                      ? 'bg-blue-600 text-white shadow-sm'
+                      : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                  }`}
+                >
+                  Tuần này
+                </button>
+                <button
+                  type="button"
                   onClick={() => handleSelectPreset('YEAR')}
                   className={`px-3 py-1 rounded-lg text-xs font-medium transition-colors ${
                     datePreset === 'YEAR'
-                      ? 'bg-blue-600 text-white'
+                      ? 'bg-blue-600 text-white shadow-sm'
                       : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
                   }`}
                 >
@@ -301,7 +338,7 @@ export const StockLedgerView: React.FC<StockLedgerViewProps> = ({
                   title="Xuất bảng tính Excel đầy đủ công thức và mẫu biểu"
                 >
                   <Download className="w-4 h-4" />
-                  <span>Xuất File Excel (.xlsx)</span>
+                  <span>Xuất Excel (.xlsx)</span>
                 </button>
 
                 <button
@@ -317,8 +354,8 @@ export const StockLedgerView: React.FC<StockLedgerViewProps> = ({
               </div>
             </div>
 
-            {/* Custom Date Pickers, Warehouse & Category filters */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 pt-3 border-t border-slate-800">
+            {/* Custom Date Pickers, Proposal Number & Category filters */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 pt-3 border-t border-slate-800">
               {/* Start Date */}
               <div>
                 <label className="block text-[11px] font-medium text-slate-400 mb-1">
@@ -349,6 +386,25 @@ export const StockLedgerView: React.FC<StockLedgerViewProps> = ({
                   }}
                   className="w-full bg-slate-800 border border-slate-700 text-white rounded-xl px-3 py-1.5 text-xs font-mono focus:outline-none focus:border-blue-500"
                 />
+              </div>
+
+              {/* Proposal Number Selector */}
+              <div>
+                <label className="block text-[11px] font-medium text-slate-400 mb-1">
+                  Theo Số tờ trình
+                </label>
+                <select
+                  value={selectedProposalNumber}
+                  onChange={(e) => setSelectedProposalNumber(e.target.value)}
+                  className="w-full bg-slate-800 border border-slate-700 text-amber-300 font-medium rounded-xl px-3 py-1.5 text-xs focus:outline-none focus:border-blue-500"
+                >
+                  <option value="ALL">-- Tất cả tờ trình --</option>
+                  {availableProposalNumbers.map((p) => (
+                    <option key={p} value={p}>
+                      {p}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               {/* Warehouse selector */}
@@ -384,29 +440,93 @@ export const StockLedgerView: React.FC<StockLedgerViewProps> = ({
                 </div>
               </div>
             </div>
+
+            {/* Quick Movement Filter Tabs */}
+            <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-slate-800/80 text-xs">
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setOnlyMovement(false)}
+                  className={`px-3 py-1.5 rounded-lg font-semibold transition-all ${
+                    !onlyMovement
+                      ? 'bg-blue-600 text-white shadow-sm'
+                      : 'bg-slate-800/80 text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  Tất cả danh mục ({fullReportData.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setOnlyMovement(true)}
+                  className={`px-3 py-1.5 rounded-lg font-semibold transition-all flex items-center gap-1.5 ${
+                    onlyMovement
+                      ? 'bg-amber-600 text-white shadow-sm'
+                      : 'bg-slate-800/80 text-amber-400 hover:bg-slate-800'
+                  }`}
+                >
+                  <span>Chỉ hiện vật tư có phát sinh (X-N)</span>
+                  <span className="bg-amber-950/80 text-amber-300 px-1.5 py-0.5 rounded text-[10px] font-bold">
+                    {movementCount}
+                  </span>
+                </button>
+              </div>
+
+              {selectedProposalNumber !== 'ALL' && (
+                <div className="flex items-center gap-1.5 bg-amber-950/40 border border-amber-800/60 px-2.5 py-1 rounded-lg text-amber-300 text-xs">
+                  <span>Đang lọc theo tờ trình:</span>
+                  <strong className="text-white">{selectedProposalNumber}</strong>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedProposalNumber('ALL')}
+                    className="ml-1 text-slate-400 hover:text-white"
+                    title="Xóa lọc tờ trình"
+                  >
+                    ×
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Official Spreadsheet Template Preview (Matching official AHT layout) */}
           <div className="printable-area bg-slate-900 border border-slate-700/80 rounded-2xl shadow-xl overflow-hidden">
             {/* Spreadsheet Official Top Header */}
-            <div className="p-6 bg-slate-950/80 border-b border-slate-800 space-y-1 text-center sm:text-left">
-              <div className="text-xs sm:text-sm font-black tracking-wide text-slate-200 uppercase">
-                ĐƠN VỊ: CÔNG TY CỔ PHẦN ĐẦU TƯ KHAI THÁC NHÀ GA QUỐC TẾ ĐÀ NẴNG (AHT)
-              </div>
-              <div className="text-[11px] sm:text-xs text-slate-400">
-                Địa chỉ: Cảng hàng không quốc tế Đà Nẵng, Phường Hòa Cường, Thành phố Đà Nẵng, Việt Nam
+            <div className="p-6 bg-slate-950/80 border-b border-slate-800">
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <AHTLogo className="h-10 w-auto" showPlane={false} allowUpload={false} />
+                  <div>
+                    <div className="text-xs sm:text-sm font-black tracking-wide text-slate-200 uppercase">
+                      CÔNG TY CỔ PHẦN ĐẦU TƯ KHAI THÁC NHÀ GA QUỐC TẾ ĐÀ NẴNG
+                    </div>
+                    <div className="text-[11px] sm:text-xs text-slate-400 font-medium">
+                      ĐỘI ĐIỆN NƯỚC CÔNG TRÌNH (DOIDNCT)
+                    </div>
+                  </div>
+                </div>
+                <div className="text-right hidden sm:block">
+                  <div className="text-[11px] font-bold text-slate-400">Mẫu biểu: Báo cáo N-X-T</div>
+                  <div className="text-[10px] text-slate-500">Thông tư 99/2025/TT-BTC</div>
+                </div>
               </div>
 
-              <div className="pt-4 pb-2 text-center">
+              <div className="pt-5 pb-2 text-center">
                 <h2 className="text-lg sm:text-xl font-black text-white uppercase tracking-wider">
                   BÁO CÁO TỔNG HỢP NHẬP - XUẤT - TỒN
                 </h2>
                 <p className="text-xs italic text-slate-400 mt-0.5">
                   Từ ngày {formatDisplayDate(startDate)} đến ngày {formatDisplayDate(endDate)}
                 </p>
-                <p className="text-xs font-bold text-slate-300 mt-1">
-                  Kho hàng: <span className="text-amber-400">{warehouseName}</span>
-                </p>
+                <div className="flex flex-wrap items-center justify-center gap-3 text-xs text-slate-300 mt-1.5">
+                  <p>
+                    Kho hàng: <span className="text-amber-400 font-bold">{warehouseName}</span>
+                  </p>
+                  {selectedProposalNumber !== 'ALL' && (
+                    <p className="text-blue-400 font-bold bg-blue-950/60 px-2 py-0.5 rounded border border-blue-800/50">
+                      Tờ trình: {selectedProposalNumber}
+                    </p>
+                  )}
+                </div>
               </div>
             </div>
 
@@ -565,46 +685,28 @@ export const StockLedgerView: React.FC<StockLedgerViewProps> = ({
               </table>
             </div>
 
-            {/* Official Report Signature Block (For PDF & Print export) */}
+            {/* Official Report Signature Block (For PDF & Print export - 2 Columns) */}
             <div className="p-6 bg-slate-950/60 border-t border-slate-800 print-signatures">
-              <div className="text-right text-xs italic text-slate-400 mb-4">
+              <div className="text-right text-xs italic text-slate-400 mb-6">
                 Đà Nẵng, ngày {new Date().getDate()} tháng {new Date().getMonth() + 1} năm {new Date().getFullYear()}
               </div>
 
-              <div className="grid grid-cols-4 gap-4 text-center text-xs">
+              <div className="grid grid-cols-2 gap-12 text-center text-xs">
                 {/* 1. Người lập biểu */}
                 <div className="space-y-1">
-                  <div className="font-bold text-slate-200 uppercase">NGƯỜI LẬP BIỂU</div>
+                  <div className="font-bold text-slate-200 uppercase text-sm">NGƯỜI LẬP BIỂU</div>
                   <div className="text-[11px] text-slate-400 italic">(Ký, ghi rõ họ tên)</div>
-                  <div className="h-16 flex items-end justify-center font-medium text-slate-300">
-                    Phạm Hà
+                  <div className="h-24 flex items-end justify-center font-medium text-slate-400">
+                    <span className="border-b border-dashed border-slate-600/80 w-48 block"></span>
                   </div>
                 </div>
 
-                {/* 2. Thủ kho */}
+                {/* 2. Quản lý / Phê duyệt */}
                 <div className="space-y-1">
-                  <div className="font-bold text-slate-200 uppercase">THỦ KHO</div>
-                  <div className="text-[11px] text-slate-400 italic">(Ký, ghi rõ họ tên)</div>
-                  <div className="h-16 flex items-end justify-center font-medium text-slate-300">
-                    Nguyễn Đức Linh Rin
-                  </div>
-                </div>
-
-                {/* 3. Kế toán trưởng */}
-                <div className="space-y-1">
-                  <div className="font-bold text-slate-200 uppercase">KẾ TOÁN TRƯỞNG</div>
-                  <div className="text-[11px] text-slate-400 italic">(Ký, ghi rõ họ tên)</div>
-                  <div className="h-16 flex items-end justify-center font-medium text-slate-300">
-                    Nguyễn Hữu Hạnh
-                  </div>
-                </div>
-
-                {/* 4. Trưởng đội Điện Nước */}
-                <div className="space-y-1">
-                  <div className="font-bold text-slate-200 uppercase">TRƯỞNG ĐỘI ĐIỆN NƯỚC</div>
+                  <div className="font-bold text-slate-200 uppercase text-sm">QUẢN LÝ / PHÊ DUYỆT</div>
                   <div className="text-[11px] text-slate-400 italic">(Ký, đóng dấu)</div>
-                  <div className="h-16 flex items-end justify-center font-medium text-slate-300">
-                    Nguyễn Văn Đức
+                  <div className="h-24 flex items-end justify-center font-medium text-slate-400">
+                    <span className="border-b border-dashed border-slate-600/80 w-48 block"></span>
                   </div>
                 </div>
               </div>
