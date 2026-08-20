@@ -6,6 +6,7 @@ import { MaterialCatalogueView } from './components/MaterialCatalogueView';
 import { TransactionManagementView } from './components/TransactionManagementView';
 import { StockLedgerView } from './components/StockLedgerView';
 import { UserManagementView } from './components/UserManagementView';
+import { SettingsView } from './components/SettingsView';
 import { AiAssistantView } from './components/AiAssistantView';
 import { SmartSearchBar } from './components/SmartSearchBar';
 import { LoginView } from './components/LoginView';
@@ -60,11 +61,20 @@ export function App() {
   }, [users]);
 
   const [materials, setMaterials] = useState<Material[]>(() => {
-    const saved = localStorage.getItem('smart_materials_v6');
+    const saved = localStorage.getItem('smart_materials_v8');
     if (saved) {
       try {
         const parsed: Material[] = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        if (Array.isArray(parsed) && parsed.length >= INITIAL_MATERIALS.length) {
+          return parsed;
+        }
+        // Merge missing materials so user gets the full 600+ materials catalog
+        const existingCodes = new Set(parsed.map((p) => p.code));
+        const missing = INITIAL_MATERIALS.filter((m) => !existingCodes.has(m.code));
+        const merged = [...parsed, ...missing];
+        if (merged.length >= INITIAL_MATERIALS.length) {
+          return merged;
+        }
       } catch {
         return INITIAL_MATERIALS;
       }
@@ -107,7 +117,7 @@ export function App() {
 
   // Sync to local storage
   React.useEffect(() => {
-    localStorage.setItem('smart_materials_v6', JSON.stringify(materials));
+    localStorage.setItem('smart_materials_v8', JSON.stringify(materials));
   }, [materials]);
 
   React.useEffect(() => {
@@ -386,6 +396,23 @@ export function App() {
               }}
               onUpdateUser={handleUpdateUser}
               onAddUser={handleAddUser}
+            />
+          )}
+
+          {activeTab === 'settings' && (
+            <SettingsView
+              currentUser={currentUser}
+              allUsers={users}
+              materials={materials}
+              transactions={transactions}
+              onUpdateMaterials={(newMats) => {
+                setMaterials(newMats);
+                showToast(`Đã cập nhật danh mục gồm ${newMats.length} vật tư.`);
+              }}
+              onUpdateUsers={(newUsers) => {
+                setUsers(newUsers);
+                showToast(`Đã cập nhật danh sách người dùng.`);
+              }}
             />
           )}
 

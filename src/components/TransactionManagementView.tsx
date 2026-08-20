@@ -947,7 +947,7 @@ export const TransactionManagementView: React.FC<TransactionManagementViewProps>
             className="w-full max-w-3xl bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh]"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="p-4 border-b border-slate-800 flex items-center justify-between bg-slate-850">
+            <div className="no-print p-4 border-b border-slate-800 flex items-center justify-between bg-slate-850">
               <div className="flex items-center gap-2">
                 <FileText className="w-5 h-5 text-blue-400" />
                 <h3 className="text-sm font-bold text-white">Chứng Từ Kho Hàng Số: {selectedTxForView.code}</h3>
@@ -969,7 +969,7 @@ export const TransactionManagementView: React.FC<TransactionManagementViewProps>
             </div>
 
             {/* Voucher Document Print Body */}
-            <div className="p-6 overflow-y-auto bg-white text-slate-900 print:p-0 font-sans space-y-4">
+            <div className="printable-area p-6 overflow-y-auto bg-white text-slate-900 print:p-0 font-sans space-y-4">
               <div className="flex justify-between items-start border-b border-slate-300 pb-4">
                 <div className="flex items-center gap-3">
                   <AHTLogo className="h-10" showPlane={false} allowUpload={false} />

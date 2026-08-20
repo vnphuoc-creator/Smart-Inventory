@@ -91,6 +91,15 @@ export const MaterialCatalogueView: React.FC<MaterialCatalogueViewProps> = ({
     return Array.from(units);
   }, [materials]);
 
+  // Real-time category counts for dropdown and quick filters
+  const categoryCounts = useMemo(() => {
+    const map: Record<string, number> = {};
+    MATERIAL_CATEGORIES.forEach((cat) => {
+      map[cat] = materials.filter((m) => m.category === cat).length;
+    });
+    return map;
+  }, [materials]);
+
   // Sync external filters
   React.useEffect(() => {
     if (appliedFilters) {
@@ -317,12 +326,12 @@ export const MaterialCatalogueView: React.FC<MaterialCatalogueViewProps> = ({
             <select
               value={selectedCategory}
               onChange={(e) => setSelectedCategory(e.target.value)}
-              className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-500"
+              className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-500 font-medium"
             >
-              <option value="ALL">Tất cả nhóm vật tư</option>
+              <option value="ALL">Tất cả nhóm vật tư ({materials.length})</option>
               {MATERIAL_CATEGORIES.map((cat) => (
                 <option key={cat} value={cat}>
-                  {cat}
+                  {cat} ({categoryCounts[cat] || 0})
                 </option>
               ))}
             </select>

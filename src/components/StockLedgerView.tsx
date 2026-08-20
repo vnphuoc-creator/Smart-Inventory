@@ -236,7 +236,7 @@ export const StockLedgerView: React.FC<StockLedgerViewProps> = ({
   return (
     <div className="space-y-6 pb-12">
       {/* Top Header & Sub-Tab Switcher */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="no-print flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-xl font-bold text-white tracking-tight">
             Tổng Hợp Nhập - Xuất - Tồn & Sổ Thẻ Kho
@@ -275,7 +275,7 @@ export const StockLedgerView: React.FC<StockLedgerViewProps> = ({
       {subTab === 'REPORT' && (
         <div className="space-y-6">
           {/* Controls: Date Range (Tuần/Tháng/Năm/Tùy chọn), Kho hàng, Export button */}
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-5 space-y-4 shadow-sm">
+          <div className="no-print bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-5 space-y-4 shadow-sm">
             <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
               {/* Preset buttons & Filters */}
               <div className="flex flex-wrap items-center gap-2">
@@ -746,7 +746,7 @@ export const StockLedgerView: React.FC<StockLedgerViewProps> = ({
       {subTab === 'CARD' && (
         <div className="space-y-6">
           {/* Material Selector & Stock Card summary */}
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-5 space-y-4">
+          <div className="no-print bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-5 space-y-4">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
               {/* Material Dropdown */}
               <div className="flex-1 max-w-xl">
@@ -820,7 +820,7 @@ export const StockLedgerView: React.FC<StockLedgerViewProps> = ({
           </div>
 
           {/* Stock Balance Trend Line Chart */}
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-sm">
+          <div className="no-print bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-sm">
             <div className="flex items-center justify-between mb-4">
               <div>
                 <h3 className="text-sm font-bold text-white flex items-center gap-2">
@@ -862,8 +862,41 @@ export const StockLedgerView: React.FC<StockLedgerViewProps> = ({
           </div>
 
           {/* Stock Card Log Table */}
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-sm">
-            <div className="p-4 bg-slate-850 border-b border-slate-800 flex items-center justify-between">
+          <div className="printable-area bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-sm">
+            {/* Header for official print / export */}
+            <div className="p-6 bg-slate-950/80 border-b border-slate-800">
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <AHTLogo className="h-10 w-auto" showPlane={false} allowUpload={false} />
+                  <div>
+                    <div className="text-xs sm:text-sm font-black tracking-wide text-slate-200 uppercase">
+                      CÔNG TY CỔ PHẦN ĐẦU TƯ KHAI THÁC NHÀ GA QUỐC TẾ ĐÀ NẴNG
+                    </div>
+                    <div className="text-[11px] sm:text-xs text-slate-400 font-medium">
+                      ĐỘI ĐIỆN NƯỚC CÔNG TRÌNH (DOIDNCT)
+                    </div>
+                  </div>
+                </div>
+                <div className="text-right hidden sm:block">
+                  <div className="text-[11px] font-bold text-slate-400">Mẫu biểu: Sổ Thẻ Kho</div>
+                  <div className="text-[10px] text-slate-500">Mã: {activeMaterial?.code}</div>
+                </div>
+              </div>
+
+              <div className="pt-4 pb-1 text-center">
+                <h2 className="text-lg sm:text-xl font-black text-white uppercase tracking-wider">
+                  THẺ KHO ĐIỆN TỬ CHI TIẾT
+                </h2>
+                <p className="text-xs font-semibold text-blue-300 mt-1">
+                  Vật tư: {activeMaterial?.name} ({activeMaterial?.code}) - ĐVT: {activeMaterial?.unit}
+                </p>
+                <p className="text-[11px] text-slate-400">
+                  Quy cách / Chủng loại: {activeMaterial?.specification || 'Theo tiêu chuẩn kỹ thuật nhà sản xuất'}
+                </p>
+              </div>
+            </div>
+
+            <div className="p-4 bg-slate-850/60 border-b border-slate-800 flex items-center justify-between no-print">
               <span className="text-xs font-bold text-white uppercase tracking-wider">
                 Nhật Ký Chứng Từ Thẻ Kho ({stockCardEntries.length} dòng)
               </span>
