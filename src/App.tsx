@@ -10,6 +10,7 @@ import { SettingsView } from './components/SettingsView';
 import { AiAssistantView } from './components/AiAssistantView';
 import { SmartSearchBar } from './components/SmartSearchBar';
 import { LoginView } from './components/LoginView';
+import { ChangePasswordModal } from './components/ChangePasswordModal';
 import {
   INITIAL_USERS,
   INITIAL_MATERIALS,
@@ -114,11 +115,42 @@ export function App() {
   const [activeTab, setActiveTab] = useState<string>('dashboard');
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [isSmartSearchOpen, setIsSmartSearchOpen] = useState(false);
+  const [isChangePasswordOpen, setIsChangePasswordOpen] = useState(false);
   const [appliedFilters, setAppliedFilters] = useState<NaturalSearchFilters | null>(null);
   const [filterExplanation, setFilterExplanation] = useState<string | null>(null);
   const [preselectedMaterialCode, setPreselectedMaterialCode] = useState<string | undefined>(undefined);
   const [transactionTypePreset, setTransactionTypePreset] = useState<'IMPORT' | 'EXPORT'>('EXPORT');
   const [transactionStatusFilterPreset, setTransactionStatusFilterPreset] = useState<string | undefined>(undefined);
+
+  // Theme State (Dark / Light)
+  const [theme, setTheme] = useState<'dark' | 'light'>(() => {
+    const saved = localStorage.getItem('smart_theme_mode');
+    return saved === 'light' ? 'light' : 'dark';
+  });
+
+  React.useEffect(() => {
+    localStorage.setItem('smart_theme_mode', theme);
+    if (theme === 'light') {
+      document.documentElement.classList.add('light-theme');
+      document.documentElement.classList.remove('dark');
+    } else {
+      document.documentElement.classList.remove('light-theme');
+      document.documentElement.classList.add('dark');
+    }
+  }, [theme]);
+
+  const handleToggleTheme = () => {
+    setTheme((prev) => {
+      const next = prev === 'dark' ? 'light' : 'dark';
+      showToast(
+        next === 'light'
+          ? 'Đã chuyển sang Giao diện Sáng (Light Theme).'
+          : 'Đã chuyển sang Giao diện Tối (Dark Theme).',
+        'info'
+      );
+      return next;
+    });
+  };
 
   // Toast notification
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'info' | 'error' } | null>(null);
@@ -326,12 +358,6 @@ export function App() {
       {/* Vertical Sidebar Navigation (Fixed on left for lg screens) */}
       <Sidebar
         currentUser={currentUser}
-        allUsers={users}
-        onSelectUser={(u) => {
-          setCurrentUser(u);
-          localStorage.setItem('smart_auth_user_id', u.id);
-          showToast(`Đã chuyển sang tài khoản: ${u.fullName} (${u.role === 'ADMIN' ? 'Quản lý' : 'Nhân viên'})`);
-        }}
         activeTab={activeTab}
         onTabChange={(tab) => {
           setActiveTab(tab);
@@ -340,21 +366,16 @@ export function App() {
         }}
         pendingApprovalsCount={pendingApprovalsCount}
         onLogout={handleLogout}
+        onOpenChangePassword={() => setIsChangePasswordOpen(true)}
         isOpenMobile={isMobileSidebarOpen}
         onToggleMobile={() => setIsMobileSidebarOpen(!isMobileSidebarOpen)}
       />
 
       {/* Main Content Column with Header Bar */}
-      <div className="lg:pl-72 flex flex-col min-h-screen">
+      <div className="lg:pl-72 flex flex-col min-h-screen app-root-container">
         {/* Top Header Bar */}
         <Navbar
           currentUser={currentUser}
-          allUsers={users}
-          onSelectUser={(u) => {
-            setCurrentUser(u);
-            localStorage.setItem('smart_auth_user_id', u.id);
-            showToast(`Đã chuyển sang tài khoản: ${u.fullName} (${u.role === 'ADMIN' ? 'Quản lý' : 'Nhân viên'})`);
-          }}
           activeTab={activeTab}
           onTabChange={(tab) => {
             setActiveTab(tab);
@@ -364,7 +385,10 @@ export function App() {
           pendingApprovalsCount={pendingApprovalsCount}
           onOpenAiSearch={() => setIsSmartSearchOpen(true)}
           onLogout={handleLogout}
+          onOpenChangePassword={() => setIsChangePasswordOpen(true)}
           onToggleSidebar={() => setIsMobileSidebarOpen(!isMobileSidebarOpen)}
+          theme={theme}
+          onToggleTheme={handleToggleTheme}
         />
 
         {/* Main View Area */}
@@ -478,6 +502,15 @@ export function App() {
         onApplyFilters={handleApplyNaturalFilters}
         materials={materials}
         transactions={transactions}
+      />
+
+      {/* Change Password Modal for Current User */}
+      <ChangePasswordModal
+        isOpen={isChangePasswordOpen}
+        onClose={() => setIsChangePasswordOpen(false)}
+        currentUser={currentUser}
+        onUpdateUser={handleUpdateUser}
+        onSuccessToast={(msg) => showToast(msg, 'success')}
       />
 
       {/* Global Toast Alerts */}
