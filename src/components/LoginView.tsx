@@ -154,26 +154,13 @@ export const LoginView: React.FC<LoginViewProps> = ({ users, onLogin }) => {
                   className="w-full bg-slate-800/90 border border-slate-700 text-white rounded-xl px-3.5 py-2.5 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent appearance-none cursor-pointer pr-10"
                 >
                   <option value="" disabled>
-                    -- Chọn tên người dùng để đăng nhập --
+                    -- Chọn họ và tên đăng nhập --
                   </option>
-                  <optgroup label="Ban Quản Lý / Admin" className="bg-slate-900 text-blue-300 font-semibold">
-                    {users
-                      .filter((u) => u.role === 'ADMIN')
-                      .map((u) => (
-                        <option key={u.id} value={u.email} className="bg-slate-800 text-white font-normal py-1">
-                          {u.fullName} ({u.department || 'Ban Quản Lý'})
-                        </option>
-                      ))}
-                  </optgroup>
-                  <optgroup label="Tổ Nhân Viên Thi Công & Kỹ Thuật" className="bg-slate-900 text-emerald-300 font-semibold">
-                    {users
-                      .filter((u) => u.role !== 'ADMIN')
-                      .map((u) => (
-                        <option key={u.id} value={u.email} className="bg-slate-800 text-white font-normal py-1">
-                          {u.fullName} ({u.department || 'Tổ Kỹ Thuật'})
-                        </option>
-                      ))}
-                  </optgroup>
+                  {users.map((u) => (
+                    <option key={u.id} value={u.email} className="bg-slate-800 text-white font-normal py-1">
+                      {u.fullName}
+                    </option>
+                  ))}
                 </select>
                 <div className="absolute inset-y-0 right-0 pr-3.5 flex items-center pointer-events-none text-slate-400">
                   <ChevronDown className="w-4 h-4" />

@@ -492,29 +492,25 @@ export const StockLedgerView: React.FC<StockLedgerViewProps> = ({
           <div className="printable-area bg-slate-900 border border-slate-700/80 rounded-2xl shadow-xl overflow-hidden">
             {/* Spreadsheet Official Top Header */}
             <div className="p-6 bg-slate-950/80 border-b border-slate-800">
-              <div className="flex items-start justify-between gap-4">
+              <div className="flex items-center justify-between gap-4">
                 <div className="flex items-center gap-3">
                   <AHTLogo className="h-10 w-auto" showPlane={false} allowUpload={false} />
                   <div>
-                    <div className="text-xs sm:text-sm font-black tracking-wide text-slate-200 uppercase">
+                    <div className="text-xs sm:text-sm font-bold tracking-wide text-slate-200 uppercase">
                       CÔNG TY CỔ PHẦN ĐẦU TƯ KHAI THÁC NHÀ GA QUỐC TẾ ĐÀ NẴNG
-                    </div>
-                    <div className="text-[11px] sm:text-xs text-slate-400 font-medium">
-                      ĐỘI ĐIỆN NƯỚC CÔNG TRÌNH (DOIDNCT)
                     </div>
                   </div>
                 </div>
                 <div className="text-right hidden sm:block">
-                  <div className="text-[11px] font-bold text-slate-400">Mẫu biểu: Báo cáo N-X-T</div>
-                  <div className="text-[10px] text-slate-500">Thông tư 99/2025/TT-BTC</div>
+                  <div className="text-xs font-semibold text-slate-400">Mẫu số: 01-VT</div>
                 </div>
               </div>
 
-              <div className="pt-5 pb-2 text-center">
+              <div className="pt-4 pb-2 text-center">
                 <h2 className="text-lg sm:text-xl font-black text-white uppercase tracking-wider">
                   BÁO CÁO TỔNG HỢP NHẬP - XUẤT - TỒN
                 </h2>
-                <p className="text-xs italic text-slate-400 mt-0.5">
+                <p className="text-xs italic text-slate-400 mt-1">
                   Từ ngày {formatDisplayDate(startDate)} đến ngày {formatDisplayDate(endDate)}
                 </p>
                 <div className="flex flex-wrap items-center justify-center gap-3 text-xs text-slate-300 mt-1.5">

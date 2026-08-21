@@ -23,6 +23,7 @@ import {
   Upload,
   Image as ImageIcon,
   Sparkles,
+  Loader2,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import {
@@ -96,6 +97,8 @@ export const TransactionManagementView: React.FC<TransactionManagementViewProps>
   const [formDate, setFormDate] = useState(new Date().toISOString().split('T')[0]);
   const [formAttachmentName, setFormAttachmentName] = useState('');
   const [formAttachmentUrl, setFormAttachmentUrl] = useState('');
+  const [isScanningProposal, setIsScanningProposal] = useState(false);
+  const [scanFeedback, setScanFeedback] = useState<string | null>(null);
   const [formItems, setFormItems] = useState<
     Array<{
       materialCode: string;
@@ -132,26 +135,24 @@ export const TransactionManagementView: React.FC<TransactionManagementViewProps>
 
   const openNewTransactionModal = (type: TransactionType = 'EXPORT') => {
     setFormType(type);
-    setFormProposalNumber(type === 'IMPORT' ? '17-DNCT/PKT' : '21-DNCT/PKT');
+    setFormProposalNumber(type === 'IMPORT' ? '17-DNCT/PKT' : '');
     setFormTitle(
       type === 'IMPORT'
-        ? 'Phiếu đề nghị nhập kho vật tư theo Tờ trình'
-        : 'Phiếu đề nghị xuất vật tư theo Tờ trình'
+        ? 'Phiếu đề nghị nhập kho vật tư'
+        : 'Phiếu đề nghị xuất vật tư thi công'
     );
-    setFormPartner(
-      type === 'IMPORT'
-        ? 'Công ty Cổ Phần Ống Nhựa & Thiết Bị Điện Nước'
-        : 'Tổ Thi Công Lắp Đặt Điện Công Trình'
-    );
+    setFormPartner('');
     setFormWarehouse('Kho Tổng');
     setFormReason(
       type === 'IMPORT'
         ? 'Nhập kho phục vụ công tác bảo trì theo Tờ trình'
-        : 'Cấp phát vật tư thi công hạ tầng theo Tờ trình'
+        : 'Cấp phát vật tư phục vụ công trình'
     );
     setFormDate(new Date().toISOString().split('T')[0]);
     setFormAttachmentName('');
     setFormAttachmentUrl('');
+    setScanFeedback(null);
+    setIsScanningProposal(false);
 
     const defaultMat = materials[0];
     setFormItems([
@@ -274,16 +275,83 @@ export const TransactionManagementView: React.FC<TransactionManagementViewProps>
     );
   };
 
+  // Handle scanning and parsing proposal file to auto-fill import voucher
+  const handleScanProposalFile = async (file: File) => {
+    setIsScanningProposal(true);
+    setScanFeedback('Đang quét và nhận diện thông tin tờ trình...');
+    setFormAttachmentName(file.name);
+
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      const dataUrl = event.target?.result as string;
+      setFormAttachmentUrl(dataUrl);
+
+      try {
+        const res = await fetch('/api/ai/scan-proposal', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            fileData: dataUrl,
+            fileName: file.name,
+            availableMaterials: materials.slice(0, 100).map((m) => ({
+              code: m.code,
+              name: m.name,
+              unit: m.unit,
+              unitPrice: m.unitPrice,
+            })),
+          }),
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          if (data.proposalNumber) setFormProposalNumber(data.proposalNumber);
+          if (data.title) setFormTitle(data.title);
+          if (data.partner) setFormPartner(data.partner);
+          if (data.reason) setFormReason(data.reason);
+          if (Array.isArray(data.items) && data.items.length > 0) {
+            const mapped = data.items.map((it: any) => {
+              const match =
+                materials.find((m) => m.code === it.materialCode) ||
+                materials.find((m) => m.name.toLowerCase().includes((it.materialName || '').toLowerCase())) ||
+                materials[0];
+              return {
+                materialCode: match ? match.code : materials[0].code,
+                quantity: Number(it.quantity) || 1,
+                unitPrice: Number(it.unitPrice) || (match ? match.unitPrice : 0),
+                notes: it.notes || `Tự động quét từ Tờ trình ${data.proposalNumber || ''}`,
+              };
+            });
+            setFormItems(mapped);
+            setScanFeedback(`✨ Quét thành công! Đã tự động điền Tờ trình "${data.proposalNumber}" và ${mapped.length} mặt hàng.`);
+          } else {
+            setScanFeedback(`✨ Đã nhận diện Tờ trình "${data.proposalNumber}".`);
+          }
+        } else {
+          setScanFeedback('Đã đính kèm tệp tờ trình.');
+        }
+      } catch {
+        setScanFeedback('Đã đính kèm tệp tờ trình.');
+      } finally {
+        setIsScanningProposal(false);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
   // Handle file upload for attachment
   const handleTransactionFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      setFormAttachmentName(file.name);
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        setFormAttachmentUrl(event.target?.result as string);
-      };
-      reader.readAsDataURL(file);
+      if (formType === 'IMPORT') {
+        handleScanProposalFile(file);
+      } else {
+        setFormAttachmentName(file.name);
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          setFormAttachmentUrl(event.target?.result as string);
+        };
+        reader.readAsDataURL(file);
+      }
     }
   };
 
@@ -874,98 +942,82 @@ export const TransactionManagementView: React.FC<TransactionManagementViewProps>
                 </div>
               </div>
 
-              {/* Proposal Number (Số Tờ Trình) & Reason */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <div className="flex items-center justify-between mb-1">
-                    <label className="block text-slate-300 font-medium">
-                      Số Tờ Trình Đề Xuất (X-N-T Theo Tờ Trình)
+              {/* Import vs Export Specific Inputs */}
+              {formType === 'IMPORT' ? (
+                <div className="space-y-4">
+                  {/* AI Proposal Scanner & Auto-Fill Dropzone */}
+                  <div className="bg-gradient-to-r from-blue-950/40 via-indigo-950/30 to-purple-950/30 border border-blue-800/40 rounded-xl p-3.5 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Sparkles className="w-4 h-4 text-blue-400" />
+                        <span className="text-xs font-bold text-blue-200">
+                          Quét File / Ảnh Tờ Trình Để Tự Động Điền
+                        </span>
+                      </div>
+                      {isScanningProposal && (
+                        <span className="text-[11px] text-amber-300 animate-pulse flex items-center gap-1">
+                          <Loader2 className="w-3 h-3 animate-spin" /> Đang nhận diện tờ trình...
+                        </span>
+                      )}
+                    </div>
+                    <label className="flex items-center justify-center gap-2 px-4 py-2.5 bg-slate-900/80 hover:bg-slate-800/80 border border-dashed border-blue-500/50 rounded-xl cursor-pointer text-blue-300 hover:text-white text-xs transition-colors">
+                      <Upload className="w-4 h-4 text-blue-400" />
+                      <span>Nhấp để tải lên hoặc kéo thả File/Ảnh Tờ Trình (PDF, PNG, JPG, TXT)</span>
+                      <input
+                        type="file"
+                        accept="image/*,.pdf,.doc,.docx,.txt"
+                        onChange={(e) => {
+                          const f = e.target.files?.[0];
+                          if (f) handleScanProposalFile(f);
+                        }}
+                        className="hidden"
+                      />
                     </label>
-                    {proposals.length > 0 && (
-                      <span className="text-[10px] text-indigo-400 font-mono">
-                        {proposals.length} tờ trình có sẵn
-                      </span>
+                    {scanFeedback && (
+                      <div className="text-xs text-emerald-300 font-medium bg-emerald-950/40 border border-emerald-800/50 rounded-lg p-2 flex items-center gap-1.5">
+                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                        <span>{scanFeedback}</span>
+                      </div>
                     )}
                   </div>
-                  <div className="space-y-1.5">
-                    <div className="flex gap-1.5">
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-slate-300 font-medium mb-1">
+                        Số Tờ Trình Đề Xuất
+                      </label>
                       <input
                         type="text"
                         value={formProposalNumber}
                         onChange={(e) => setFormProposalNumber(e.target.value)}
-                        placeholder="Ví dụ: 17-DNCT/PKT, 26-DNCT/PKT, 21-DNCT/PKT..."
-                        className="flex-1 bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2 text-white font-mono focus:outline-none focus:border-blue-500 text-xs"
+                        placeholder="Ví dụ: 17-DNCT/PKT, 26-DNCT/PKT..."
+                        className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2 text-white font-mono focus:outline-none focus:border-blue-500 text-xs"
                       />
-                      {proposals.length > 0 && (
-                        <select
-                          onChange={(e) => {
-                            if (e.target.value) {
-                              setFormProposalNumber(e.target.value);
-                              const p = proposals.find((prop) => prop.proposalNumber === e.target.value);
-                              if (p) {
-                                if (p.attachmentName) setFormAttachmentName(p.attachmentName);
-                                if (p.attachmentUrl) setFormAttachmentUrl(p.attachmentUrl);
-                              }
-                            }
-                          }}
-                          className="bg-slate-800 border border-slate-700 rounded-xl px-2 py-2 text-slate-300 text-xs focus:outline-none focus:border-indigo-500"
-                          defaultValue=""
-                        >
-                          <option value="" disabled>
-                            -- Chọn Tờ Trình --
-                          </option>
-                          {proposals.map((p) => (
-                            <option key={p.id} value={p.proposalNumber}>
-                              {p.proposalNumber} ({p.title.slice(0, 24)}...)
-                            </option>
-                          ))}
-                        </select>
-                      )}
                     </div>
-
-                    {/* Quick suggestion tags */}
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      <span className="text-[10px] text-slate-400">Chọn nhanh:</span>
-                      {proposals.length > 0
-                        ? proposals.slice(0, 4).map((p) => (
-                            <button
-                              key={p.id}
-                              type="button"
-                              onClick={() => {
-                                setFormProposalNumber(p.proposalNumber);
-                                if (p.attachmentName) setFormAttachmentName(p.attachmentName);
-                                if (p.attachmentUrl) setFormAttachmentUrl(p.attachmentUrl);
-                              }}
-                              className="text-[10px] bg-indigo-950/60 hover:bg-indigo-900/80 text-indigo-300 border border-indigo-700/60 px-2 py-0.5 rounded font-mono transition-colors"
-                            >
-                              {p.proposalNumber}
-                            </button>
-                          ))
-                        : ['17-DNCT/PKT', '21-DNCT/PKT', '26-DNCT/PKT', '09-DNCT/PKT'].map((num) => (
-                            <button
-                              key={num}
-                              type="button"
-                              onClick={() => setFormProposalNumber(num)}
-                              className="text-[10px] bg-slate-800 hover:bg-slate-700 text-blue-300 border border-slate-700 px-2 py-0.5 rounded font-mono transition-colors"
-                            >
-                              {num}
-                            </button>
-                          ))}
+                    <div>
+                      <label className="block text-slate-300 font-medium mb-1">Lý Do Nhập Kho</label>
+                      <input
+                        type="text"
+                        value={formReason}
+                        onChange={(e) => setFormReason(e.target.value)}
+                        placeholder="Mục đích sử dụng, căn cứ hợp đồng hoặc tờ trình..."
+                        className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2 text-white focus:outline-none focus:border-blue-500"
+                      />
                     </div>
                   </div>
                 </div>
-
+              ) : (
                 <div>
-                  <label className="block text-slate-300 font-medium mb-1">Lý Do Nhập / Xuất</label>
+                  <label className="block text-slate-300 font-medium mb-1">Lý Do Xuất Kho</label>
                   <input
                     type="text"
                     value={formReason}
                     onChange={(e) => setFormReason(e.target.value)}
-                    placeholder="Mục đích sử dụng, căn cứ lệnh điều động hoặc hợp đồng..."
+                    placeholder="Mục đích xuất vật tư, công trình thi công hoặc kế hoạch bảo dưỡng..."
                     className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2 text-white focus:outline-none focus:border-blue-500"
                   />
                 </div>
-              </div>
+              )}
 
               {/* Proposal Document / Image Attachment (Optional - "phần import này không bắt buộc") */}
               <div className="bg-slate-850 p-3.5 rounded-xl border border-slate-800 space-y-2">

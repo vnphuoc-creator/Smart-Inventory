@@ -13,7 +13,7 @@
 }
 
 /* ========================================================================= */
-/* LIGHT THEME STYLING OVERRIDES                                             */
+/* LIGHT THEME STYLING OVERRIDES (MODERN ENTERPRISE AESTHETICS)              */
 /* ========================================================================= */
 .light-theme {
   color-scheme: light;
@@ -38,32 +38,36 @@
 .light-theme .bg-slate-900\/95,
 .light-theme .bg-slate-900\/90,
 .light-theme .bg-slate-900\/80 {
-  background-color: rgba(255, 255, 255, 0.96) !important;
+  background-color: rgba(255, 255, 255, 0.98) !important;
   border-color: #e2e8f0 !important;
 }
 
-.light-theme .bg-slate-950\/60,
 .light-theme .bg-slate-950\/80,
+.light-theme .bg-slate-950\/60,
 .light-theme .bg-slate-850 {
-  background-color: #f1f5f9 !important;
+  background-color: #f8fafc !important;
   border-color: #e2e8f0 !important;
 }
 
 .light-theme .bg-slate-800,
-.light-theme .bg-slate-800\/80,
 .light-theme .bg-slate-800\/90,
+.light-theme .bg-slate-800\/80,
 .light-theme .bg-slate-800\/60 {
-  background-color: #f8fafc !important;
-  border-color: #cbd5e1 !important;
+  background-color: #f1f5f9 !important;
+  border-color: #e2e8f0 !important;
+  color: #1e293b !important;
 }
 
 .light-theme .bg-slate-800\/50,
-.light-theme .bg-slate-800\/40 {
-  background-color: #f1f5f9 !important;
+.light-theme .bg-slate-800\/40,
+.light-theme .bg-slate-800\/30 {
+  background-color: #f8fafc !important;
+  border-color: #e2e8f0 !important;
 }
 
 .light-theme .hover\:bg-slate-800:hover,
 .light-theme .hover\:bg-slate-800\/80:hover,
+.light-theme .hover\:bg-slate-800\/60:hover,
 .light-theme .hover\:bg-slate-750:hover,
 .light-theme .hover\:bg-slate-700:hover {
   background-color: #e2e8f0 !important;
@@ -73,11 +77,12 @@
 .light-theme .border-slate-800,
 .light-theme .border-slate-700,
 .light-theme .border-slate-700\/80,
-.light-theme .border-slate-700\/60 {
+.light-theme .border-slate-700\/60,
+.light-theme .border-slate-700\/50 {
   border-color: #e2e8f0 !important;
 }
 
-/* Typography contrast */
+/* Typography contrast - ensure headings and paragraphs are clear */
 .light-theme .text-white {
   color: #0f172a !important;
 }
@@ -87,11 +92,11 @@
 }
 
 .light-theme .text-slate-200 {
-  color: #334155 !important;
+  color: #1e293b !important;
 }
 
 .light-theme .text-slate-300 {
-  color: #475569 !important;
+  color: #334155 !important;
 }
 
 .light-theme .text-slate-400 {
@@ -102,7 +107,7 @@
   color: #94a3b8 !important;
 }
 
-/* Inputs, Selects & Tables */
+/* Inputs, Selects & Textareas */
 .light-theme input:not([type="checkbox"]):not([type="radio"]),
 .light-theme select,
 .light-theme textarea {
@@ -116,28 +121,54 @@
   color: #94a3b8 !important;
 }
 
-.light-theme table thead {
+/* Table styles */
+.light-theme table thead,
+.light-theme thead.bg-slate-850 {
   background-color: #f1f5f9 !important;
   border-color: #e2e8f0 !important;
 }
 
 .light-theme table tbody tr {
   border-color: #f1f5f9 !important;
+  background-color: #ffffff !important;
 }
 
-.light-theme table tbody tr:hover {
+.light-theme table tbody tr:nth-child(even) {
   background-color: #f8fafc !important;
 }
 
-/* Preserve active primary buttons */
+.light-theme table tbody tr:hover {
+  background-color: #f1f5f9 !important;
+}
+
+/* Retain crisp white text on solid buttons & badges */
 .light-theme .bg-blue-600,
+.light-theme .bg-blue-700,
 .light-theme .bg-indigo-600,
 .light-theme .bg-emerald-600,
-.light-theme .bg-amber-500 {
+.light-theme .bg-emerald-700,
+.light-theme .bg-rose-600,
+.light-theme .bg-red-600,
+.light-theme .bg-amber-600,
+.light-theme .bg-amber-500,
+.light-theme .bg-sky-600,
+.light-theme button.bg-blue-600,
+.light-theme button.bg-indigo-600,
+.light-theme button.bg-emerald-600,
+.light-theme button.bg-rose-600,
+.light-theme button.bg-amber-600 {
   color: #ffffff !important;
 }
-.light-theme .bg-blue-600 .text-white,
-.light-theme .bg-blue-600 .text-blue-100 {
+
+.light-theme .bg-blue-600 *,
+.light-theme .bg-indigo-600 *,
+.light-theme .bg-emerald-600 *,
+.light-theme .bg-rose-600 *,
+.light-theme .bg-red-600 *,
+.light-theme .bg-amber-600 *,
+.light-theme button.bg-blue-600 *,
+.light-theme button.bg-indigo-600 *,
+.light-theme button.bg-emerald-600 * {
   color: #ffffff !important;
 }
 
@@ -147,14 +178,14 @@
 @media print {
   @page {
     size: A4 landscape;
-    margin: 8mm 10mm 10mm 10mm;
+    margin: 8mm 8mm 8mm 8mm;
   }
 
   html, body {
     background: #ffffff !important;
     color: #000000 !important;
-    font-size: 9.5pt !important;
-    line-height: 1.3 !important;
+    font-size: 8.5pt !important;
+    line-height: 1.25 !important;
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
   }
@@ -190,7 +221,7 @@
 
   .printable-area * {
     color: #000000 !important;
-    border-color: #cbd5e1 !important;
+    border-color: #94a3b8 !important;
     background-color: transparent !important;
   }
 
@@ -204,19 +235,21 @@
     border-collapse: collapse !important;
     color: #000000 !important;
     background: #ffffff !important;
-    font-size: 8.5pt !important;
+    font-size: 8pt !important;
+    table-layout: fixed !important;
   }
 
   .printable-table th,
   .printable-table td {
-    border: 1px solid #333333 !important;
-    padding: 4px 6px !important;
+    border: 1px solid #475569 !important;
+    padding: 3px 4px !important;
     color: #000000 !important;
+    word-wrap: break-word !important;
   }
 
   .printable-table th {
     background-color: #f1f5f9 !important;
-    font-weight: bold !important;
+    font-weight: 700 !important;
     text-align: center !important;
   }
 
@@ -235,6 +268,13 @@
   /* Signatures section */
   .print-signatures {
     page-break-inside: avoid !important;
-    margin-top: 24px !important;
+    margin-top: 18px !important;
+    padding: 0 !important;
+    border: none !important;
+    background: transparent !important;
+  }
+
+  .print-signatures * {
+    color: #000000 !important;
   }
 }
