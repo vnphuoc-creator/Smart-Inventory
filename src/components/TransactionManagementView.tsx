@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import mammoth from 'mammoth';
 import {
   ArrowRightLeft,
   ArrowDownRight,
@@ -24,6 +25,7 @@ import {
   Image as ImageIcon,
   Sparkles,
   Loader2,
+  Copy,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import {
@@ -78,7 +80,7 @@ export const TransactionManagementView: React.FC<TransactionManagementViewProps>
   );
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedTxForView, setSelectedTxForView] = useState<InventoryTransaction | null>(null);
-  const [lightboxImage, setLightboxImage] = useState<string | null>(null);
+  const [viewingDoc, setViewingDoc] = useState<{ url: string; html?: string; name?: string } | null>(null);
 
   // Approval Modal state
   const [approvingTx, setApprovingTx] = useState<InventoryTransaction | null>(null);
@@ -91,12 +93,12 @@ export const TransactionManagementView: React.FC<TransactionManagementViewProps>
   const [formType, setFormType] = useState<TransactionType>(initialType || 'EXPORT');
   const [formProposalNumber, setFormProposalNumber] = useState('17-DNCT/PKT');
   const [formTitle, setFormTitle] = useState('');
-  const [formPartner, setFormPartner] = useState('');
   const [formWarehouse, setFormWarehouse] = useState('Kho Tổng');
   const [formReason, setFormReason] = useState('');
   const [formDate, setFormDate] = useState(new Date().toISOString().split('T')[0]);
   const [formAttachmentName, setFormAttachmentName] = useState('');
   const [formAttachmentUrl, setFormAttachmentUrl] = useState('');
+  const [formAttachmentHtml, setFormAttachmentHtml] = useState('');
   const [isScanningProposal, setIsScanningProposal] = useState(false);
   const [scanFeedback, setScanFeedback] = useState<string | null>(null);
   const [formItems, setFormItems] = useState<
@@ -141,7 +143,6 @@ export const TransactionManagementView: React.FC<TransactionManagementViewProps>
         ? 'Phiếu đề nghị nhập kho vật tư'
         : 'Phiếu đề nghị xuất vật tư thi công'
     );
-    setFormPartner('');
     setFormWarehouse('Kho Tổng');
     setFormReason(
       type === 'IMPORT'
@@ -151,6 +152,7 @@ export const TransactionManagementView: React.FC<TransactionManagementViewProps>
     setFormDate(new Date().toISOString().split('T')[0]);
     setFormAttachmentName('');
     setFormAttachmentUrl('');
+    setFormAttachmentHtml('');
     setScanFeedback(null);
     setIsScanningProposal(false);
 
@@ -174,20 +176,20 @@ export const TransactionManagementView: React.FC<TransactionManagementViewProps>
     setFormType('IMPORT');
     setFormProposalNumber(proposal.proposalNumber);
     setFormTitle(`Phiếu nhập kho theo Tờ trình ${proposal.proposalNumber}`);
-    setFormPartner('Công ty Cổ Phần Ống Nhựa & Thiết Bị Điện Nước');
     setFormWarehouse('Kho Tổng');
     setFormReason(`Nhập vật tư theo Tờ trình ${proposal.proposalNumber} đã được Quản lý phê duyệt`);
     setFormDate(new Date().toISOString().split('T')[0]);
     setFormAttachmentName(proposal.attachmentName || '');
     setFormAttachmentUrl(proposal.attachmentUrl || '');
+    setFormAttachmentHtml(proposal.attachmentHtml || '');
 
-    if (missingItems && missingItems.length > 0) {
+    if (missingItems.length > 0) {
       setFormItems(
         missingItems.map((item) => ({
           materialCode: item.materialCode,
           quantity: item.missingQty,
           unitPrice: item.unitPrice,
-          notes: `Nhập bổ sung theo Tờ trình ${proposal.proposalNumber}`,
+          notes: `Nhập vật tư theo Tờ trình ${proposal.proposalNumber}`,
         }))
       );
     } else {
@@ -195,7 +197,7 @@ export const TransactionManagementView: React.FC<TransactionManagementViewProps>
         proposal.items.map((item) => ({
           materialCode: item.materialCode,
           quantity: item.requestedQuantity,
-          unitPrice: item.unitPrice || 0,
+          unitPrice: item.unitPrice,
           notes: `Nhập theo Tờ trình ${proposal.proposalNumber}`,
         }))
       );
@@ -278,8 +280,32 @@ export const TransactionManagementView: React.FC<TransactionManagementViewProps>
   // Handle scanning and parsing proposal file to auto-fill import voucher
   const handleScanProposalFile = async (file: File) => {
     setIsScanningProposal(true);
-    setScanFeedback('Đang quét và nhận diện thông tin tờ trình...');
+    setScanFeedback('Đang phân tích và quét thông tin từ tệp tờ trình...');
     setFormAttachmentName(file.name);
+
+    let docHtml = '';
+    let rawText = '';
+
+    try {
+      if (file.name.endsWith('.docx') || file.name.endsWith('.doc')) {
+        const arrayBuffer = await file.arrayBuffer();
+        try {
+          const resMammothHtml = await mammoth.convertToHtml({ arrayBuffer });
+          docHtml = resMammothHtml.value;
+          const resMammothText = await mammoth.extractRawText({ arrayBuffer });
+          rawText = resMammothText.value;
+          setFormAttachmentHtml(docHtml);
+        } catch (e) {
+          console.warn('Mammoth docx parse error:', e);
+        }
+      } else if (file.name.endsWith('.txt')) {
+        rawText = await file.text();
+        docHtml = `<pre style="white-space: pre-wrap; font-family: inherit;">${rawText}</pre>`;
+        setFormAttachmentHtml(docHtml);
+      }
+    } catch (e) {
+      console.warn('File reading error:', e);
+    }
 
     const reader = new FileReader();
     reader.onload = async (event) => {
@@ -293,6 +319,8 @@ export const TransactionManagementView: React.FC<TransactionManagementViewProps>
           body: JSON.stringify({
             fileData: dataUrl,
             fileName: file.name,
+            fileText: rawText,
+            docHtml: docHtml,
             availableMaterials: materials.slice(0, 100).map((m) => ({
               code: m.code,
               name: m.name,
@@ -306,7 +334,6 @@ export const TransactionManagementView: React.FC<TransactionManagementViewProps>
           const data = await res.json();
           if (data.proposalNumber) setFormProposalNumber(data.proposalNumber);
           if (data.title) setFormTitle(data.title);
-          if (data.partner) setFormPartner(data.partner);
           if (data.reason) setFormReason(data.reason);
           if (Array.isArray(data.items) && data.items.length > 0) {
             const mapped = data.items.map((it: any) => {
@@ -339,13 +366,25 @@ export const TransactionManagementView: React.FC<TransactionManagementViewProps>
   };
 
   // Handle file upload for attachment
-  const handleTransactionFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleTransactionFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       if (formType === 'IMPORT') {
         handleScanProposalFile(file);
       } else {
         setFormAttachmentName(file.name);
+        if (file.name.endsWith('.docx') || file.name.endsWith('.doc')) {
+          try {
+            const arrayBuffer = await file.arrayBuffer();
+            const resMammothHtml = await mammoth.convertToHtml({ arrayBuffer });
+            setFormAttachmentHtml(resMammothHtml.value);
+          } catch (err) {
+            console.warn(err);
+          }
+        } else if (file.name.endsWith('.txt')) {
+          const text = await file.text();
+          setFormAttachmentHtml(`<pre style="white-space: pre-wrap;">${text}</pre>`);
+        }
         const reader = new FileReader();
         reader.onload = (event) => {
           setFormAttachmentUrl(event.target?.result as string);
@@ -443,7 +482,7 @@ export const TransactionManagementView: React.FC<TransactionManagementViewProps>
       creatorEmail: currentUser.email,
       creatorName: currentUser.fullName,
       creatorRole: currentUser.role,
-      partner: formPartner.trim() || 'Nội bộ',
+      partner: '',
       warehouse: formWarehouse,
       status: isAutoApprove ? 'APPROVED' : 'PENDING',
       items: preparedItems,
@@ -452,6 +491,7 @@ export const TransactionManagementView: React.FC<TransactionManagementViewProps>
       reason: formReason,
       attachmentName: formAttachmentName || undefined,
       attachmentUrl: formAttachmentUrl || undefined,
+      attachmentHtml: formAttachmentHtml || undefined,
       attachmentType: formAttachmentName.endsWith('.pdf') ? 'pdf' : 'image',
       ...(isAutoApprove && {
         approverEmail: currentUser.email,
@@ -669,7 +709,6 @@ export const TransactionManagementView: React.FC<TransactionManagementViewProps>
                 <th className="py-3.5 px-3">Số Tờ Trình</th>
                 <th className="py-3.5 px-3">Loại Phiếu</th>
                 <th className="py-3.5 px-4 min-w-[220px]">Diễn Giải / Tên Phiếu</th>
-                <th className="py-3.5 px-3">Đối Tác / Đơn Vị Nhận</th>
                 <th className="py-3.5 px-3">Ngày Lập</th>
                 <th className="py-3.5 px-3">Người Lập</th>
                 <th className="py-3.5 px-3 text-right">Tổng SL</th>
@@ -683,7 +722,7 @@ export const TransactionManagementView: React.FC<TransactionManagementViewProps>
             <tbody className="divide-y divide-slate-800">
               {filteredTransactions.length === 0 ? (
                 <tr>
-                  <td colSpan={11} className="py-12 text-center text-slate-400">
+                  <td colSpan={10} className="py-12 text-center text-slate-400">
                     <FileText className="w-8 h-8 text-slate-600 mx-auto mb-2 opacity-50" />
                     Không tìm thấy chứng từ nào phù hợp.
                   </td>
@@ -728,11 +767,6 @@ export const TransactionManagementView: React.FC<TransactionManagementViewProps>
                       <div className="text-[11px] text-slate-400 truncate max-w-xs mt-0.5">
                         {tx.items.map((i) => `${i.materialCode} (${i.quantity} ${i.unit})`).join(', ')}
                       </div>
-                    </td>
-
-                    {/* Partner */}
-                    <td className="py-3 px-3 text-slate-300 text-[11px] truncate max-w-[150px]">
-                      {tx.partner}
                     </td>
 
                     {/* Date */}
@@ -906,40 +940,23 @@ export const TransactionManagementView: React.FC<TransactionManagementViewProps>
                 </div>
               </div>
 
-              {/* Title & Partner */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-slate-300 font-medium mb-1">
-                    Tiêu Đề / Diễn Giải <span className="text-rose-400">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={formTitle}
-                    onChange={(e) => setFormTitle(e.target.value)}
-                    placeholder="Ví dụ: Xuất cáp điện thi công tuyến 2..."
-                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2 text-white focus:outline-none focus:border-blue-500"
-                    required
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-slate-300 font-medium mb-1">
-                    {formType === 'IMPORT' ? 'Nhà Cung Cấp / Đối Tác' : 'Đơn Vị Nhận / Công Trình'}{' '}
-                    <span className="text-rose-400">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={formPartner}
-                    onChange={(e) => setFormPartner(e.target.value)}
-                    placeholder={
-                      formType === 'IMPORT'
-                        ? 'Tên nhà cung ứng vật tư...'
-                        : 'Tên tổ thi công, công trình, dự án...'
-                    }
-                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2 text-white focus:outline-none focus:border-blue-500"
-                    required
-                  />
-                </div>
+              {/* Title */}
+              <div>
+                <label className="block text-slate-300 font-medium mb-1">
+                  Tiêu Đề / Diễn Giải <span className="text-rose-400">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={formTitle}
+                  onChange={(e) => setFormTitle(e.target.value)}
+                  placeholder={
+                    formType === 'IMPORT'
+                      ? 'Ví dụ: Đề xuất nhập kho cáp điện và phụ kiện...'
+                      : 'Ví dụ: Xuất cáp điện thi công tuyến 2...'
+                  }
+                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2 text-white focus:outline-none focus:border-blue-500"
+                  required
+                />
               </div>
 
               {/* Import vs Export Specific Inputs */}
@@ -956,13 +973,13 @@ export const TransactionManagementView: React.FC<TransactionManagementViewProps>
                       </div>
                       {isScanningProposal && (
                         <span className="text-[11px] text-amber-300 animate-pulse flex items-center gap-1">
-                          <Loader2 className="w-3 h-3 animate-spin" /> Đang nhận diện tờ trình...
+                          <Loader2 className="w-3 h-3 animate-spin" /> Đang phân tích tờ trình...
                         </span>
                       )}
                     </div>
                     <label className="flex items-center justify-center gap-2 px-4 py-2.5 bg-slate-900/80 hover:bg-slate-800/80 border border-dashed border-blue-500/50 rounded-xl cursor-pointer text-blue-300 hover:text-white text-xs transition-colors">
                       <Upload className="w-4 h-4 text-blue-400" />
-                      <span>Nhấp để tải lên hoặc kéo thả File/Ảnh Tờ Trình (PDF, PNG, JPG, TXT)</span>
+                      <span>Nhấp để tải lên File/Ảnh Tờ Trình (DOCX, PDF, PNG, JPG, TXT)</span>
                       <input
                         type="file"
                         accept="image/*,.pdf,.doc,.docx,.txt"
@@ -1033,6 +1050,7 @@ export const TransactionManagementView: React.FC<TransactionManagementViewProps>
                       onClick={() => {
                         setFormAttachmentName('');
                         setFormAttachmentUrl('');
+                        setFormAttachmentHtml('');
                       }}
                       className="text-[11px] text-rose-400 hover:underline flex items-center gap-1"
                     >
@@ -1049,7 +1067,7 @@ export const TransactionManagementView: React.FC<TransactionManagementViewProps>
                           src={formAttachmentUrl}
                           alt="Đính kèm"
                           className="w-9 h-9 object-cover rounded border border-slate-600 cursor-pointer"
-                          onClick={() => setLightboxImage(formAttachmentUrl)}
+                          onClick={() => setViewingDoc({ url: formAttachmentUrl, html: formAttachmentHtml, name: formAttachmentName })}
                         />
                       ) : (
                         <div className="w-9 h-9 rounded bg-blue-900/40 border border-blue-600 flex items-center justify-center text-blue-400">
@@ -1067,20 +1085,20 @@ export const TransactionManagementView: React.FC<TransactionManagementViewProps>
                     </div>
                     <button
                       type="button"
-                      onClick={() => setLightboxImage(formAttachmentUrl)}
+                      onClick={() => setViewingDoc({ url: formAttachmentUrl, html: formAttachmentHtml, name: formAttachmentName })}
                       className="px-2.5 py-1 bg-slate-700 hover:bg-slate-600 text-slate-200 text-[11px] font-medium rounded transition-colors shrink-0"
                     >
-                      Xem phóng to
+                      Xem trên hệ thống
                     </button>
                   </div>
                 ) : (
                   <div className="flex items-center gap-3">
                     <label className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-750 border border-dashed border-slate-700 rounded-xl cursor-pointer text-slate-400 hover:text-slate-200 text-xs transition-colors">
                       <Upload className="w-4 h-4 text-blue-400" />
-                      <span>Chọn ảnh hoặc file PDF tờ trình (Tùy chọn)</span>
+                      <span>Chọn ảnh hoặc file DOCX / PDF tờ trình (Tùy chọn)</span>
                       <input
                         type="file"
-                        accept="image/*,.pdf"
+                        accept="image/*,.pdf,.doc,.docx,.txt"
                         onChange={handleTransactionFileUpload}
                         className="hidden"
                       />
@@ -1361,15 +1379,13 @@ export const TransactionManagementView: React.FC<TransactionManagementViewProps>
                 <div className="flex items-center gap-3">
                   <AHTLogo className="h-10" showPlane={false} allowUpload={false} />
                   <div>
-                    <h4 className="font-bold text-xs sm:text-sm text-blue-950 uppercase tracking-tight">
-                      CÔNG TY CỔ PHẦN ĐẦU TƯ KHAI THÁC NHÀ GA QUỐC TẾ ĐÀ NẴNG
+                    <h4 className="font-bold text-xs sm:text-sm text-blue-950 uppercase tracking-tight leading-tight">
+                      CÔNG TY CỔ PHẦN ĐẦU TƯ KHAI THÁC<br />NHÀ GA QUỐC TẾ ĐÀ NẴNG
                     </h4>
-                    <p className="text-xs font-semibold text-slate-700">Đội Điện Nước Công Trình (DOIDNCT)</p>
                   </div>
                 </div>
                 <div className="text-right shrink-0">
                   <div className="text-xs font-bold text-slate-700 font-mono">Mẫu số: 01-VT</div>
-                  <div className="text-[11px] text-slate-500">Ban hành theo Thông tư 99/2025/TT-BTC</div>
                   <div className="text-xs font-bold text-blue-800 mt-1 font-mono">Số: {selectedTxForView.code}</div>
                   {selectedTxForView.type === 'IMPORT' && selectedTxForView.proposalNumber && (
                     <div className="text-[11px] font-semibold text-slate-700 font-mono mt-0.5">
@@ -1400,11 +1416,8 @@ export const TransactionManagementView: React.FC<TransactionManagementViewProps>
                   <div>
                     <strong>Kho thực hiện:</strong> {selectedTxForView.warehouse}
                   </div>
-                  <div>
-                    <strong>Nhà cung cấp:</strong> {selectedTxForView.partner}
-                  </div>
-                  <div className="sm:col-span-2">
-                    <strong>Lý do:</strong> {selectedTxForView.reason || 'Theo nhu cầu công việc'}
+                  <div className="sm:col-span-3">
+                    <strong>Lý do:</strong> {selectedTxForView.reason || 'Theo nhu cầu bảo trì và vận hành'}
                   </div>
                 </div>
               ) : (
@@ -1584,40 +1597,57 @@ export const TransactionManagementView: React.FC<TransactionManagementViewProps>
         </div>
       )}
 
-      {/* Modal: Lightbox Image Viewer */}
-      {lightboxImage && (
+      {/* Modal: In-App Document & Image Viewer (No Forced Download) */}
+      {viewingDoc && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-md animate-in fade-in duration-150"
-          onClick={() => setLightboxImage(null)}
+          onClick={() => setViewingDoc(null)}
         >
           <div
-            className="relative max-w-4xl max-h-[90vh] bg-slate-900 border border-slate-700 rounded-2xl overflow-hidden shadow-2xl p-2"
+            className="relative w-full max-w-4xl max-h-[90vh] bg-slate-900 border border-slate-700 rounded-2xl overflow-hidden shadow-2xl flex flex-col"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center justify-between p-2 border-b border-slate-800">
-              <span className="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
+            <div className="flex items-center justify-between p-3.5 border-b border-slate-800 bg-slate-850">
+              <div className="flex items-center gap-2">
                 <FileText className="w-4 h-4 text-blue-400" />
-                Tài Liệu / Ảnh Tờ Trình Đính Kèm
-              </span>
+                <span className="text-xs font-bold text-slate-200">
+                  {viewingDoc.name || 'Tài Liệu / Tờ Trình Đính Kèm'}
+                </span>
+                {viewingDoc.html && (
+                  <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-950 text-emerald-300 border border-emerald-800">
+                    Xem trực tiếp trên hệ thống (DOCX)
+                  </span>
+                )}
+              </div>
               <button
-                onClick={() => setLightboxImage(null)}
+                onClick={() => setViewingDoc(null)}
                 className="p-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
-            <div className="p-3 flex items-center justify-center overflow-auto max-h-[80vh]">
-              {lightboxImage.startsWith('data:image') || lightboxImage.includes('images.unsplash') ? (
-                <img
-                  src={lightboxImage}
-                  alt="Ảnh tờ trình phóng to"
-                  className="max-w-full max-h-[75vh] object-contain rounded-lg shadow-md"
-                />
+
+            <div className="p-4 sm:p-6 overflow-y-auto max-h-[80vh]">
+              {viewingDoc.html ? (
+                <div className="bg-white text-slate-900 p-6 rounded-xl shadow-inner max-w-none text-xs sm:text-sm leading-relaxed overflow-x-auto">
+                  <div
+                    dangerouslySetInnerHTML={{ __html: viewingDoc.html }}
+                    className="prose prose-sm max-w-none [&_table]:w-full [&_table]:border-collapse [&_table]:border [&_table]:border-slate-300 [&_th]:border [&_th]:border-slate-300 [&_th]:p-2 [&_th]:bg-slate-100 [&_td]:border [&_td]:border-slate-300 [&_td]:p-2 [&_p]:mb-2"
+                  />
+                </div>
+              ) : viewingDoc.url.startsWith('data:image') || viewingDoc.url.includes('images.unsplash') ? (
+                <div className="flex items-center justify-center">
+                  <img
+                    src={viewingDoc.url}
+                    alt={viewingDoc.name || 'Ảnh tờ trình'}
+                    className="max-w-full max-h-[75vh] object-contain rounded-lg shadow-md border border-slate-800"
+                  />
+                </div>
               ) : (
                 <iframe
-                  src={lightboxImage}
+                  src={viewingDoc.url}
                   title="Tài liệu tờ trình"
-                  className="w-full h-[75vh] rounded-lg"
+                  className="w-full h-[75vh] rounded-lg bg-white"
                 />
               )}
             </div>

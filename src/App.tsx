@@ -30,6 +30,7 @@ import {
   AlertCircle,
   X,
   Sparkles,
+  ShieldAlert,
 } from 'lucide-react';
 
 export function App() {
@@ -63,20 +64,20 @@ export function App() {
     localStorage.setItem('smart_users_v6', JSON.stringify(users));
   }, [users]);
 
+  const isMasterAdmin = currentUser?.email?.toLowerCase().trim() === 'vn.phuoc235@gmail.com';
+
   const [materials, setMaterials] = useState<Material[]>(() => {
-    const saved = localStorage.getItem('smart_materials_v9');
+    const saved = localStorage.getItem('smart_materials_v10');
     if (saved) {
       try {
         const parsed: Material[] = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length >= INITIAL_MATERIALS.length) {
-          return parsed;
-        }
-        // Merge missing materials so user gets the full 630+ materials catalog
-        const existingCodes = new Set(parsed.map((p) => p.code));
-        const missing = INITIAL_MATERIALS.filter((m) => !existingCodes.has(m.code));
-        const merged = [...parsed, ...missing];
-        if (merged.length >= INITIAL_MATERIALS.length) {
-          return merged;
+          // Check if codes follow the standard format
+          const regex = /^DN_(VT|CC|TT)_[A-Z0-9]{5}_\d{2,4}$/;
+          const hasInvalid = parsed.some(m => !regex.test(m.code));
+          if (!hasInvalid) {
+            return parsed;
+          }
         }
       } catch {
         return INITIAL_MATERIALS;
@@ -84,6 +85,11 @@ export function App() {
     }
     return INITIAL_MATERIALS;
   });
+
+  // Sync materials to localStorage
+  React.useEffect(() => {
+    localStorage.setItem('smart_materials_v10', JSON.stringify(materials));
+  }, [materials]);
 
   const [proposals, setProposals] = useState<PurchaseProposal[]>(() => {
     const saved = localStorage.getItem('smart_proposals_v2');
@@ -451,34 +457,70 @@ export function App() {
           )}
 
           {activeTab === 'users' && (
-            <UserManagementView
-              currentUser={currentUser}
-              allUsers={users}
-              onSelectUser={(u) => {
-                setCurrentUser(u);
-                localStorage.setItem('smart_auth_user_id', u.id);
-                showToast(`Đã chuyển phiên làm việc sang: ${u.fullName}`);
-              }}
-              onUpdateUser={handleUpdateUser}
-              onAddUser={handleAddUser}
-            />
+            isMasterAdmin ? (
+              <UserManagementView
+                currentUser={currentUser}
+                allUsers={users}
+                onSelectUser={(u) => {
+                  setCurrentUser(u);
+                  localStorage.setItem('smart_auth_user_id', u.id);
+                  showToast(`Đã chuyển phiên làm việc sang: ${u.fullName}`);
+                }}
+                onUpdateUser={handleUpdateUser}
+                onAddUser={handleAddUser}
+              />
+            ) : (
+              <div className="bg-slate-900 border border-red-500/30 rounded-2xl p-8 text-center max-w-lg mx-auto my-12">
+                <div className="w-16 h-16 rounded-full bg-red-500/10 text-red-400 flex items-center justify-center mx-auto mb-4 border border-red-500/20">
+                  <ShieldAlert className="w-8 h-8" />
+                </div>
+                <h3 className="text-xl font-bold text-white mb-2">Quyền Truy Cập Bị Giới Hạn</h3>
+                <p className="text-slate-400 text-sm mb-6 leading-relaxed">
+                  Mục Phân Quyền Người Dùng chỉ dành riêng cho tài khoản Quản trị viên cấp cao <strong className="text-amber-300">vn.phuoc235@gmail.com</strong>.
+                </p>
+                <button
+                  onClick={() => setActiveTab('dashboard')}
+                  className="px-6 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-sm font-semibold transition shadow-lg shadow-blue-600/30"
+                >
+                  Quay lại Bảng Điều Khiển
+                </button>
+              </div>
+            )
           )}
 
           {activeTab === 'settings' && (
-            <SettingsView
-              currentUser={currentUser}
-              allUsers={users}
-              materials={materials}
-              transactions={transactions}
-              onUpdateMaterials={(newMats) => {
-                setMaterials(newMats);
-                showToast(`Đã cập nhật danh mục gồm ${newMats.length} vật tư.`);
-              }}
-              onUpdateUsers={(newUsers) => {
-                setUsers(newUsers);
-                showToast(`Đã cập nhật danh sách người dùng.`);
-              }}
-            />
+            isMasterAdmin ? (
+              <SettingsView
+                currentUser={currentUser}
+                allUsers={users}
+                materials={materials}
+                transactions={transactions}
+                onUpdateMaterials={(newMats) => {
+                  setMaterials(newMats);
+                  showToast(`Đã cập nhật danh mục gồm ${newMats.length} vật tư.`);
+                }}
+                onUpdateUsers={(newUsers) => {
+                  setUsers(newUsers);
+                  showToast(`Đã cập nhật danh sách người dùng.`);
+                }}
+              />
+            ) : (
+              <div className="bg-slate-900 border border-red-500/30 rounded-2xl p-8 text-center max-w-lg mx-auto my-12">
+                <div className="w-16 h-16 rounded-full bg-red-500/10 text-red-400 flex items-center justify-center mx-auto mb-4 border border-red-500/20">
+                  <ShieldAlert className="w-8 h-8" />
+                </div>
+                <h3 className="text-xl font-bold text-white mb-2">Quyền Truy Cập Bị Giới Hạn</h3>
+                <p className="text-slate-400 text-sm mb-6 leading-relaxed">
+                  Mục Cài Đặt Hệ Thống chỉ dành riêng cho tài khoản Quản trị viên cấp cao <strong className="text-amber-300">vn.phuoc235@gmail.com</strong>.
+                </p>
+                <button
+                  onClick={() => setActiveTab('dashboard')}
+                  className="px-6 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-sm font-semibold transition shadow-lg shadow-blue-600/30"
+                >
+                  Quay lại Bảng Điều Khiển
+                </button>
+              </div>
+            )
           )}
 
           {activeTab === 'ai' && (

@@ -62,8 +62,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
       icon: FileSpreadsheet,
       description: 'Mẫu TT 99/2025/TT-BTC & PDF',
     },
-    // ADMIN ONLY: Completely hidden if not ADMIN!
-    ...(currentUser.role === 'ADMIN'
+    // MASTER ADMIN ONLY (vn.phuoc235@gmail.com): Strictly restricted!
+    ...(currentUser.email?.toLowerCase().trim() === 'vn.phuoc235@gmail.com'
       ? [
           {
             id: 'users',

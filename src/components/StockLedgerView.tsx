@@ -496,8 +496,8 @@ export const StockLedgerView: React.FC<StockLedgerViewProps> = ({
                 <div className="flex items-center gap-3">
                   <AHTLogo className="h-10 w-auto" showPlane={false} allowUpload={false} />
                   <div>
-                    <div className="text-xs sm:text-sm font-bold tracking-wide text-slate-200 uppercase">
-                      CÔNG TY CỔ PHẦN ĐẦU TƯ KHAI THÁC NHÀ GA QUỐC TẾ ĐÀ NẴNG
+                    <div className="text-xs sm:text-sm font-bold tracking-wide text-slate-200 uppercase leading-tight">
+                      CÔNG TY CỔ PHẦN ĐẦU TƯ KHAI THÁC<br />NHÀ GA QUỐC TẾ ĐÀ NẴNG
                     </div>
                   </div>
                 </div>
@@ -865,11 +865,8 @@ export const StockLedgerView: React.FC<StockLedgerViewProps> = ({
                 <div className="flex items-center gap-3">
                   <AHTLogo className="h-10 w-auto" showPlane={false} allowUpload={false} />
                   <div>
-                    <div className="text-xs sm:text-sm font-black tracking-wide text-slate-200 uppercase">
-                      CÔNG TY CỔ PHẦN ĐẦU TƯ KHAI THÁC NHÀ GA QUỐC TẾ ĐÀ NẴNG
-                    </div>
-                    <div className="text-[11px] sm:text-xs text-slate-400 font-medium">
-                      ĐỘI ĐIỆN NƯỚC CÔNG TRÌNH (DOIDNCT)
+                    <div className="text-xs sm:text-sm font-black tracking-wide text-slate-200 uppercase leading-tight">
+                      CÔNG TY CỔ PHẦN ĐẦU TƯ KHAI THÁC<br />NHÀ GA QUỐC TẾ ĐÀ NẴNG
                     </div>
                   </div>
                 </div>

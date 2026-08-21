@@ -74,6 +74,7 @@ export interface PurchaseProposal {
   attachmentUrl?: string; // Data URL or Image/PDF link
   attachmentName?: string;
   attachmentType?: 'image' | 'pdf' | 'document';
+  attachmentHtml?: string; // Rich HTML rendered from docx for in-app viewing without downloading
   items: ProposalItem[];
   notes?: string;
   createdAt: string;
@@ -88,9 +89,11 @@ export interface InventoryTransaction {
   proposalAttachmentUrl?: string; // Ảnh/File tờ trình đính kèm
   proposalAttachmentName?: string;
   proposalAttachmentType?: 'image' | 'pdf' | 'document';
+  proposalAttachmentHtml?: string; // Rendered HTML for docx
   attachmentUrl?: string; // Tương thích đính kèm
   attachmentName?: string;
   attachmentType?: 'image' | 'pdf' | 'document';
+  attachmentHtml?: string;
   date: string; // YYYY-MM-DD
   creatorEmail: string;
   creatorName: string;
