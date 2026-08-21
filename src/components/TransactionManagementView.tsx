@@ -54,6 +54,8 @@ interface TransactionManagementViewProps {
   onRejectTransaction: (txId: string, note?: string) => void;
   onUpdateProposal?: (proposal: PurchaseProposal) => void;
   onCreateProposal?: (proposal: PurchaseProposal) => void;
+  onDeleteTransaction?: (txId: string) => void;
+  onDeleteProposal?: (proposalId: string) => void;
   initialType?: 'IMPORT' | 'EXPORT';
   initialStatusFilter?: string;
   preselectedMaterialCode?: string;
@@ -71,6 +73,8 @@ export const TransactionManagementView: React.FC<TransactionManagementViewProps>
   onRejectTransaction,
   onUpdateProposal,
   onCreateProposal,
+  onDeleteTransaction,
+  onDeleteProposal,
   initialType,
   initialStatusFilter,
   preselectedMaterialCode,
@@ -81,6 +85,7 @@ export const TransactionManagementView: React.FC<TransactionManagementViewProps>
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedTxForView, setSelectedTxForView] = useState<InventoryTransaction | null>(null);
   const [viewingDoc, setViewingDoc] = useState<{ url: string; html?: string; name?: string } | null>(null);
+  const [txToDelete, setTxToDelete] = useState<InventoryTransaction | null>(null);
 
   // Approval Modal state
   const [approvingTx, setApprovingTx] = useState<InventoryTransaction | null>(null);
@@ -312,6 +317,81 @@ export const TransactionManagementView: React.FC<TransactionManagementViewProps>
       const dataUrl = event.target?.result as string;
       setFormAttachmentUrl(dataUrl);
 
+      let detectedItems: any[] = [];
+      let detectedPropNum = '';
+      let detectedTitle = '';
+      let detectedReason = '';
+
+      // 1. Client-side extraction from HTML / rawText
+      if (docHtml) {
+        try {
+          const parser = new DOMParser();
+          const doc = parser.parseFromString(docHtml, 'text/html');
+          
+          // Extract proposal number from text
+          const allText = doc.body.textContent || rawText;
+          const propNumMatch = allText.match(/(?:Tờ\s*trình\s*(?:số)?|Số)\s*[:.]?\s*([0-9A-Z_/-]+)/i);
+          if (propNumMatch && propNumMatch[1]) {
+            detectedPropNum = propNumMatch[1].trim();
+          }
+
+          const titleMatch = allText.match(/(?:V\/v|Về\s*việc)\s*[:.]?\s*([^\n\r]+)/i);
+          if (titleMatch && titleMatch[1]) {
+            detectedTitle = titleMatch[1].trim();
+          }
+
+          // Parse table rows
+          const rows = Array.from(doc.querySelectorAll('tr'));
+          for (const row of rows) {
+            const cells = Array.from(row.querySelectorAll('td, th')).map((c) => (c.textContent || '').trim());
+            if (cells.length >= 3) {
+              // Find matching material from cell text
+              for (const cellText of cells) {
+                if (!cellText || cellText.length < 3) continue;
+                // Check if any material code matches exactly
+                const matchByCode = materials.find((m) => m.code.toLowerCase() === cellText.toLowerCase());
+                // Or check if material name is in cellText or vice versa
+                const matchByName = !matchByCode ? materials.find((m) => {
+                  const mName = m.name.toLowerCase();
+                  const cName = cellText.toLowerCase();
+                  return cName.includes(mName) || (mName.length > 5 && mName.includes(cName));
+                }) : null;
+
+                const matchedMat = matchByCode || matchByName;
+                if (matchedMat) {
+                  // Find numeric quantity in other cells
+                  let quantity = 1;
+                  let unitPrice = matchedMat.unitPrice;
+
+                  const numbersInRow = cells
+                    .map((c) => c.replace(/[,.](?=\d{3})/g, '').replace(/,/g, '.'))
+                    .map((c) => parseFloat(c))
+                    .filter((n) => !isNaN(n) && n > 0 && n < 1000000);
+
+                  if (numbersInRow.length > 0) {
+                    // Usually quantity is smaller than price
+                    quantity = numbersInRow.find((n) => n <= 5000) || numbersInRow[0] || 1;
+                  }
+
+                  if (!detectedItems.some((it) => it.materialCode === matchedMat.code)) {
+                    detectedItems.push({
+                      materialCode: matchedMat.code,
+                      quantity: Math.max(1, Math.round(quantity)),
+                      unitPrice: unitPrice,
+                      notes: `Quét từ tệp ${file.name}`,
+                    });
+                  }
+                  break;
+                }
+              }
+            }
+          }
+        } catch (parseErr) {
+          console.warn('Client DOM parsing error:', parseErr);
+        }
+      }
+
+      // 2. Also try Server Gemini API for advanced semantic understanding
       try {
         const res = await fetch('/api/ai/scan-proposal', {
           method: 'POST',
@@ -321,7 +401,7 @@ export const TransactionManagementView: React.FC<TransactionManagementViewProps>
             fileName: file.name,
             fileText: rawText,
             docHtml: docHtml,
-            availableMaterials: materials.slice(0, 100).map((m) => ({
+            availableMaterials: materials.slice(0, 150).map((m) => ({
               code: m.code,
               name: m.name,
               unit: m.unit,
@@ -332,11 +412,11 @@ export const TransactionManagementView: React.FC<TransactionManagementViewProps>
 
         if (res.ok) {
           const data = await res.json();
-          if (data.proposalNumber) setFormProposalNumber(data.proposalNumber);
-          if (data.title) setFormTitle(data.title);
-          if (data.reason) setFormReason(data.reason);
+          if (data.proposalNumber) detectedPropNum = data.proposalNumber;
+          if (data.title) detectedTitle = data.title;
+          if (data.reason) detectedReason = data.reason;
           if (Array.isArray(data.items) && data.items.length > 0) {
-            const mapped = data.items.map((it: any) => {
+            detectedItems = data.items.map((it: any) => {
               const match =
                 materials.find((m) => m.code === it.materialCode) ||
                 materials.find((m) => m.name.toLowerCase().includes((it.materialName || '').toLowerCase())) ||
@@ -348,19 +428,24 @@ export const TransactionManagementView: React.FC<TransactionManagementViewProps>
                 notes: it.notes || `Tự động quét từ Tờ trình ${data.proposalNumber || ''}`,
               };
             });
-            setFormItems(mapped);
-            setScanFeedback(`✨ Quét thành công! Đã tự động điền Tờ trình "${data.proposalNumber}" và ${mapped.length} mặt hàng.`);
-          } else {
-            setScanFeedback(`✨ Đã nhận diện Tờ trình "${data.proposalNumber}".`);
           }
-        } else {
-          setScanFeedback('Đã đính kèm tệp tờ trình.');
         }
       } catch {
-        setScanFeedback('Đã đính kèm tệp tờ trình.');
-      } finally {
-        setIsScanningProposal(false);
+        // Continue with client-side detected items
       }
+
+      // Apply detected fields to form
+      if (detectedPropNum) setFormProposalNumber(detectedPropNum);
+      if (detectedTitle) setFormTitle(detectedTitle);
+      if (detectedReason) setFormReason(detectedReason);
+      if (detectedItems.length > 0) {
+        setFormItems(detectedItems);
+        setScanFeedback(`✨ Quét thành công! Đã tự động nhận diện Tờ trình "${detectedPropNum || file.name}" và điền ${detectedItems.length} mặt hàng.`);
+      } else {
+        setScanFeedback(`✨ Đã gắn tệp "${file.name}". Bạn có thể chọn tiếp các mặt hàng cần nhập.`);
+      }
+
+      setIsScanningProposal(false);
     };
     reader.readAsDataURL(file);
   };
@@ -698,6 +783,7 @@ export const TransactionManagementView: React.FC<TransactionManagementViewProps>
           onStartImportForProposal={handleStartImportForProposal}
           onUpdateProposal={onUpdateProposal}
           onCreateProposal={onCreateProposal}
+          onDeleteProposal={onDeleteProposal}
         />
       ) : (
         <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-sm">
@@ -838,6 +924,18 @@ export const TransactionManagementView: React.FC<TransactionManagementViewProps>
                               <XCircle className="w-3 h-3" /> Từ chối
                             </button>
                           </>
+                        )}
+
+                        {/* Admin Delete button for wrong transactions */}
+                        {(currentUser.email === 'vn.phuoc235@gmail.com' || currentUser.role === 'ADMIN') && onDeleteTransaction && (
+                          <button
+                            id={`btn-delete-tx-${tx.id}`}
+                            onClick={() => setTxToDelete(tx)}
+                            className="p-1.5 rounded-lg bg-slate-800 hover:bg-rose-900/50 text-slate-400 hover:text-rose-300 border border-slate-700/80 hover:border-rose-500/40 transition-colors"
+                            title="Xóa phiếu này"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
                         )}
                       </div>
                     </td>
@@ -1650,6 +1748,49 @@ export const TransactionManagementView: React.FC<TransactionManagementViewProps>
                   className="w-full h-[75vh] rounded-lg bg-white"
                 />
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Confirm Delete Transaction */}
+      {txToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in">
+          <div className="w-full max-w-md bg-slate-900 border border-slate-700 rounded-2xl p-6 shadow-2xl space-y-4">
+            <div className="flex items-center gap-3 text-rose-400">
+              <div className="w-10 h-10 rounded-xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center">
+                <Trash2 className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-white">Xác Nhận Xóa Phiếu Kho</h3>
+                <p className="text-xs text-slate-400 font-mono">{txToDelete.code}</p>
+              </div>
+            </div>
+
+            <p className="text-xs text-slate-300 leading-relaxed">
+              Bạn có chắc chắn muốn xóa phiếu <strong className="text-amber-300">{txToDelete.code}</strong> ({txToDelete.type === 'IMPORT' ? 'Nhập kho' : 'Xuất kho'})? Số lượng tồn kho và thẻ kho của các mặt hàng liên quan sẽ được tự động hoàn tác và cập nhật lại ngay lập tức.
+            </p>
+
+            <div className="flex items-center justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setTxToDelete(null)}
+                className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 transition"
+              >
+                Hủy bỏ
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (onDeleteTransaction) {
+                    onDeleteTransaction(txToDelete.id);
+                  }
+                  setTxToDelete(null);
+                }}
+                className="px-4 py-2 rounded-xl text-xs font-bold bg-rose-600 hover:bg-rose-500 text-white shadow-md shadow-rose-600/30 transition"
+              >
+                Xác Nhận Xóa
+              </button>
             </div>
           </div>
         </div>

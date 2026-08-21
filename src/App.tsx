@@ -67,14 +67,14 @@ export function App() {
   const isMasterAdmin = currentUser?.email?.toLowerCase().trim() === 'vn.phuoc235@gmail.com';
 
   const [materials, setMaterials] = useState<Material[]>(() => {
-    const saved = localStorage.getItem('smart_materials_v10');
+    const saved = localStorage.getItem('smart_materials_v11');
     if (saved) {
       try {
         const parsed: Material[] = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length >= INITIAL_MATERIALS.length) {
-          // Check if codes follow the standard format
-          const regex = /^DN_(VT|CC|TT)_[A-Z0-9]{5}_\d{2,4}$/;
-          const hasInvalid = parsed.some(m => !regex.test(m.code));
+          // Check if codes follow the standard format DN_VT or DN_CC
+          const regex = /^DN_(VT|CC)_[A-Z0-9]{5}_\d{2,4}$/;
+          const hasInvalid = parsed.some((m) => !regex.test(m.code));
           if (!hasInvalid) {
             return parsed;
           }
@@ -88,7 +88,7 @@ export function App() {
 
   // Sync materials to localStorage
   React.useEffect(() => {
-    localStorage.setItem('smart_materials_v10', JSON.stringify(materials));
+    localStorage.setItem('smart_materials_v11', JSON.stringify(materials));
   }, [materials]);
 
   const [proposals, setProposals] = useState<PurchaseProposal[]>(() => {
@@ -293,6 +293,46 @@ export function App() {
     showToast(`Đã từ chối phiếu giao dịch "${txId}".`, 'error');
   };
 
+  // Handler: Delete Transaction (Master Admin / Admin)
+  const handleDeleteTransaction = (txId: string) => {
+    const tx = transactions.find((t) => t.id === txId);
+    setTransactions((prev) => prev.filter((t) => t.id !== txId));
+    showToast(
+      `Đã xóa chứng từ "${tx?.code || txId}". Số lượng tồn kho và thẻ kho đã được tự động tính toán lại!`,
+      'info'
+    );
+  };
+
+  // Handler: Delete Proposal (Master Admin / Admin)
+  const handleDeleteProposal = (propId: string) => {
+    const prop = proposals.find((p) => p.id === propId);
+    setProposals((prev) => prev.filter((p) => p.id !== propId));
+    showToast(
+      `Đã xóa Tờ trình "${prop?.proposalNumber || propId}" thành công.`,
+      'info'
+    );
+  };
+
+  // Handler: Reset Default Demo Data
+  const handleResetDemoData = () => {
+    setMaterials(INITIAL_MATERIALS);
+    setTransactions(INITIAL_TRANSACTIONS);
+    setProposals(INITIAL_PROPOSALS);
+    localStorage.setItem('smart_materials_v11', JSON.stringify(INITIAL_MATERIALS));
+    localStorage.setItem('smart_transactions_v6', JSON.stringify(INITIAL_TRANSACTIONS));
+    localStorage.setItem('smart_proposals_v2', JSON.stringify(INITIAL_PROPOSALS));
+    showToast('Đã khôi phục dữ liệu mẫu gốc chuẩn AHT thành công!', 'success');
+  };
+
+  // Handler: Clear All Demo Data for Real Data Import
+  const handleClearAllTransactionsAndProposals = () => {
+    setTransactions([]);
+    setProposals([]);
+    localStorage.setItem('smart_transactions_v6', JSON.stringify([]));
+    localStorage.setItem('smart_proposals_v2', JSON.stringify([]));
+    showToast('Đã dọn dẹp sạch toàn bộ chứng từ & tờ trình thử nghiệm. Sẵn sàng nhập số liệu thực tế!', 'success');
+  };
+
   // Handler: Open Stock Card
   const handleOpenStockCard = (materialCode: string) => {
     setPreselectedMaterialCode(materialCode);
@@ -438,9 +478,11 @@ export function App() {
               proposals={proposals}
               onUpdateProposal={handleUpdateProposal}
               onCreateProposal={handleCreateProposal}
+              onDeleteProposal={handleDeleteProposal}
               onCreateTransaction={handleCreateTransaction}
               onApproveTransaction={handleApproveTransaction}
               onRejectTransaction={handleRejectTransaction}
+              onDeleteTransaction={handleDeleteTransaction}
               initialType={transactionTypePreset}
               initialStatusFilter={transactionStatusFilterPreset}
               preselectedMaterialCode={preselectedMaterialCode}
@@ -495,6 +537,11 @@ export function App() {
                 allUsers={users}
                 materials={materials}
                 transactions={transactions}
+                proposals={proposals}
+                onDeleteProposal={handleDeleteProposal}
+                onDeleteTransaction={handleDeleteTransaction}
+                onResetDemoData={handleResetDemoData}
+                onClearAllTransactionsAndProposals={handleClearAllTransactionsAndProposals}
                 onUpdateMaterials={(newMats) => {
                   setMaterials(newMats);
                   showToast(`Đã cập nhật danh mục gồm ${newMats.length} vật tư.`);

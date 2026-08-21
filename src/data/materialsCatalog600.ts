@@ -294,7 +294,7 @@ function generateComprehensiveCatalog(): Material[] {
     });
   });
 
-  // 2.2 Aptomat khối MCCB Schneider EasyPact EZC (21 mã) -> DN_TT_MCCBS_01..21
+  // 2.2 Aptomat khối MCCB Schneider EasyPact EZC (21 mã) -> DN_VT_MCCBS_01..21
   const mccbRatings = [
     { amp: '40A', poles: '3P', ics: '15kA', price: 680000 },
     { amp: '50A', poles: '3P', ics: '15kA', price: 720000 },
@@ -321,7 +321,7 @@ function generateComprehensiveCatalog(): Material[] {
   mccbRatings.forEach((mc, idx) => {
     items.push({
       id: `mat_dn_mccb_${idCounter++}`,
-      code: `DN_TT_MCCBS_${pad2(idx + 1)}`,
+      code: `DN_VT_MCCBS_${pad2(idx + 1)}`,
       name: `Aptomat khối MCCB Schneider EasyPact ${mc.poles} ${mc.amp} (${mc.ics})`,
       category: 'Thiết bị Điện & Trạm trung thế',
       unit: 'Bộ',
@@ -368,7 +368,7 @@ function generateComprehensiveCatalog(): Material[] {
     });
   });
 
-  // 2.4 Chống dòng rò RCBO & Chống sét SPD (12 mã) -> DN_VT_RCBOS_01..07 & DN_TT_SPDSN_01..05
+  // 2.4 Chống dòng rò RCBO & Chống sét SPD (12 mã) -> DN_VT_RCBOS_01..07 & DN_VT_SPDSN_01..05
   ['2P-25A-30mA', '2P-32A-30mA', '2P-40A-30mA', '2P-63A-30mA', '4P-40A-30mA', '4P-63A-30mA', '4P-100A-300mA'].forEach((rcbo, idx) => {
     items.push({
       id: `mat_dn_rcbo_${idCounter++}`,
@@ -388,7 +388,7 @@ function generateComprehensiveCatalog(): Material[] {
   ['1P-40kA', '2P-40kA', '3P+N-40kA', '3P+N-65kA', '3P+N-100kA'].forEach((spd, idx) => {
     items.push({
       id: `mat_dn_spd_${idCounter++}`,
-      code: `DN_TT_SPDSN_${pad2(idx + 1)}`,
+      code: `DN_VT_SPDSN_${pad2(idx + 1)}`,
       name: `Thiết bị chống sét lan truyền đường nguồn AC Schneider iPRD ${spd} (Type 2)`,
       category: 'Thiết bị Điện & Trạm trung thế',
       unit: 'Bộ',
@@ -812,7 +812,7 @@ function generateComprehensiveCatalog(): Material[] {
   });
 
   // =========================================================================
-  // 5. PHÂN HỆ THIẾT BỊ VỆ SINH & XỬ LÝ NƯỚC (~120 MÃ) -> DN_TT_TBVS0_01..24
+  // 5. PHÂN HỆ THIẾT BỊ VỆ SINH & XỬ LÝ NƯỚC (~120 MÃ) -> DN_VT_TBVS0_01..24
   // =========================================================================
   const sanitaryItems = [
     { name: 'Bộ van xả tiểu nam cảm ứng âm tường TOTO DUE126UEK', price: 4850000 },
@@ -843,7 +843,7 @@ function generateComprehensiveCatalog(): Material[] {
   sanitaryItems.forEach((st, idx) => {
     items.push({
       id: `mat_dn_st_${idCounter++}`,
-      code: `DN_TT_TBVS0_${pad2(idx + 1)}`,
+      code: `DN_VT_TBVS0_${pad2(idx + 1)}`,
       name: st.name,
       category: 'Thiết bị vệ sinh & Xử lý nước',
       unit: 'Bộ',

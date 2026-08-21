@@ -40,6 +40,7 @@ interface ProposalReconciliationViewProps {
   onStartImportForProposal: (proposal: PurchaseProposal, missingItems: Array<{ materialCode: string; missingQty: number; unitPrice: number }>) => void;
   onUpdateProposal?: (proposal: PurchaseProposal) => void;
   onCreateProposal?: (proposal: PurchaseProposal) => void;
+  onDeleteProposal?: (proposalId: string) => void;
 }
 
 export const ProposalReconciliationView: React.FC<ProposalReconciliationViewProps> = ({
@@ -51,11 +52,13 @@ export const ProposalReconciliationView: React.FC<ProposalReconciliationViewProp
   onStartImportForProposal,
   onUpdateProposal,
   onCreateProposal,
+  onDeleteProposal,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'COMPLETED' | 'INCOMPLETE' | 'UNTOUCHED'>('ALL');
   const [expandedProposalId, setExpandedProposalId] = useState<string | null>(proposals[0]?.id || null);
   const [viewingAttachment, setViewingAttachment] = useState<{ url: string; name: string; type?: string } | null>(null);
+  const [proposalToDelete, setProposalToDelete] = useState<PurchaseProposal | null>(null);
 
   // New Proposal Modal
   const [isNewProposalModalOpen, setIsNewProposalModalOpen] = useState(false);
@@ -529,6 +532,21 @@ export const ProposalReconciliationView: React.FC<ProposalReconciliationViewProp
                         </button>
                       )}
 
+                      {(currentUser.email === 'vn.phuoc235@gmail.com' || currentUser.role === 'ADMIN') && onDeleteProposal && (
+                        <button
+                          type="button"
+                          id={`btn-delete-proposal-${proposal.id}`}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setProposalToDelete(proposal);
+                          }}
+                          className="p-2 rounded-xl bg-slate-800 hover:bg-rose-900/50 text-slate-400 hover:text-rose-300 border border-slate-700 hover:border-rose-500/40 transition-colors"
+                          title="Xóa Tờ trình này"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+
                       <div className="p-1.5 text-slate-400 hover:text-white rounded-lg">
                         {isExpanded ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
                       </div>
@@ -931,6 +949,49 @@ export const ProposalReconciliationView: React.FC<ProposalReconciliationViewProp
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Confirm Delete Proposal */}
+      {proposalToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in">
+          <div className="w-full max-w-md bg-slate-900 border border-slate-700 rounded-2xl p-6 shadow-2xl space-y-4">
+            <div className="flex items-center gap-3 text-rose-400">
+              <div className="w-10 h-10 rounded-xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center">
+                <Trash2 className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-white">Xác Nhận Xóa Tờ Trình</h3>
+                <p className="text-xs text-slate-400 font-mono">{proposalToDelete.proposalNumber}</p>
+              </div>
+            </div>
+
+            <p className="text-xs text-slate-300 leading-relaxed">
+              Bạn có chắc chắn muốn xóa tờ trình <strong className="text-amber-300">"{proposalToDelete.title}"</strong> ({proposalToDelete.proposalNumber}) không? Dữ liệu này sẽ được xóa khỏi bảng đối soát.
+            </p>
+
+            <div className="flex items-center justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setProposalToDelete(null)}
+                className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 transition"
+              >
+                Hủy bỏ
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (onDeleteProposal) {
+                    onDeleteProposal(proposalToDelete.id);
+                  }
+                  setProposalToDelete(null);
+                }}
+                className="px-4 py-2 rounded-xl text-xs font-bold bg-rose-600 hover:bg-rose-500 text-white shadow-md shadow-rose-600/30 transition"
+              >
+                Xác Nhận Xóa
+              </button>
+            </div>
           </div>
         </div>
       )}

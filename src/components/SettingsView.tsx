@@ -22,7 +22,8 @@ import {
   Image as ImageIcon,
 } from 'lucide-react';
 import { STANDARD_UNITS } from '../data/seedData';
-import { User, Material, InventoryTransaction } from '../types';
+import { User, Material, InventoryTransaction, PurchaseProposal } from '../types';
+import { formatVND, formatNumber, formatDisplayDate } from '../utils/inventoryEngine';
 import { AHTLogo } from './AHTLogo';
 import { ExcelStockImportModal } from './ExcelStockImportModal';
 
@@ -31,8 +32,13 @@ interface SettingsViewProps {
   allUsers: User[];
   materials: Material[];
   transactions: InventoryTransaction[];
+  proposals?: PurchaseProposal[];
   onUpdateMaterials?: (materials: Material[]) => void;
   onUpdateUsers?: (users: User[]) => void;
+  onDeleteProposal?: (proposalId: string) => void;
+  onDeleteTransaction?: (txId: string) => void;
+  onResetDemoData?: () => void;
+  onClearAllTransactionsAndProposals?: () => void;
 }
 
 export const SettingsView: React.FC<SettingsViewProps> = ({
@@ -40,10 +46,15 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   allUsers,
   materials,
   transactions,
+  proposals = [],
   onUpdateMaterials,
   onUpdateUsers,
+  onDeleteProposal,
+  onDeleteTransaction,
+  onResetDemoData,
+  onClearAllTransactionsAndProposals,
 }) => {
-  const [activeTab, setActiveTab] = useState<'UNITS_PASSWORD' | 'LOGO_COMPANY' | 'IMPORT_STOCK' | 'BACKUP'>('UNITS_PASSWORD');
+  const [activeTab, setActiveTab] = useState<'UNITS_PASSWORD' | 'LOGO_COMPANY' | 'IMPORT_STOCK' | 'DATA_MANAGEMENT' | 'BACKUP'>('UNITS_PASSWORD');
 
   // --- UNIT MANAGEMENT STATE ---
   const [units, setUnits] = useState<string[]>(() => {
@@ -112,6 +123,13 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
 
   // --- EXCEL IMPORT MODAL STATE ---
   const [isExcelModalOpen, setIsExcelModalOpen] = useState(false);
+
+  // --- DATA MANAGEMENT STATE (ADMIN DELETIONS) ---
+  const [dataSubTab, setDataSubTab] = useState<'PROPOSALS' | 'TRANSACTIONS'>('PROPOSALS');
+  const [propToDelete, setPropToDelete] = useState<PurchaseProposal | null>(null);
+  const [txToDelete, setTxToDelete] = useState<InventoryTransaction | null>(null);
+  const [showClearAllModal, setShowClearAllModal] = useState(false);
+  const [showResetDemoModal, setShowResetDemoModal] = useState(false);
 
   // Security guard: Admin only
   if (currentUser.role !== 'ADMIN') {
@@ -301,6 +319,18 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         >
           <FileSpreadsheet className="w-4 h-4 text-emerald-400" />
           <span>Import File Tồn Kho (Excel / CSV)</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('DATA_MANAGEMENT')}
+          className={`px-4 py-3 text-xs font-bold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${
+            activeTab === 'DATA_MANAGEMENT'
+              ? 'border-amber-500 text-amber-400 bg-amber-500/10 rounded-t-xl'
+              : 'border-transparent text-slate-400 hover:text-slate-200'
+          }`}
+        >
+          <Trash2 className="w-4 h-4 text-amber-400" />
+          <span>Quản Lý & Xóa Tờ Trình / Chứng Từ Sai ({proposals.length + transactions.length})</span>
         </button>
 
         <button
@@ -612,7 +642,263 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         </div>
       )}
 
-      {/* TAB 4: BACKUP & RESTORE */}
+      {/* TAB 4: DATA MANAGEMENT (ADMIN DELETE/RESET) */}
+      {activeTab === 'DATA_MANAGEMENT' && (
+        <div className="space-y-6">
+          {/* Top Banner Notice */}
+          <div className="bg-gradient-to-r from-amber-950/40 via-slate-900 to-slate-900 border border-amber-500/30 rounded-2xl p-5 shadow-sm space-y-2">
+            <div className="flex items-center gap-2">
+              <span className="w-1.5 h-5 bg-amber-500 rounded-full"></span>
+              <h2 className="text-sm font-bold text-amber-300 uppercase tracking-wide flex items-center gap-2">
+                <Trash2 className="w-4 h-4 text-amber-400" />
+                Quản Trị & Xóa Dữ Liệu Tờ Trình / Chứng Từ Nhập Sai
+              </h2>
+            </div>
+            <p className="text-xs text-slate-300 leading-relaxed">
+              Khu vực dành riêng cho Quản trị viên cấp cao <strong className="text-amber-300">{currentUser.email}</strong>. Bạn có thể xóa các tờ trình hoặc phiếu nhập/xuất bị sai trong giai đoạn thử nghiệm. Khi xóa hoặc nhập file thực tế, hệ thống sẽ tự động tính toán lại tồn kho và thẻ kho theo thời gian thực.
+            </p>
+
+            {/* Quick Actions Row */}
+            <div className="flex flex-wrap items-center gap-3 pt-3">
+              <button
+                type="button"
+                onClick={() => setShowClearAllModal(true)}
+                className="bg-rose-900/40 hover:bg-rose-800/60 text-rose-200 border border-rose-500/40 px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition shadow-sm"
+              >
+                <Trash2 className="w-3.5 h-3.5 text-rose-400" />
+                <span>Xóa Toàn Bộ Chứng Từ & Tờ Trình Demo (Để Nạp Dữ Liệu Thực Tế)</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setShowResetDemoModal(true)}
+                className="bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition"
+              >
+                <RefreshCw className="w-3.5 h-3.5 text-blue-400" />
+                <span>Khôi Phục Dữ Liệu Mẫu Chuẩn AHT</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Sub-tab Navigation */}
+          <div className="flex items-center gap-2 bg-slate-900 p-1.5 rounded-xl border border-slate-800 w-fit">
+            <button
+              onClick={() => setDataSubTab('PROPOSALS')}
+              className={`px-4 py-2 rounded-lg text-xs font-bold transition flex items-center gap-2 ${
+                dataSubTab === 'PROPOSALS'
+                  ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              <FileSpreadsheet className="w-3.5 h-3.5" />
+              <span>Danh Sách Tờ Trình Mua Sắm ({proposals.length})</span>
+            </button>
+            <button
+              onClick={() => setDataSubTab('TRANSACTIONS')}
+              className={`px-4 py-2 rounded-lg text-xs font-bold transition flex items-center gap-2 ${
+                dataSubTab === 'TRANSACTIONS'
+                  ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              <Layers className="w-3.5 h-3.5" />
+              <span>Danh Sách Phiếu Nhập / Xuất Kho ({transactions.length})</span>
+            </button>
+          </div>
+
+          {/* Sub-tab 1: PROPOSALS */}
+          {dataSubTab === 'PROPOSALS' && (
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-sm">
+              <div className="p-4 border-b border-slate-800 flex items-center justify-between">
+                <div>
+                  <h3 className="text-xs font-bold text-white uppercase tracking-wider">
+                    Các Tờ Trình Đã Lưu Trong Hệ Thống
+                  </h3>
+                  <p className="text-[11px] text-slate-400 mt-0.5">
+                    Nhấp nút "Xóa" tại hàng tương ứng để loại bỏ tờ trình nhập sai hoặc thử nghiệm
+                  </p>
+                </div>
+                <span className="text-xs font-mono bg-blue-900/40 text-blue-300 border border-blue-700/50 px-2.5 py-1 rounded-full font-bold">
+                  {proposals.length} Tờ trình
+                </span>
+              </div>
+
+              {proposals.length === 0 ? (
+                <div className="p-8 text-center text-slate-400 text-xs">
+                  Chưa có tờ trình nào được lưu hoặc toàn bộ đã được dọn dẹp.
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs border-collapse">
+                    <thead>
+                      <tr className="bg-slate-950/60 text-slate-400 border-b border-slate-800 text-[11px] uppercase tracking-wider font-semibold">
+                        <th className="py-2.5 px-3">STT</th>
+                        <th className="py-2.5 px-3">Số Tờ Trình</th>
+                        <th className="py-2.5 px-3">Tiêu Đề / Diễn Giải</th>
+                        <th className="py-2.5 px-3">Ngày Lập</th>
+                        <th className="py-2.5 px-3">Người Đề Xuất</th>
+                        <th className="py-2.5 px-3 text-center">Số Mặt Hàng</th>
+                        <th className="py-2.5 px-3 text-right">Tổng Tiền</th>
+                        <th className="py-2.5 px-3 text-center">Thao Tác</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-800 text-slate-300 font-sans">
+                      {proposals.map((prop, idx) => (
+                        <tr key={prop.id} className="hover:bg-slate-800/40 transition">
+                          <td className="py-3 px-3 font-mono text-slate-400">{idx + 1}</td>
+                          <td className="py-3 px-3 font-mono font-bold text-amber-400">
+                            {prop.proposalNumber}
+                          </td>
+                          <td className="py-3 px-3">
+                            <div className="font-semibold text-slate-200">{prop.title}</div>
+                            {prop.reason && (
+                              <div className="text-[11px] text-slate-400 truncate max-w-xs">
+                                {prop.reason}
+                              </div>
+                            )}
+                          </td>
+                          <td className="py-3 px-3 text-slate-400">
+                            {formatDisplayDate(prop.proposalDate)}
+                          </td>
+                          <td className="py-3 px-3 text-slate-300">{prop.proposedByName}</td>
+                          <td className="py-3 px-3 text-center font-mono">
+                            <span className="bg-slate-800 px-2 py-0.5 rounded text-blue-300 font-semibold">
+                              {prop.items.length} mục
+                            </span>
+                          </td>
+                          <td className="py-3 px-3 text-right font-mono font-semibold text-emerald-400">
+                            {formatVND(prop.totalEstimatedAmount || 0)}
+                          </td>
+                          <td className="py-3 px-3 text-center">
+                            <button
+                              type="button"
+                              onClick={() => setPropToDelete(prop)}
+                              className="px-2.5 py-1 rounded-lg bg-rose-900/30 hover:bg-rose-800/60 text-rose-300 border border-rose-500/30 text-[11px] font-bold inline-flex items-center gap-1 transition"
+                            >
+                              <Trash2 className="w-3 h-3 text-rose-400" />
+                              <span>Xóa</span>
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Sub-tab 2: TRANSACTIONS */}
+          {dataSubTab === 'TRANSACTIONS' && (
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-sm">
+              <div className="p-4 border-b border-slate-800 flex items-center justify-between">
+                <div>
+                  <h3 className="text-xs font-bold text-white uppercase tracking-wider">
+                    Các Phiếu Nhập / Xuất Kho Trong Hệ Thống
+                  </h3>
+                  <p className="text-[11px] text-slate-400 mt-0.5">
+                    Xóa các phiếu nhập hoặc xuất sai. Số lượng tồn kho sẽ được tự động hoàn tác và tính toán lại ngay lập tức.
+                  </p>
+                </div>
+                <span className="text-xs font-mono bg-blue-900/40 text-blue-300 border border-blue-700/50 px-2.5 py-1 rounded-full font-bold">
+                  {transactions.length} Phiếu
+                </span>
+              </div>
+
+              {transactions.length === 0 ? (
+                <div className="p-8 text-center text-slate-400 text-xs">
+                  Chưa có chứng từ nào hoặc toàn bộ phiếu đã được dọn dẹp sạch sẽ.
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs border-collapse">
+                    <thead>
+                      <tr className="bg-slate-950/60 text-slate-400 border-b border-slate-800 text-[11px] uppercase tracking-wider font-semibold">
+                        <th className="py-2.5 px-3">STT</th>
+                        <th className="py-2.5 px-3">Mã Phiếu</th>
+                        <th className="py-2.5 px-3">Loại</th>
+                        <th className="py-2.5 px-3">Tờ Trình / Diễn Giải</th>
+                        <th className="py-2.5 px-3">Ngày</th>
+                        <th className="py-2.5 px-3 text-right">Tổng SL</th>
+                        <th className="py-2.5 px-3 text-right">Tổng Tiền</th>
+                        <th className="py-2.5 px-3 text-center">Trạng Thái</th>
+                        <th className="py-2.5 px-3 text-center">Thao Tác</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-800 text-slate-300 font-sans">
+                      {transactions.map((tx, idx) => (
+                        <tr key={tx.id} className="hover:bg-slate-800/40 transition">
+                          <td className="py-3 px-3 font-mono text-slate-400">{idx + 1}</td>
+                          <td className="py-3 px-3 font-mono font-bold text-white">{tx.code}</td>
+                          <td className="py-3 px-3">
+                            <span
+                              className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                                tx.type === 'IMPORT'
+                                  ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                                  : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                              }`}
+                            >
+                              {tx.type === 'IMPORT' ? 'NHẬP KHO' : 'XUẤT KHO'}
+                            </span>
+                          </td>
+                          <td className="py-3 px-3">
+                            <div className="font-semibold text-slate-200 truncate max-w-xs">
+                              {tx.title}
+                            </div>
+                            {tx.proposalNumber && (
+                              <div className="text-[11px] text-amber-400 font-mono">
+                                Tờ trình: {tx.proposalNumber}
+                              </div>
+                            )}
+                          </td>
+                          <td className="py-3 px-3 text-slate-400">
+                            {formatDisplayDate(tx.date)}
+                          </td>
+                          <td className="py-3 px-3 text-right font-mono font-semibold text-slate-200">
+                            {formatNumber(tx.totalQuantity)}
+                          </td>
+                          <td className="py-3 px-3 text-right font-mono font-semibold text-emerald-400">
+                            {formatVND(tx.totalAmount)}
+                          </td>
+                          <td className="py-3 px-3 text-center">
+                            <span
+                              className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${
+                                tx.status === 'APPROVED'
+                                  ? 'bg-emerald-950 text-emerald-300 border border-emerald-700/50'
+                                  : tx.status === 'PENDING'
+                                  ? 'bg-amber-950 text-amber-300 border border-amber-700/50'
+                                  : 'bg-rose-950 text-rose-300 border border-rose-700/50'
+                              }`}
+                            >
+                              {tx.status === 'APPROVED'
+                                ? 'Đã duyệt'
+                                : tx.status === 'PENDING'
+                                ? 'Chờ duyệt'
+                                : 'Từ chối'}
+                            </span>
+                          </td>
+                          <td className="py-3 px-3 text-center">
+                            <button
+                              type="button"
+                              onClick={() => setTxToDelete(tx)}
+                              className="px-2.5 py-1 rounded-lg bg-rose-900/30 hover:bg-rose-800/60 text-rose-300 border border-rose-500/30 text-[11px] font-bold inline-flex items-center gap-1 transition"
+                            >
+                              <Trash2 className="w-3 h-3 text-rose-400" />
+                              <span>Xóa</span>
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* TAB 5: BACKUP & RESTORE */}
       {activeTab === 'BACKUP' && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-sm space-y-3">
@@ -712,6 +998,186 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         </div>
       )}
 
+      {/* Modal: Confirm Delete Single Proposal */}
+      {propToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in">
+          <div className="w-full max-w-md bg-slate-900 border border-slate-700 rounded-2xl p-6 shadow-2xl space-y-4">
+            <div className="flex items-center gap-3 text-rose-400">
+              <div className="w-10 h-10 rounded-xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center">
+                <Trash2 className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-white">Xác Nhận Xóa Tờ Trình</h3>
+                <p className="text-xs text-slate-400 font-mono">{propToDelete.proposalNumber}</p>
+              </div>
+            </div>
+
+            <p className="text-xs text-slate-300 leading-relaxed">
+              Bạn có chắc chắn muốn xóa tờ trình <strong className="text-amber-300">"{propToDelete.title}"</strong> ({propToDelete.proposalNumber}) không? Dữ liệu tờ trình này sẽ bị xóa khỏi danh sách.
+            </p>
+
+            <div className="flex items-center justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setPropToDelete(null)}
+                className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 transition"
+              >
+                Hủy bỏ
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (onDeleteProposal) {
+                    onDeleteProposal(propToDelete.id);
+                  }
+                  setPropToDelete(null);
+                  setUnitToast(`Đã xóa tờ trình "${propToDelete.proposalNumber}" thành công!`);
+                  setTimeout(() => setUnitToast(null), 3000);
+                }}
+                className="px-4 py-2 rounded-xl text-xs font-bold bg-rose-600 hover:bg-rose-500 text-white shadow-md shadow-rose-600/30 transition"
+              >
+                Xác Nhận Xóa
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Confirm Delete Single Transaction */}
+      {txToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in">
+          <div className="w-full max-w-md bg-slate-900 border border-slate-700 rounded-2xl p-6 shadow-2xl space-y-4">
+            <div className="flex items-center gap-3 text-rose-400">
+              <div className="w-10 h-10 rounded-xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center">
+                <Trash2 className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-white">Xác Nhận Xóa Phiếu Kho</h3>
+                <p className="text-xs text-slate-400 font-mono">{txToDelete.code}</p>
+              </div>
+            </div>
+
+            <p className="text-xs text-slate-300 leading-relaxed">
+              Bạn có chắc chắn muốn xóa phiếu <strong className="text-amber-300">{txToDelete.code}</strong> ({txToDelete.type === 'IMPORT' ? 'Nhập kho' : 'Xuất kho'})? Số lượng tồn kho và thẻ kho của các mặt hàng liên quan sẽ được tự động hoàn tác và tính toán lại.
+            </p>
+
+            <div className="flex items-center justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setTxToDelete(null)}
+                className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 transition"
+              >
+                Hủy bỏ
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (onDeleteTransaction) {
+                    onDeleteTransaction(txToDelete.id);
+                  }
+                  setTxToDelete(null);
+                  setUnitToast(`Đã xóa phiếu "${txToDelete.code}". Tồn kho đã tự động tính lại!`);
+                  setTimeout(() => setUnitToast(null), 3000);
+                }}
+                className="px-4 py-2 rounded-xl text-xs font-bold bg-rose-600 hover:bg-rose-500 text-white shadow-md shadow-rose-600/30 transition"
+              >
+                Xác Nhận Xóa
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Confirm Clear All Demo Data */}
+      {showClearAllModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in">
+          <div className="w-full max-w-md bg-slate-900 border border-slate-700 rounded-2xl p-6 shadow-2xl space-y-4">
+            <div className="flex items-center gap-3 text-rose-400">
+              <div className="w-10 h-10 rounded-xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center">
+                <Trash2 className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-white">Xác Nhận Xóa Hết Dữ Liệu Demo</h3>
+                <p className="text-xs text-rose-300">Chuẩn bị nạp dữ liệu thực tế</p>
+              </div>
+            </div>
+
+            <p className="text-xs text-slate-300 leading-relaxed">
+              Thao tác này sẽ xóa sạch toàn bộ <strong>{transactions.length} phiếu xuất/nhập kho</strong> và <strong>{proposals.length} tờ trình</strong> thử nghiệm. Danh mục vật tư gốc vẫn được giữ nguyên để bạn tiến hành import file Xuất - Nhập - Tồn thực tế.
+            </p>
+
+            <div className="flex items-center justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setShowClearAllModal(false)}
+                className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 transition"
+              >
+                Hủy bỏ
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (onClearAllTransactionsAndProposals) {
+                    onClearAllTransactionsAndProposals();
+                  }
+                  setShowClearAllModal(false);
+                  setUnitToast('Đã dọn dẹp sạch toàn bộ chứng từ thử nghiệm!');
+                  setTimeout(() => setUnitToast(null), 3000);
+                }}
+                className="px-4 py-2 rounded-xl text-xs font-bold bg-rose-600 hover:bg-rose-500 text-white shadow-md shadow-rose-600/30 transition"
+              >
+                Xóa Hết Dữ Liệu Demo
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Confirm Reset Demo Data */}
+      {showResetDemoModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in">
+          <div className="w-full max-w-md bg-slate-900 border border-slate-700 rounded-2xl p-6 shadow-2xl space-y-4">
+            <div className="flex items-center gap-3 text-blue-400">
+              <div className="w-10 h-10 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center">
+                <RefreshCw className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-white">Khôi Phục Dữ Liệu Chuẩn AHT</h3>
+                <p className="text-xs text-slate-400">Đặt lại mẫu ban đầu</p>
+              </div>
+            </div>
+
+            <p className="text-xs text-slate-300 leading-relaxed">
+              Bạn có muốn khôi phục toàn bộ danh mục vật tư &gt;626 mã chuẩn AHT và các tờ trình mẫu ban đầu không?
+            </p>
+
+            <div className="flex items-center justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setShowResetDemoModal(false)}
+                className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 transition"
+              >
+                Hủy bỏ
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (onResetDemoData) {
+                    onResetDemoData();
+                  }
+                  setShowResetDemoModal(false);
+                  setUnitToast('Đã khôi phục dữ liệu mẫu gốc thành công!');
+                  setTimeout(() => setUnitToast(null), 3000);
+                }}
+                className="px-4 py-2 rounded-xl text-xs font-bold bg-blue-600 hover:bg-blue-500 text-white shadow-md shadow-blue-600/30 transition"
+              >
+                Khôi Phục Mẫu
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Embedded Excel Stock Import Modal */}
       <ExcelStockImportModal
         isOpen={isExcelModalOpen}
@@ -721,7 +1187,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
           if (onUpdateMaterials) {
             onUpdateMaterials(updated);
           }
-          localStorage.setItem('smart_materials_v6', JSON.stringify(updated));
+          localStorage.setItem('smart_materials_v11', JSON.stringify(updated));
           setUnitToast(`Đã cập nhật thành công ${updated.length} vật tư lên hệ thống web!`);
           setTimeout(() => setUnitToast(null), 4000);
         }}
