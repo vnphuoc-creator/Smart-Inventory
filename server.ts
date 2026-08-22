@@ -338,32 +338,39 @@ app.post("/api/ai/scan-proposal", async (req, res) => {
         }
       }
 
-      const promptText = `Bạn là chuyên gia phân tích và bóc tách tài liệu Tờ trình / Báo giá / Phiếu đề xuất vật tư của Cảng Hàng Không Quốc Tế Đà Nẵng (AHT - Đội ĐNCT).
-Nhiệm vụ tối quan trọng: Trích xuất ĐẦY ĐỦ VÀ CHÍNH XÁC 100% TOÀN BỘ danh sách vật tư trong bảng tài liệu:
-1. Số tờ trình: Ví dụ "29-DNCT/PKT", "17-DNCT/PKT", "26-DNCT/PKT", "31-DNCT/PKT", "08-DNCT/PKT", "45-DNCT/PKT"...
-2. Tên tiêu đề / Về việc mua sắm gì.
-3. Đơn vị cung ứng / Nhà cung cấp (nếu có).
-4. Ngày lập tờ trình (YYYY-MM-DD nếu có).
-5. Lý do nhập kho.
-6. Danh sách TOÀN BỘ các dòng vật tư trong bảng (KHÔNG ĐƯỢC BỎ SÓT BẤT KỲ DÒNG NÀO):
-   - quantity: BẮT BUỘC lấy chính xác số lượng yêu cầu trong cột Số lượng (không lấy nhầm cột STT hay cột đơn giá).
-   - unit: Đơn vị tính (Bộ, Cái, Mét, Cuộn, Cây, Thùng, Hộp, v.v.).
-   - unitPrice: Đơn giá dự toán nếu có.
-   - materialName: Tên và quy cách kỹ thuật đầy đủ trong văn bản.
-   - materialCode: Tìm mã tương ứng bắt đầu bằng "DN_" trong danh mục nếu khớp sát nghĩa, nếu không khớp thì để trống.
+      const promptText = `Bạn là chuyên gia phân tích và bóc tách tài liệu Tờ trình / Báo giá / Đề xuất vật tư của Cảng Hàng Không Quốc Tế Đà Nẵng (AHT - Đội ĐNCT).
+
+QUY TẮC CỐT LÕI (BẮT BUỘC TUÂN THỦ 100%):
+1. Thông tin chung:
+   - proposalNumber: Số tờ trình (ví dụ "29-DNCT/PKT", "17-DNCT/PKT", "26-DNCT/PKT", "31-DNCT/PKT", "08-DNCT/PKT", "45-DNCT/PKT",...).
+   - title: Tiêu đề đề xuất / Trích yếu (V/v: ...).
+   - partner: Đơn vị đề xuất / Nhà cung ứng.
+   - reason: Lý do nhập kho / Mục đích đề xuất.
+   - date: Ngày lập tờ trình (YYYY-MM-DD nếu có).
+
+2. DANH SÁCH VẬT TƯ (items):
+   - CHỈ trích xuất các mặt hàng từ BẢNG DANH MỤC VẬT TƯ KỸ THUẬT (bảng chứa danh sách hàng hóa có Tên vật tư, Quy cách, ĐVT, Số lượng, Đơn giá).
+   - TUYỆT ĐỐI KHÔNG ĐƯỢC trích xuất các trường thông tin hành chính, tiêu đề phiếu hoặc chữ ký thành vật tư!
+     Ví dụ KHÔNG trích xuất: "Số tờ trình", "Bản in", "Phó trưởng phòng", "Ngày yêu cầu", "Thuộc ca", "Bổ sung", "Chi phí", "Phạm vi", "Ngày giao", "Số tiền", "Kính gửi", "Căn cứ", "Tổng cộng", "Người lập biểu", "Giám đốc", "Kế toán".
+   - Với mỗi mặt hàng thực sự:
+     + materialName: Tên và quy cách kỹ thuật đầy đủ.
+     + quantity: Số lượng yêu cầu (số nguyên hoặc số thập phân dương).
+     + unit: Đơn vị tính chuẩn (Bộ, Cái, Mét, Cuộn, Cây, Thùng, Hộp, Bình, Lít, Kg, v.v.).
+     + unitPrice: Đơn giá (nếu có, không có thì để theo danh mục tham chiếu).
+     + materialCode: Khớp chính xác với mã chuẩn bắt đầu bằng "DN_" trong danh sách vật tư tham chiếu dưới đây (nếu tìm thấy mã khớp tên/quy cách).
 
 ${fileText ? `Nội dung văn bản nhận diện được:\n${fileText}\n` : ""}
-${docHtml ? `Cấu trúc bảng HTML:\n${docHtml.slice(0, 8000)}\n` : ""}
+${docHtml ? `Cấu trúc bảng HTML:\n${docHtml.slice(0, 10000)}\n` : ""}
 
-Danh sách mã vật tư tham chiếu:
-${Array.isArray(availableMaterials) ? availableMaterials.slice(0, 150).map((m: any) => `${m.code}: ${m.name} (${m.unit || 'Cái'})`).join("\n") : "Mã DN_..."}
+Danh sách mã vật tư tham chiếu của hệ thống:
+${Array.isArray(availableMaterials) ? availableMaterials.slice(0, 300).map((m: any) => `${m.code}: ${m.name} (${m.unit || 'Cái'})`).join("\n") : "Mã DN_..."}
 
-Hãy trả về định dạng JSON:
+Trả về định dạng JSON duy nhất:
 {
   "success": true,
   "proposalNumber": "29-DNCT/PKT",
   "title": "Tiêu đề đề xuất",
-  "partner": "Nhà cung cấp",
+  "partner": "Đội Điện Nước Công Trình",
   "reason": "Lý do nhập kho",
   "date": "YYYY-MM-DD",
   "items": [
@@ -386,14 +393,22 @@ Hãy trả về định dạng JSON:
         config: {
           responseMimeType: "application/json",
           systemInstruction:
-            "Bạn là chuyên gia OCR và bóc tách bảng biểu tờ trình kỹ thuật AHT. Đảm bảo 100% trích xuất đúng số lượng từng mặt hàng và không bỏ sót dòng nào.",
+            "Bạn là chuyên gia OCR và bóc tách tài liệu kỹ thuật AHT. CHỈ trích xuất danh sách hàng hóa/vật tư thực tế, không lấy các trường thông tin hành chính hay tiêu đề.",
         },
       });
 
       const outputText = response.text || "{}";
       const parsed = JSON.parse(outputText);
       if (parsed && parsed.items && Array.isArray(parsed.items) && parsed.items.length > 0) {
-        return res.json(parsed);
+        // Filter out any accidental metadata items
+        parsed.items = parsed.items.filter((it: any) => {
+          const name = (it.materialName || '').toLowerCase().trim();
+          const isMeta = /^(số tờ|bản in|phó trưởng|trưởng phòng|ngày yêu|thuộc ca|chi phí|phạm vi|ngày giao|số tiền|kính gửi|căn cứ|tổng cộng|người lập|kế toán|giám đốc)/i.test(name);
+          return name.length >= 2 && !isMeta;
+        });
+        if (parsed.items.length > 0) {
+          return res.json(parsed);
+        }
       }
     } catch (err: unknown) {
       console.warn("Gemini Proposal Scan error, switching to heuristic parsing:", err);

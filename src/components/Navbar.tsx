@@ -124,10 +124,11 @@ export const Navbar: React.FC<NavbarProps> = ({
 
             <div className="hidden sm:block truncate">
               <h1 className="text-sm sm:text-base font-bold text-white tracking-tight truncate">
-                Hệ thống quản lý kho
+                Cảng HKQT Đà Nẵng • Nhà Ga Quốc Tế T2
               </h1>
-              <p className="text-[11px] text-blue-300 font-medium truncate">
-                Hệ thống quản lý xuất - nhập - tồn vật tư thuộc đội ĐNCT
+              <p className="text-[11px] text-blue-300 font-medium truncate flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse inline-block"></span>
+                Vận hành kỹ thuật 24/7 &bull; Quản lý xuất nhập tồn
               </p>
             </div>
           </div>

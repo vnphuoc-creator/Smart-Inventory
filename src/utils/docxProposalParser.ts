@@ -26,13 +26,76 @@ function normalizeText(str: string): string {
     .toLowerCase()
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
+    .replace(/đ/g, 'd')
+    .replace(/Đ/g, 'd')
     .replace(/[^a-z0-9\s]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
 }
 
 /**
- * Intelligent fuzzy matcher to map extracted document item name/code to standard DN_* catalog
+ * Check if a text is an administrative header / metadata field rather than an actual technical material
+ */
+export function isAdministrativeText(text: string): boolean {
+  if (!text) return true;
+  const clean = text.trim();
+  if (clean.length < 2) return true;
+
+  const norm = normalizeText(clean);
+  const adminKeywords = [
+    'so to trinh',
+    'to trinh so',
+    'to trinh',
+    'ban in',
+    'pho truong phong',
+    'truong phong',
+    'pho truong',
+    'ngay yeu cau',
+    'ngay de xuat',
+    'thuoc ca',
+    'bo sung',
+    'chi phi',
+    'pham vi',
+    'ngay giao',
+    'ngay lap',
+    'ngay trinh',
+    'so tien',
+    'tong tien',
+    'tong chi phi',
+    'kinh phi',
+    'kinh gui',
+    'can cu',
+    'muc dich',
+    'noi dung',
+    'du toan',
+    'tong cong',
+    'nguoi lap bieu',
+    'nguoi lap',
+    'nguoi de xuat',
+    'ke toan',
+    'thu kho',
+    'giam doc',
+    'ban giam doc',
+    'phe duyet',
+    'don vi de xuat',
+    'don vi thuc hien',
+    'thoi gian thuc hien',
+    'stt',
+    'tt',
+    'mau so',
+    'cong',
+    'bang chu',
+    'ghi chu',
+    'chu ky',
+    'dia diem',
+    'thoi gian',
+  ];
+
+  return adminKeywords.some((kw) => norm === kw || norm.startsWith(kw + ' ') || norm.startsWith(kw + ':'));
+}
+
+/**
+ * Intelligent fuzzy matcher to map extracted document item name/code to standard catalog
  */
 export function findBestMaterialMatch(
   itemName: string,
@@ -51,12 +114,11 @@ export function findBestMaterialMatch(
     if (directCode) return directCode;
   }
 
-  // 2. Code substring inside item name
-  const codeInName = materials.find(
-    (m) =>
-      cleanName.includes(m.code.toLowerCase()) ||
-      (m.code.length > 6 && cleanName.includes(m.code.slice(3).toLowerCase()))
-  );
+  // 2. Code inside item name
+  const codeInName = materials.find((m) => {
+    const mCode = m.code.toLowerCase();
+    return cleanName.includes(mCode) || (mCode.length > 6 && cleanName.includes(mCode.slice(3)));
+  });
   if (codeInName) return codeInName;
 
   // 3. Exact name match
@@ -67,7 +129,14 @@ export function findBestMaterialMatch(
   const exactNorm = materials.find((m) => normalizeText(m.name) === normName);
   if (exactNorm) return exactNorm;
 
-  // 5. Token overlap scoring with high threshold (>= 0.65 to avoid wrong mapping)
+  // 5. Significant substring match
+  const subMatch = materials.find((m) => {
+    const mNorm = normalizeText(m.name);
+    return (mNorm.length >= 10 && normName.includes(mNorm)) || (normName.length >= 10 && mNorm.includes(normName));
+  });
+  if (subMatch) return subMatch;
+
+  // 6. Token overlap scoring with high threshold
   const itemTokens = normName.split(' ').filter((w) => w.length >= 2);
   if (itemTokens.length === 0) return null;
 
@@ -88,8 +157,8 @@ export function findBestMaterialMatch(
     }
 
     const score = matchCount / Math.max(itemTokens.length, 3);
-    // Strict threshold: score must be at least 0.65 to avoid incorrect mapping
-    if (score > bestScore && score >= 0.65) {
+    // Strict threshold: score must be at least 0.60
+    if (score > bestScore && score >= 0.60) {
       bestScore = score;
       bestMatch = mat;
     }
@@ -109,6 +178,8 @@ export function generateSuggestedCode(name: string, index: number): string {
 
   if (words.some((w) => ['dong', 'ho', 'ampe', 'kim', 'may', 'han', 'kiem', 'tra'].includes(w))) {
     prefix = 'CC';
+  } else if (words.some((w) => ['den', 'chieu', 'sang', 'pha', 'led', 'tup'].includes(w))) {
+    prefix = 'VT';
   }
 
   if (words.length > 0) {
@@ -132,14 +203,14 @@ export function parseDocxHtml(
 ): ExtractedProposalData {
   let detectedPropNum = '';
   let detectedTitle = '';
-  let detectedPartner = '';
+  let detectedPartner = 'Đội Điện Nước Công Trình';
   let detectedReason = '';
   let detectedDate = '';
   const detectedItems: ExtractedProposalItem[] = [];
 
   const allText = (rawText || docHtml || '').replace(/<[^>]+>/g, ' ');
 
-  // 1. Extract proposal number (e.g. 29-DNCT/PKT, 29-ĐNCT/PKT, 17-DNCT/PKT, 26-DNCT/PKT, 31-DNCT/PKT, 08-DNCT/PKT, 45-DNCT/PKT, etc.)
+  // 1. Extract proposal number (e.g. 29-DNCT/PKT, 29/TTr-DNCT, 17-DNCT/PKT, 26-DNCT/PKT, 31-DNCT/PKT, 08-DNCT/PKT, 45-DNCT/PKT, etc.)
   const propNumMatch =
     allText.match(
       /(?:tờ\s*trình\s*(?:số)?|số\s*hiệu|số)\s*[:.]?\s*([0-9]{1,4}(?:[/-][a-zA-Z0-9_/-Đđ]+)?)/i
@@ -175,7 +246,56 @@ export function parseDocxHtml(
       const doc = parser.parseFromString(docHtml, 'text/html');
       const tables = Array.from(doc.querySelectorAll('table'));
 
-      for (const table of tables) {
+      // Filter and score each table to find the ACTUAL materials table
+      const scoredTables = tables.map((table) => {
+        const rows = Array.from(table.querySelectorAll('tr'));
+        let score = 0;
+        let hasHeaderKeywords = false;
+        let adminRowCount = 0;
+
+        for (let rIdx = 0; rIdx < Math.min(3, rows.length); rIdx++) {
+          const cellsText = Array.from(rows[rIdx].querySelectorAll('th, td'))
+            .map((c) => (c.textContent || '').toLowerCase().trim())
+            .join(' ');
+
+          if (
+            cellsText.includes('tên vật tư') ||
+            cellsText.includes('mô tả') ||
+            cellsText.includes('quy cách') ||
+            cellsText.includes('mặt hàng') ||
+            cellsText.includes('danh mục') ||
+            cellsText.includes('đvt') ||
+            cellsText.includes('số lượng') ||
+            cellsText.includes('khối lượng') ||
+            cellsText.includes('đơn giá') ||
+            cellsText.includes('mã vt') ||
+            cellsText.includes('mã số')
+          ) {
+            hasHeaderKeywords = true;
+            score += 10;
+          }
+        }
+
+        // Check if rows look like administrative key-value pairs
+        for (const row of rows) {
+          const firstCell = (row.querySelector('td, th')?.textContent || '').toLowerCase().trim();
+          if (isAdministrativeText(firstCell)) {
+            adminRowCount++;
+          }
+        }
+
+        if (rows.length >= 2) score += rows.length * 2;
+        if (adminRowCount > rows.length * 0.4) score -= 20;
+
+        return { table, score, hasHeaderKeywords, rowsCount: rows.length };
+      });
+
+      // Sort tables by highest score
+      scoredTables.sort((a, b) => b.score - a.score);
+
+      for (const { table, score } of scoredTables) {
+        if (score < 5) continue; // Skip tables that are obviously administrative or empty
+
         const rows = Array.from(table.querySelectorAll('tr'));
         if (rows.length < 2) continue;
 
@@ -204,20 +324,17 @@ export function parseDocxHtml(
               text.includes('mã vật tư') ||
               text.includes('mã vt') ||
               text.includes('mã hàng') ||
-              text.includes('mã hiệu') ||
+              text.includes('mã số') ||
               text.includes('ký hiệu')
             ) {
               codeCol = cIdx;
-            } else if (text.includes('mã') && codeCol === -1) {
-              codeCol = cIdx;
             } else if (
-              text.includes('mô tả chung') ||
+              text.includes('mô tả') ||
               text.includes('mặt hàng') ||
               text.includes('tên vật tư') ||
               text.includes('tên hàng') ||
               text.includes('quy cách') ||
               text.includes('danh mục') ||
-              text.includes('hàng hóa') ||
               text.includes('nội dung') ||
               text.includes('chủng loại') ||
               text.includes('tên')
@@ -248,7 +365,7 @@ export function parseDocxHtml(
             }
           });
 
-          if (nameCol !== -1 && (qtyCol !== -1 || unitCol !== -1 || headerCells.length >= 4)) {
+          if (nameCol !== -1 && (qtyCol !== -1 || unitCol !== -1 || headerCells.length >= 3)) {
             headerRowIndex = rIdx;
             break;
           }
@@ -270,23 +387,6 @@ export function parseDocxHtml(
           let rawPriceStr = priceCol !== -1 && cells[priceCol] ? cells[priceCol] : '';
           let rawNote = noteCol !== -1 && cells[noteCol] ? cells[noteCol] : '';
 
-          // Skip section / category divider rows like "I. Vận hành hệ thống...", "II. Vận hành..."
-          const isSectionHeader =
-            /^(I|II|III|IV|V|VI|VII|VIII|IX|X)[\.\s\:\-]/i.test(rawName) ||
-            /^(hệ thống|hạng mục|phân hệ|giai đoạn|khu vực)/i.test(rawName);
-          if (isSectionHeader && !rawCode && !rawQtyStr) {
-            continue;
-          }
-
-          // If code is in another column (e.g. if code column had DN_*)
-          if (!rawCode) {
-            const foundCodeCell = cells.find((c) => /^DN_[A-Z0-9_]+/i.test(c.trim()));
-            if (foundCodeCell) {
-              const m = foundCodeCell.match(/DN_[A-Za-z0-9_]+/);
-              if (m) rawCode = m[0].toUpperCase();
-            }
-          }
-
           // Deduce name if header index was missed
           if (!rawName) {
             let maxLen = 0;
@@ -298,6 +398,29 @@ export function parseDocxHtml(
             });
           }
 
+          // Skip if row is administrative or section title
+          if (isAdministrativeText(rawName)) {
+            continue;
+          }
+
+          // Skip section / category divider rows like "I. Vận hành hệ thống...", "II. Vận hành..."
+          const isSectionHeader =
+            /^(I|II|III|IV|V|VI|VII|VIII|IX|X)[\.\s\:\-]/i.test(rawName) ||
+            /^(hệ thống|hạng mục|phân hệ|giai đoạn|khu vực)/i.test(rawName);
+          if (isSectionHeader && !rawCode && !rawQtyStr) {
+            continue;
+          }
+
+          // If code is in another cell (e.g. if code column had DN_*)
+          if (!rawCode) {
+            const foundCodeCell = cells.find((c) => /^(DN|CD)_[A-Z0-9_]+/i.test(c.trim()));
+            if (foundCodeCell) {
+              const m = foundCodeCell.match(/(?:DN|CD)_[A-Za-z0-9_]+/i);
+              if (m) rawCode = m[0].toUpperCase();
+            }
+          }
+
+          // Deduce unit
           if (!rawUnit) {
             const unitCell = cells.find((c) =>
               /^(cái|bộ|mét|m|cuộn|cây|thùng|hộp|kg|lít|lit|bình|quả|viên|chiếc|ống|thanh|khung|sợi|tấm|đôi|cặp|túi|can|bao)$/i.test(
@@ -307,6 +430,7 @@ export function parseDocxHtml(
             if (unitCell) rawUnit = unitCell.trim();
           }
 
+          // Deduce quantity
           if (!rawQtyStr) {
             for (let idx = 0; idx < cells.length; idx++) {
               if (idx === sttCol || idx === codeCol || idx === priceCol || idx === totalCol) continue;
@@ -339,18 +463,15 @@ export function parseDocxHtml(
             if (!isNaN(parsedP)) price = parsedP;
           }
 
-          // Ignore summary / total rows
-          const isTotalRow = /^(tổng|tổng\s*cộng|cộng|bằng\s*chữ|stt|thuế)/i.test(rawName);
-
-          if (rawName && rawName.length >= 2 && !isTotalRow) {
-            // Match with catalog
+          if (rawName && rawName.length >= 2) {
+            // Match with standard catalog
             const matchedMat = findBestMaterialMatch(rawName, rawCode, materials);
             const assignedCode = rawCode
               ? rawCode.toUpperCase().trim()
               : matchedMat
               ? matchedMat.code
               : generateSuggestedCode(rawName, detectedItems.length);
-            const assignedName = rawName || (matchedMat ? matchedMat.name : rawName);
+            const assignedName = matchedMat ? matchedMat.name : rawName;
             const assignedUnit = rawUnit || (matchedMat ? matchedMat.unit : 'Cái');
             const assignedPrice = price || (matchedMat ? matchedMat.unitPrice : 0);
 
@@ -360,9 +481,14 @@ export function parseDocxHtml(
               quantity: qty,
               unit: assignedUnit,
               unitPrice: assignedPrice,
-              notes: rawNote || `Quét từ Tờ trình ${detectedPropNum || ''}`,
+              notes: rawNote || `Trích xuất từ Tờ trình ${detectedPropNum || ''}`,
             });
           }
+        }
+
+        // If this table yielded real materials, stop searching other tables
+        if (detectedItems.length > 0) {
+          break;
         }
       }
     } catch (e) {
@@ -374,6 +500,8 @@ export function parseDocxHtml(
   if (detectedItems.length === 0 && allText) {
     const lines = allText.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
     for (const line of lines) {
+      if (isAdministrativeText(line)) continue;
+
       const itemMatch = line.match(
         /^(\d{1,2})[.\s\-]+([^\d\n\r]+?)(?:[-:|,\t]+|\s{2,})(?:(?:sl|số\s*lượng|khối\s*lượng)[:\s]*)?(\d+(?:[.,]\d+)?)\s*([a-zA-Zà-ỹÀ-Ỹ]+)?/i
       );
@@ -382,7 +510,7 @@ export function parseDocxHtml(
         const rawQtyStr = itemMatch[3];
         const rawUnit = (itemMatch[4] || '').trim();
 
-        if (rawName.length >= 3 && !/^(stt|tổng|cộng|ngày|kính|thay|căn)/i.test(rawName)) {
+        if (rawName.length >= 3 && !isAdministrativeText(rawName)) {
           const qty = parseFloat(rawQtyStr.replace(/,/g, '.')) || 1;
           const matchedMat = findBestMaterialMatch(rawName, '', materials);
 

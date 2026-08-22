@@ -20,6 +20,7 @@ import {
   Eye,
   Info,
   Archive,
+  Printer,
 } from 'lucide-react';
 import {
   Material,
@@ -249,9 +250,18 @@ export const MaterialCatalogueView: React.FC<MaterialCatalogueViewProps> = ({
 
         <div className="flex items-center gap-2 shrink-0 flex-wrap sm:flex-nowrap">
           <button
+            onClick={() => window.print()}
+            className="no-print bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 px-3 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors"
+            title="In PDF Báo cáo Danh mục và Tồn kho Vật tư Chuẩn AHT"
+          >
+            <Printer className="w-4 h-4 text-blue-400" />
+            <span>In PDF Báo Cáo</span>
+          </button>
+
+          <button
             id="btn-export-materials-csv"
             onClick={handleExportCSV}
-            className="bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 px-3 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors"
+            className="no-print bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 px-3 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors"
             title="Xuất file Excel báo cáo danh mục và định mức vật tư chuẩn AHT"
           >
             <Download className="w-4 h-4 text-emerald-400" />
@@ -641,6 +651,26 @@ export const MaterialCatalogueView: React.FC<MaterialCatalogueViewProps> = ({
               )}
             </tbody>
           </table>
+        </div>
+
+        {/* Printable Footer with Corporate Signatures */}
+        <div className="hidden print:block mt-8 pt-4 text-slate-800 text-xs">
+          <div className="flex justify-between items-start">
+            <div className="text-center w-64">
+              <div className="font-bold uppercase text-[11px]">NGƯỜI LẬP BÁO CÁO</div>
+              <div className="italic text-[10px] text-slate-600 mb-14">(Ký và ghi rõ họ tên)</div>
+              <div className="font-semibold text-slate-900">{currentUser.fullName}</div>
+            </div>
+
+            <div className="text-center w-64">
+              <div className="italic text-[10px] text-slate-600 mb-1">
+                Đà Nẵng, ngày {new Date().getDate()} tháng {new Date().getMonth() + 1} năm {new Date().getFullYear()}
+              </div>
+              <div className="font-bold uppercase text-[11px]">ĐỘI TRƯỞNG / THỦ KHO</div>
+              <div className="italic text-[10px] text-slate-600 mb-14">(Ký, đóng dấu và ghi rõ họ tên)</div>
+              <div className="font-semibold text-slate-900">Ban Quản Lý Kho ĐNCT</div>
+            </div>
+          </div>
         </div>
       </div>
 

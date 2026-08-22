@@ -497,6 +497,24 @@ export const TransactionManagementView: React.FC<TransactionManagementViewProps>
       };
     });
 
+    // STRICT VALIDATION FOR EXPORT: Prevent export if out of stock or insufficient quantity
+    if (formType === 'EXPORT') {
+      for (const item of preparedItems) {
+        const matStock = calculatedStocks.find((m) => m.code === item.materialCode);
+        const currentStock = matStock !== undefined ? matStock.currentStock : 0;
+        
+        if (currentStock <= 0) {
+          alert(`🚫 KHÔNG THỂ XUẤT KHO:\nVật tư "${item.materialName}" (Mã: ${item.materialCode}) hiện tại ĐÃ HẾT HÀNG TRONG KHO (Tồn kho: 0).\nVui lòng loại bỏ hoặc điều chỉnh danh sách trước khi xuất!`);
+          return;
+        }
+
+        if (item.quantity > currentStock) {
+          alert(`🚫 KHÔNG THỂ XUẤT KHO:\nVật tư "${item.materialName}" (Mã: ${item.materialCode}) yêu cầu xuất ${item.quantity} ${item.unit}, nhưng tồn kho hiện tại chỉ còn ${currentStock} ${item.unit}.\nSố lượng xuất vượt quá tồn kho khả dụng!`);
+          return;
+        }
+      }
+    }
+
     const totalQty = preparedItems.reduce((sum, i) => sum + i.quantity, 0);
     const totalAmt = preparedItems.reduce((sum, i) => sum + i.totalAmount, 0);
 
@@ -1398,8 +1416,28 @@ export const TransactionManagementView: React.FC<TransactionManagementViewProps>
                 </div>
               </div>
 
+              {/* Export Stock Warning Banner if any item exceeds stock */}
+              {formType === 'EXPORT' &&
+                formItems.some((item) => {
+                  const matStock = calculatedStocks.find((m) => m.code === item.materialCode);
+                  const cur = matStock !== undefined ? matStock.currentStock : 0;
+                  return cur <= 0 || (Number(item.quantity) || 0) > cur;
+                }) && (
+                  <div className="p-3 bg-rose-950/70 border border-rose-600/80 rounded-xl text-xs text-rose-200 flex items-start gap-2.5">
+                    <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
+                    <div>
+                      <div className="font-bold text-rose-100 uppercase tracking-wide">
+                        Cảnh Báo Không Đủ Tồn Kho
+                      </div>
+                      <div className="text-[11px] text-rose-300 mt-0.5">
+                        Có vật tư trong danh sách đã hết hàng (Tồn: 0) hoặc số lượng xuất vượt quá tồn kho hiện tại. Hệ thống không cho phép xuất kho khi không đủ hàng tồn.
+                      </div>
+                    </div>
+                  </div>
+                )}
+
               {/* Modal Footer */}
-              <div className="pt-4 border-t border-slate-800 flex items-center justify-between">
+              <div className="pt-4 border-t border-slate-800 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
                 <div className="text-[11px] text-slate-400">
                   {currentUser.role === 'ADMIN' ? (
                     <span className="text-emerald-400">
@@ -1412,7 +1450,7 @@ export const TransactionManagementView: React.FC<TransactionManagementViewProps>
                   )}
                 </div>
 
-                <div className="flex items-center gap-3">
+                <div className="flex items-center justify-end gap-3">
                   <button
                     type="button"
                     onClick={() => setIsCreateModalOpen(false)}
@@ -1423,7 +1461,7 @@ export const TransactionManagementView: React.FC<TransactionManagementViewProps>
                   <button
                     type="submit"
                     id="btn-submit-tx-form"
-                    className="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold shadow-md shadow-blue-600/30"
+                    className="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold shadow-md shadow-blue-600/30 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {currentUser.role === 'ADMIN' ? 'Lập Phiếu & Duyệt Kho' : 'Gửi Đề Xuất Phê Duyệt'}
                   </button>
@@ -1689,47 +1727,55 @@ export const TransactionManagementView: React.FC<TransactionManagementViewProps>
       {/* Modal: In-App Document & Image Viewer (No Forced Download) */}
       {viewingDoc && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-md animate-in fade-in duration-150"
+          className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-950/90 backdrop-blur-md animate-in fade-in duration-150"
           onClick={() => setViewingDoc(null)}
         >
           <div
-            className="relative w-full max-w-4xl max-h-[90vh] bg-slate-900 border border-slate-700 rounded-2xl overflow-hidden shadow-2xl flex flex-col"
+            className="relative w-full max-w-5xl max-h-[92vh] bg-slate-900 border border-slate-700 rounded-2xl overflow-hidden shadow-2xl flex flex-col"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between p-3.5 border-b border-slate-800 bg-slate-850">
-              <div className="flex items-center gap-2">
-                <FileText className="w-4 h-4 text-blue-400" />
-                <span className="text-xs font-bold text-slate-200">
+              <div className="flex items-center gap-2 overflow-hidden">
+                <FileText className="w-4 h-4 text-blue-400 shrink-0" />
+                <span className="text-xs font-bold text-slate-200 truncate max-w-sm">
                   {viewingDoc.name || 'Tài Liệu / Tờ Trình Đính Kèm'}
                 </span>
                 {viewingDoc.html && (
-                  <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-950 text-emerald-300 border border-emerald-800">
+                  <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-950 text-emerald-300 border border-emerald-800 shrink-0 hidden sm:inline-block">
                     Xem trực tiếp trên hệ thống (DOCX)
                   </span>
                 )}
               </div>
-              <button
-                onClick={() => setViewingDoc(null)}
-                className="p-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white"
-              >
-                <X className="w-4 h-4" />
-              </button>
+
+              <div className="flex items-center gap-2">
+                <div className="text-[11px] text-slate-400 bg-slate-800 px-2 py-1 rounded border border-slate-700 flex items-center gap-1">
+                  <span>Thanh cuộn ngang &darr;</span>
+                </div>
+                <button
+                  onClick={() => setViewingDoc(null)}
+                  className="p-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
             </div>
 
-            <div className="p-4 sm:p-6 overflow-y-auto max-h-[80vh]">
+            <div className="p-3 sm:p-5 overflow-y-auto max-h-[82vh] overflow-x-auto">
               {viewingDoc.html ? (
-                <div className="bg-white text-slate-900 p-6 rounded-xl shadow-inner max-w-none text-xs sm:text-sm leading-relaxed overflow-x-auto">
-                  <div
-                    dangerouslySetInnerHTML={{ __html: viewingDoc.html }}
-                    className="prose prose-sm max-w-none [&_table]:w-full [&_table]:border-collapse [&_table]:border [&_table]:border-slate-300 [&_th]:border [&_th]:border-slate-300 [&_th]:p-2 [&_th]:bg-slate-100 [&_td]:border [&_td]:border-slate-300 [&_td]:p-2 [&_p]:mb-2"
-                  />
+                <div className="overflow-x-auto pb-4">
+                  <div className="bg-white text-slate-900 p-6 sm:p-8 rounded-xl shadow-md min-w-[760px] text-xs sm:text-sm leading-relaxed">
+                    <div
+                      dangerouslySetInnerHTML={{ __html: viewingDoc.html }}
+                      className="prose prose-sm max-w-none [&_table]:w-full [&_table]:min-w-[700px] [&_table]:border-collapse [&_table]:border [&_table]:border-slate-300 [&_th]:border [&_th]:border-slate-300 [&_th]:p-2.5 [&_th]:bg-slate-100 [&_th]:font-bold [&_td]:border [&_td]:border-slate-300 [&_td]:p-2 [&_p]:mb-2"
+                    />
+                  </div>
                 </div>
               ) : viewingDoc.url.startsWith('data:image') || viewingDoc.url.includes('images.unsplash') ? (
-                <div className="flex items-center justify-center">
+                <div className="overflow-x-auto flex items-center justify-center p-2">
                   <img
                     src={viewingDoc.url}
                     alt={viewingDoc.name || 'Ảnh tờ trình'}
-                    className="max-w-full max-h-[75vh] object-contain rounded-lg shadow-md border border-slate-800"
+                    className="max-w-full max-h-[75vh] object-contain rounded-lg shadow-md border border-slate-800 min-w-[320px]"
                   />
                 </div>
               ) : (
