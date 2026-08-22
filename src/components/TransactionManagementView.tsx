@@ -87,6 +87,7 @@ export const TransactionManagementView: React.FC<TransactionManagementViewProps>
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedTxForView, setSelectedTxForView] = useState<InventoryTransaction | null>(null);
   const [viewingDoc, setViewingDoc] = useState<{ url: string; html?: string; name?: string } | null>(null);
+  const [docZoom, setDocZoom] = useState<number>(100);
   const [txToDelete, setTxToDelete] = useState<InventoryTransaction | null>(null);
 
   // Approval Modal state
@@ -920,9 +921,9 @@ export const TransactionManagementView: React.FC<TransactionManagementViewProps>
 
       {/* Modal: Create Transaction / Voucher */}
       {isCreateModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-150">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-150">
           <div
-            className="w-full max-w-3xl bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh]"
+            className="w-full max-w-5xl bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[94vh]"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Modal Header */}
@@ -1274,16 +1275,16 @@ export const TransactionManagementView: React.FC<TransactionManagementViewProps>
                   </button>
                 </div>
 
-                <div className="bg-slate-850 border border-slate-800 rounded-xl overflow-visible">
-                  <table className="w-full text-left text-xs text-slate-300">
+                <div className="bg-slate-850 border border-slate-800 rounded-xl overflow-x-auto">
+                  <table className="w-full text-left text-xs text-slate-300 min-w-[760px]">
                     <thead className="bg-slate-900 border-b border-slate-800 text-[11px] font-semibold text-slate-400 uppercase rounded-t-xl">
                       <tr>
-                        <th className="py-2.5 px-3 min-w-[280px]">Vật Tư (Mã DN_* hoặc Tên)</th>
-                        <th className="py-2.5 px-2 text-center">Tồn Hiện Tại</th>
-                        <th className="py-2.5 px-3 text-right">Số Lượng</th>
-                        <th className="py-2.5 px-3 text-right">Đơn Giá (VNĐ)</th>
-                        <th className="py-2.5 px-3 text-right">Thành Tiền</th>
-                        <th className="py-2.5 px-2 text-center">Xóa</th>
+                        <th className="py-2.5 px-3 min-w-[340px] sm:min-w-[420px]">Vật Tư & Quy Cách (Mã Chuẩn DN_*)</th>
+                        <th className="py-2.5 px-2 text-center w-24">Tồn Hiện Tại</th>
+                        <th className="py-2.5 px-3 text-right w-28">Số Lượng</th>
+                        <th className="py-2.5 px-3 text-right w-32">Đơn Giá (VNĐ)</th>
+                        <th className="py-2.5 px-3 text-right w-36">Thành Tiền</th>
+                        <th className="py-2.5 px-2 text-center w-12">Xóa</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-800">
@@ -1296,7 +1297,7 @@ export const TransactionManagementView: React.FC<TransactionManagementViewProps>
                         return (
                           <tr key={idx} className="hover:bg-slate-800/40">
                             {/* Material Select */}
-                            <td className="py-2.5 px-3 min-w-[280px]">
+                            <td className="py-2.5 px-3 min-w-[340px] sm:min-w-[420px]">
                               <SearchableMaterialSelect
                                 value={item.materialCode}
                                 materials={materials}
@@ -1728,10 +1729,13 @@ export const TransactionManagementView: React.FC<TransactionManagementViewProps>
       {viewingDoc && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-950/90 backdrop-blur-md animate-in fade-in duration-150"
-          onClick={() => setViewingDoc(null)}
+          onClick={() => {
+            setViewingDoc(null);
+            setDocZoom(100);
+          }}
         >
           <div
-            className="relative w-full max-w-5xl max-h-[92vh] bg-slate-900 border border-slate-700 rounded-2xl overflow-hidden shadow-2xl flex flex-col"
+            className="relative w-full max-w-6xl max-h-[94vh] bg-slate-900 border border-slate-700 rounded-2xl overflow-hidden shadow-2xl flex flex-col"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between p-3.5 border-b border-slate-800 bg-slate-850">
@@ -1748,11 +1752,44 @@ export const TransactionManagementView: React.FC<TransactionManagementViewProps>
               </div>
 
               <div className="flex items-center gap-2">
-                <div className="text-[11px] text-slate-400 bg-slate-800 px-2 py-1 rounded border border-slate-700 flex items-center gap-1">
-                  <span>Thanh cuộn ngang &darr;</span>
+                {/* Zoom Controls for Images and Documents */}
+                <div className="flex items-center gap-1 bg-slate-800 p-0.5 rounded-lg border border-slate-700">
+                  <button
+                    type="button"
+                    onClick={() => setDocZoom((prev) => Math.max(50, prev - 25))}
+                    className="px-2 py-1 text-xs text-slate-300 hover:text-white rounded hover:bg-slate-700 font-bold"
+                    title="Thu nhỏ"
+                  >
+                    -
+                  </button>
+                  <span className="text-[11px] font-mono text-slate-200 px-1 font-semibold min-w-[40px] text-center">
+                    {docZoom}%
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setDocZoom((prev) => Math.min(250, prev + 25))}
+                    className="px-2 py-1 text-xs text-slate-300 hover:text-white rounded hover:bg-slate-700 font-bold"
+                    title="Phóng to"
+                  >
+                    +
+                  </button>
+                  {docZoom !== 100 && (
+                    <button
+                      type="button"
+                      onClick={() => setDocZoom(100)}
+                      className="px-1.5 py-0.5 text-[10px] text-blue-400 hover:text-blue-300 rounded hover:bg-slate-700"
+                      title="Đặt lại 100%"
+                    >
+                      Reset
+                    </button>
+                  )}
                 </div>
+
                 <button
-                  onClick={() => setViewingDoc(null)}
+                  onClick={() => {
+                    setViewingDoc(null);
+                    setDocZoom(100);
+                  }}
                   className="p-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white"
                 >
                   <X className="w-4 h-4" />
@@ -1760,29 +1797,37 @@ export const TransactionManagementView: React.FC<TransactionManagementViewProps>
               </div>
             </div>
 
-            <div className="p-3 sm:p-5 overflow-y-auto max-h-[82vh] overflow-x-auto">
+            <div className="p-3 sm:p-6 overflow-y-auto max-h-[84vh] overflow-x-auto bg-slate-950/60">
               {viewingDoc.html ? (
-                <div className="overflow-x-auto pb-4">
-                  <div className="bg-white text-slate-900 p-6 sm:p-8 rounded-xl shadow-md min-w-[760px] text-xs sm:text-sm leading-relaxed">
+                <div className="overflow-x-auto pb-4 flex justify-center">
+                  <div
+                    style={{ transform: `scale(${docZoom / 100})`, transformOrigin: 'top center', transition: 'transform 0.15s ease' }}
+                    className="bg-white text-slate-900 p-6 sm:p-8 rounded-xl shadow-md min-w-[780px] text-xs sm:text-sm leading-relaxed"
+                  >
                     <div
                       dangerouslySetInnerHTML={{ __html: viewingDoc.html }}
-                      className="prose prose-sm max-w-none [&_table]:w-full [&_table]:min-w-[700px] [&_table]:border-collapse [&_table]:border [&_table]:border-slate-300 [&_th]:border [&_th]:border-slate-300 [&_th]:p-2.5 [&_th]:bg-slate-100 [&_th]:font-bold [&_td]:border [&_td]:border-slate-300 [&_td]:p-2 [&_p]:mb-2"
+                      className="prose prose-sm max-w-none [&_table]:w-full [&_table]:min-w-[720px] [&_table]:border-collapse [&_table]:border [&_table]:border-slate-300 [&_th]:border [&_th]:border-slate-300 [&_th]:p-2.5 [&_th]:bg-slate-100 [&_th]:font-bold [&_td]:border [&_td]:border-slate-300 [&_td]:p-2 [&_p]:mb-2"
                     />
                   </div>
                 </div>
               ) : viewingDoc.url.startsWith('data:image') || viewingDoc.url.includes('images.unsplash') ? (
-                <div className="overflow-x-auto flex items-center justify-center p-2">
-                  <img
-                    src={viewingDoc.url}
-                    alt={viewingDoc.name || 'Ảnh tờ trình'}
-                    className="max-w-full max-h-[75vh] object-contain rounded-lg shadow-md border border-slate-800 min-w-[320px]"
-                  />
+                <div className="overflow-auto flex items-center justify-center p-4 min-h-[500px]">
+                  <div
+                    style={{ transform: `scale(${docZoom / 100})`, transformOrigin: 'center center', transition: 'transform 0.15s ease' }}
+                    className="flex justify-center"
+                  >
+                    <img
+                      src={viewingDoc.url}
+                      alt={viewingDoc.name || 'Ảnh tờ trình'}
+                      className="max-w-full rounded-lg shadow-2xl border border-slate-700 object-contain"
+                    />
+                  </div>
                 </div>
               ) : (
                 <iframe
                   src={viewingDoc.url}
                   title="Tài liệu tờ trình"
-                  className="w-full h-[75vh] rounded-lg bg-white"
+                  className="w-full h-[78vh] rounded-lg bg-white shadow-lg"
                 />
               )}
             </div>

@@ -893,7 +893,7 @@ function generateComprehensiveCatalog(): Material[] {
     });
   });
 
-  // 6.2 Dụng cụ đo kiểm kỹ thuật (5 mã) -> DN_CC_DOKIEM_01..05
+  // 6.2 Dụng cụ đo kiểm kỹ thuật (5 mã) -> DN_CC_DKIEM_01..05
   const toolList = [
     { name: 'Đồng hồ đo điện trở đất kỹ thuật số Kyoritsu 4105A chính hãng', price: 4850000 },
     { name: 'Ampe kìm đo dòng AC/DC 2000A Kyoritsu 2002PA', price: 3450000 },
@@ -904,7 +904,7 @@ function generateComprehensiveCatalog(): Material[] {
   toolList.forEach((tl, idx) => {
     items.push({
       id: `mat_dn_tool_${idCounter++}`,
-      code: `DN_CC_DOKIEM_${pad2(idx + 1)}`,
+      code: `DN_CC_DKIEM_${pad2(idx + 1)}`,
       name: tl.name,
       category: 'Vật tư Điện & Phụ kiện tiêu hao',
       unit: 'Bộ',

@@ -59,6 +59,7 @@ export const ProposalReconciliationView: React.FC<ProposalReconciliationViewProp
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'COMPLETED' | 'INCOMPLETE' | 'UNTOUCHED'>('ALL');
   const [expandedProposalId, setExpandedProposalId] = useState<string | null>(proposals[0]?.id || null);
   const [viewingAttachment, setViewingAttachment] = useState<{ url: string; name: string; type?: string } | null>(null);
+  const [attachmentZoom, setAttachmentZoom] = useState<number>(100);
   const [proposalToDelete, setProposalToDelete] = useState<PurchaseProposal | null>(null);
 
   // New Proposal Modal

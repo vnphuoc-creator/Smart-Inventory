@@ -129,71 +129,102 @@ export const SearchableMaterialSelect: React.FC<SearchableMaterialSelectProps> =
 
   return (
     <div className={`relative ${className}`} ref={containerRef}>
-      {/* Combobox Input Trigger */}
-      <div
-        className={`w-full bg-slate-800 hover:bg-slate-750 border ${
-          isOpen ? 'border-blue-500 ring-1 ring-blue-500/30' : 'border-slate-700'
-        } rounded-lg px-2.5 py-1 text-xs text-white flex items-center justify-between transition-colors shadow-sm`}
-      >
-        <div className="flex items-center gap-2 flex-1 min-w-0">
-          <Search className="w-3.5 h-3.5 text-blue-400 shrink-0" />
-          <input
-            ref={inputRef}
-            type="text"
-            value={isOpen ? searchTerm : selectedMaterial ? `${selectedMaterial.code} - ${selectedMaterial.name}` : value ? `Vật tư: ${value}` : ''}
-            placeholder={placeholder}
-            onFocus={() => {
-              setIsOpen(true);
-              setSearchTerm('');
-            }}
-            onChange={(e) => {
-              if (!isOpen) setIsOpen(true);
-              setSearchTerm(e.target.value);
-            }}
-            onKeyDown={handleKeyDown}
-            className="w-full bg-transparent border-none text-xs text-white placeholder-slate-400 focus:outline-none truncate py-0.5"
-          />
-        </div>
+      {/* Combobox Trigger */}
+      {!isOpen && selectedMaterial ? (
+        <div
+          onClick={() => {
+            setIsOpen(true);
+            setTimeout(() => inputRef.current?.focus(), 50);
+          }}
+          className="w-full bg-slate-800/90 hover:bg-slate-750 border border-slate-700 hover:border-blue-500/60 rounded-lg p-2 text-xs text-white flex items-center justify-between gap-2 transition-all cursor-pointer shadow-sm group"
+          title={`${selectedMaterial.code} - ${selectedMaterial.name} (${selectedMaterial.specification || ''})`}
+        >
+          <div className="flex items-center gap-2 min-w-0 flex-1">
+            <span className="font-mono text-[11px] font-bold bg-blue-950 text-blue-300 border border-blue-800/80 px-2 py-0.5 rounded shrink-0">
+              {selectedMaterial.code}
+            </span>
+            <div className="min-w-0 flex-1">
+              <div className="font-medium text-slate-100 truncate text-xs leading-tight">
+                {selectedMaterial.name}
+              </div>
+              {selectedMaterial.specification && (
+                <div className="text-[10px] text-slate-400 truncate leading-tight mt-0.5">
+                  {selectedMaterial.specification}
+                </div>
+              )}
+            </div>
+          </div>
 
-        <div className="flex items-center gap-1 shrink-0 ml-1.5">
-          {selectedMaterial && !isOpen && (
-            <span className="text-[11px] font-medium text-emerald-400 bg-emerald-950/60 px-1.5 py-0.2 rounded border border-emerald-800/40">
+          <div className="flex items-center gap-1.5 shrink-0">
+            <span className="text-[11px] font-semibold text-emerald-400 bg-emerald-950/70 px-1.5 py-0.5 rounded border border-emerald-800/50">
               {selectedMaterial.unit}
             </span>
-          )}
+            <ChevronDown className="w-3.5 h-3.5 text-slate-400 group-hover:text-blue-400 transition-colors" />
+          </div>
+        </div>
+      ) : (
+        <div
+          className={`w-full bg-slate-800 hover:bg-slate-750 border ${
+            isOpen ? 'border-blue-500 ring-1 ring-blue-500/30' : 'border-slate-700'
+          } rounded-lg px-2.5 py-2 text-xs text-white flex items-center justify-between transition-colors shadow-sm`}
+        >
+          <div className="flex items-center gap-2 flex-1 min-w-0">
+            <Search className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+            <input
+              ref={inputRef}
+              type="text"
+              value={isOpen ? searchTerm : value ? `Mã: ${value}` : ''}
+              placeholder={placeholder}
+              onFocus={() => {
+                setIsOpen(true);
+                setSearchTerm('');
+              }}
+              onChange={(e) => {
+                if (!isOpen) setIsOpen(true);
+                setSearchTerm(e.target.value);
+              }}
+              onKeyDown={handleKeyDown}
+              className="w-full bg-transparent border-none text-xs text-white placeholder-slate-400 focus:outline-none py-0.5"
+            />
+          </div>
 
-          {isOpen && searchTerm && (
+          <div className="flex items-center gap-1 shrink-0 ml-1.5">
+            {isOpen && searchTerm && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setSearchTerm('');
+                }}
+                className="p-0.5 text-slate-400 hover:text-white rounded"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+
             <button
               type="button"
-              onClick={() => setSearchTerm('')}
-              className="p-0.5 text-slate-400 hover:text-white rounded"
+              onClick={() => {
+                setIsOpen(!isOpen);
+                if (!isOpen) {
+                  setTimeout(() => inputRef.current?.focus(), 50);
+                }
+              }}
+              className="p-0.5 text-slate-400 hover:text-white"
             >
-              <X className="w-3.5 h-3.5" />
+              <ChevronDown
+                className={`w-3.5 h-3.5 text-slate-400 shrink-0 transition-transform ${
+                  isOpen ? 'rotate-180 text-blue-400' : ''
+                }`}
+              />
             </button>
-          )}
-
-          <button
-            type="button"
-            onClick={() => {
-              setIsOpen(!isOpen);
-              if (!isOpen) {
-                setTimeout(() => inputRef.current?.focus(), 50);
-              }
-            }}
-            className="p-0.5 text-slate-400 hover:text-white"
-          >
-            <ChevronDown
-              className={`w-3.5 h-3.5 text-slate-400 shrink-0 transition-transform ${
-                isOpen ? 'rotate-180 text-blue-400' : ''
-              }`}
-            />
-          </button>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Popover Dropdown with Real-time Search Suggestions */}
       {isOpen && (
-        <div className="absolute z-[9999] left-0 top-full mt-1 w-full min-w-[340px] max-w-[620px] bg-slate-900 border border-slate-700 rounded-xl shadow-2xl overflow-hidden animate-in fade-in-50 zoom-in-95 duration-100">
+        <div className="absolute z-[9999] left-0 top-full mt-1 w-full min-w-[360px] sm:min-w-[460px] max-w-[640px] bg-slate-900 border border-slate-700 rounded-xl shadow-2xl overflow-hidden animate-in fade-in-50 zoom-in-95 duration-100">
           {/* Header prompt */}
           <div className="px-3 py-1.5 bg-slate-850 border-b border-slate-800 text-[11px] text-slate-400 flex items-center justify-between">
             <span className="font-semibold text-blue-400">Gợi ý danh mục vật tư ({filteredMaterials.length} kết quả):</span>
