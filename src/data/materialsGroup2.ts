@@ -508,8 +508,8 @@ export const materialsGroup2: Material[] = [
   },
   {
     id: 'mat_dn_091',
-    code: 'DN_VT_MUOI_01',
-    name: 'Muối tinh khiết hoàn nguyên hạt nhựa làm mềm nước (bao 25kg)',
+    code: 'DN_VT_0MUOI_01',
+    name: 'Muối tái sinh (25kg/bao) - Muối tinh khiết hoàn nguyên hạt nhựa làm mềm nước',
     category: 'Thiết bị vệ sinh & Xử lý nước',
     unit: 'Bao',
     specification: 'Muối tinh khiết 99.5% NaCl tái sinh cột trao đổi ion trạm xử lý nước',
@@ -522,7 +522,7 @@ export const materialsGroup2: Material[] = [
   },
   {
     id: 'mat_dn_092',
-    code: 'DN_VT_CLORIN_01',
+    code: 'DN_VT_000CL_01',
     name: 'Clorin viên nén TCCA 90% khử trùng nước thải (thùng 20kg)',
     category: 'Thiết bị vệ sinh & Xử lý nước',
     unit: 'Kg',
@@ -536,7 +536,7 @@ export const materialsGroup2: Material[] = [
   },
   {
     id: 'mat_dn_093',
-    code: 'DN_VT_AQUACLEAN_01',
+    code: 'DN_VT_00ANA_01',
     name: 'Men vi sinh xử lý nước thải Aquaclean NA (can 3.78L)',
     category: 'Thiết bị vệ sinh & Xử lý nước',
     unit: 'Can',

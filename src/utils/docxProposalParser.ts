@@ -190,36 +190,62 @@ export function parseDocxHtml(
         let noteCol = -1;
         let headerRowIndex = -1;
 
-        for (let rIdx = 0; rIdx < Math.min(4, rows.length); rIdx++) {
+        for (let rIdx = 0; rIdx < Math.min(5, rows.length); rIdx++) {
           const headerCells = Array.from(rows[rIdx].querySelectorAll('th, td')).map((c) =>
             (c.textContent || '').toLowerCase().trim()
           );
 
           headerCells.forEach((text, cIdx) => {
-            if (text.includes('stt') || text === 'tt' || text === 'no' || text === 'số tt') sttCol = cIdx;
-            else if (text.includes('mã') || text.includes('ký hiệu')) codeCol = cIdx;
-            else if (
-              text.includes('tên') ||
-              text.includes('vật tư') ||
+            if (text.includes('stt') || text === 'tt' || text === 'no' || text === 'số tt') {
+              sttCol = cIdx;
+            } else if (text.includes('mã chi phí') || text.includes('mã cp')) {
+              // Ignore expense code column
+            } else if (
+              text.includes('mã vật tư') ||
+              text.includes('mã vt') ||
+              text.includes('mã hàng') ||
+              text.includes('mã hiệu') ||
+              text.includes('ký hiệu')
+            ) {
+              codeCol = cIdx;
+            } else if (text.includes('mã') && codeCol === -1) {
+              codeCol = cIdx;
+            } else if (
+              text.includes('mô tả chung') ||
+              text.includes('mặt hàng') ||
+              text.includes('tên vật tư') ||
+              text.includes('tên hàng') ||
               text.includes('quy cách') ||
               text.includes('danh mục') ||
               text.includes('hàng hóa') ||
               text.includes('nội dung') ||
-              text.includes('chủng loại')
+              text.includes('chủng loại') ||
+              text.includes('tên')
             ) {
-              nameCol = cIdx;
-            } else if (text.includes('đvt') || text.includes('đơn vị') || text === 'đv') unitCol = cIdx;
-            else if (
-              text.includes('số lượng') ||
-              text.includes('sl') ||
-              text.includes('khối lượng') ||
-              text.includes('yêu cầu') ||
-              text.includes('đề xuất')
+              if (nameCol === -1) nameCol = cIdx;
+            } else if (text.includes('đvt') || text.includes('đơn vị') || text === 'đv') {
+              unitCol = cIdx;
+            } else if (
+              text.includes('số lượng dự kiến') ||
+              text.includes('số lượng đề xuất') ||
+              text.includes('số lượng yêu cầu') ||
+              text.includes('sl dự kiến') ||
+              text.includes('khối lượng')
             ) {
               qtyCol = cIdx;
-            } else if (text.includes('đơn giá') || text === 'giá' || text.includes('đơn giá (vnđ)')) priceCol = cIdx;
-            else if (text.includes('thành tiền') || text.includes('tổng tiền')) totalCol = cIdx;
-            else if (text.includes('ghi chú') || text.includes('note') || text.includes('mục đích')) noteCol = cIdx;
+            } else if (
+              (text.includes('số lượng') || text.includes('sl')) &&
+              !text.includes('tồn') &&
+              qtyCol === -1
+            ) {
+              qtyCol = cIdx;
+            } else if (text.includes('đơn giá') || text === 'giá' || text.includes('đơn giá (vnđ)')) {
+              priceCol = cIdx;
+            } else if (text.includes('thành tiền') || text.includes('tổng tiền')) {
+              totalCol = cIdx;
+            } else if (text.includes('ghi chú') || text.includes('note') || text.includes('phạm vi')) {
+              noteCol = cIdx;
+            }
           });
 
           if (nameCol !== -1 && (qtyCol !== -1 || unitCol !== -1 || headerCells.length >= 4)) {
@@ -244,12 +270,28 @@ export function parseDocxHtml(
           let rawPriceStr = priceCol !== -1 && cells[priceCol] ? cells[priceCol] : '';
           let rawNote = noteCol !== -1 && cells[noteCol] ? cells[noteCol] : '';
 
-          // Deduce values if header indices were missed
+          // Skip section / category divider rows like "I. Vận hành hệ thống...", "II. Vận hành..."
+          const isSectionHeader =
+            /^(I|II|III|IV|V|VI|VII|VIII|IX|X)[\.\s\:\-]/i.test(rawName) ||
+            /^(hệ thống|hạng mục|phân hệ|giai đoạn|khu vực)/i.test(rawName);
+          if (isSectionHeader && !rawCode && !rawQtyStr) {
+            continue;
+          }
+
+          // If code is in another column (e.g. if code column had DN_*)
+          if (!rawCode) {
+            const foundCodeCell = cells.find((c) => /^DN_[A-Z0-9_]+/i.test(c.trim()));
+            if (foundCodeCell) {
+              const m = foundCodeCell.match(/DN_[A-Za-z0-9_]+/);
+              if (m) rawCode = m[0].toUpperCase();
+            }
+          }
+
+          // Deduce name if header index was missed
           if (!rawName) {
-            // Find longest text cell that is not purely numeric
             let maxLen = 0;
             cells.forEach((c, idx) => {
-              if (idx !== sttCol && c.length > maxLen && !/^\d+([.,]\d+)?$/.test(c)) {
+              if (idx !== sttCol && idx !== codeCol && c.length > maxLen && !/^\d+([.,]\d+)?$/.test(c)) {
                 maxLen = c.length;
                 rawName = c;
               }
@@ -258,7 +300,7 @@ export function parseDocxHtml(
 
           if (!rawUnit) {
             const unitCell = cells.find((c) =>
-              /^(cái|bộ|mét|m|cuộn|cây|thùng|hộp|kg|lít|bình|quả|viên|chiếc|ống|thanh|khung|sợi|tấm|đôi|cặp|túi|can)$/i.test(
+              /^(cái|bộ|mét|m|cuộn|cây|thùng|hộp|kg|lít|lit|bình|quả|viên|chiếc|ống|thanh|khung|sợi|tấm|đôi|cặp|túi|can|bao)$/i.test(
                 c.trim()
               )
             );
@@ -266,7 +308,6 @@ export function parseDocxHtml(
           }
 
           if (!rawQtyStr) {
-            // Find numeric cell between 1 and 100,000 that is not STT and not large unit price
             for (let idx = 0; idx < cells.length; idx++) {
               if (idx === sttCol || idx === codeCol || idx === priceCol || idx === totalCol) continue;
               const val = cells[idx].replace(/,/g, '.').replace(/\s/g, '');
@@ -304,10 +345,12 @@ export function parseDocxHtml(
           if (rawName && rawName.length >= 2 && !isTotalRow) {
             // Match with catalog
             const matchedMat = findBestMaterialMatch(rawName, rawCode, materials);
-            const assignedCode = matchedMat
+            const assignedCode = rawCode
+              ? rawCode.toUpperCase().trim()
+              : matchedMat
               ? matchedMat.code
-              : rawCode || generateSuggestedCode(rawName, detectedItems.length);
-            const assignedName = matchedMat ? matchedMat.name : rawName;
+              : generateSuggestedCode(rawName, detectedItems.length);
+            const assignedName = rawName || (matchedMat ? matchedMat.name : rawName);
             const assignedUnit = rawUnit || (matchedMat ? matchedMat.unit : 'Cái');
             const assignedPrice = price || (matchedMat ? matchedMat.unitPrice : 0);
 

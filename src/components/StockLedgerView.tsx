@@ -44,6 +44,7 @@ import {
 } from '../utils/excelExporter';
 import { MATERIAL_CATEGORIES } from '../data/seedData';
 import { AHTLogo } from './AHTLogo';
+import { SearchableMaterialSelect } from './SearchableMaterialSelect';
 
 interface StockLedgerViewProps {
   materials: Material[];
@@ -730,22 +731,18 @@ export const StockLedgerView: React.FC<StockLedgerViewProps> = ({
           {/* Material Selector & Stock Card summary */}
           <div className="no-print bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-5 space-y-4">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-              {/* Material Dropdown */}
+              {/* Searchable Material Dropdown */}
               <div className="flex-1 max-w-xl">
                 <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1.5">
-                  Chọn Mặt Hàng Để Xem Sổ Thẻ Kho:
+                  Tìm kiếm & Chọn mặt hàng xem Sổ Thẻ Kho:
                 </label>
-                <select
+                <SearchableMaterialSelect
                   value={selectedMaterialCode}
-                  onChange={(e) => setSelectedMaterialCode(e.target.value)}
-                  className="w-full bg-slate-800 border border-slate-700 text-white rounded-xl px-3.5 py-2.5 text-xs font-medium focus:outline-none focus:border-blue-500"
-                >
-                  {materials.map((m) => (
-                    <option key={m.code} value={m.code}>
-                      {m.code} - {m.name} ({m.unit})
-                    </option>
-                  ))}
-                </select>
+                  materials={materials}
+                  calculatedStocks={calculatedStocks}
+                  onChange={(code) => setSelectedMaterialCode(code)}
+                  placeholder="Gõ mã DN_* hoặc tên vật tư để tra cứu thẻ kho..."
+                />
               </div>
 
               {/* Action buttons */}
@@ -753,9 +750,9 @@ export const StockLedgerView: React.FC<StockLedgerViewProps> = ({
                 <button
                   type="button"
                   onClick={handlePrint}
-                  className="bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 px-3.5 py-2 rounded-xl text-xs font-medium flex items-center gap-1.5 transition-colors"
+                  className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-sm"
                 >
-                  <Printer className="w-4 h-4" /> In Thẻ Kho
+                  <Printer className="w-4 h-4" /> In PDF Thẻ Kho
                 </button>
               </div>
             </div>

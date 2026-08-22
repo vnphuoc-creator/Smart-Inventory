@@ -122,11 +122,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
           <div>
             <div className="text-[13px] font-bold text-white tracking-wide uppercase flex items-center gap-1.5">
-              <span>Đội Điện Nước Công Trình</span>
+              <span>Hệ Thống Quản Lý Kho</span>
             </div>
-            <div className="text-[11px] text-slate-400 flex items-center gap-1 mt-0.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-              <span>Cảng HKQT Đà Nẵng (AHT)</span>
+            <div className="text-[11px] text-blue-300 font-medium flex items-center gap-1 mt-0.5 leading-tight">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse shrink-0"></span>
+              <span>Hệ thống quản lý xuất - nhập - tồn vật tư thuộc đội ĐNCT</span>
             </div>
           </div>
         </div>

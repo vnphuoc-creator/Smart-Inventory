@@ -99,6 +99,13 @@ export const SearchableMaterialSelect: React.FC<SearchableMaterialSelectProps> =
               ({selectedMaterial.unit})
             </span>
           </div>
+        ) : value ? (
+          <div className="flex items-center gap-2 truncate pr-2">
+            <span className="font-mono font-semibold text-blue-400 shrink-0">
+              {value}
+            </span>
+            <span className="text-slate-300 truncate">Vật tư: {value}</span>
+          </div>
         ) : (
           <span className="text-slate-400 truncate">{placeholder}</span>
         )}

@@ -177,17 +177,27 @@
 /* ========================================================================= */
 @media print {
   @page {
-    size: A4 landscape;
-    margin: 8mm 8mm 8mm 8mm;
+    size: landscape;
+    margin: 6mm 6mm;
   }
 
   html, body {
     background: #ffffff !important;
     color: #000000 !important;
-    font-size: 8.5pt !important;
-    line-height: 1.25 !important;
+    font-size: 8pt !important;
+    line-height: 1.2 !important;
+    width: 100% !important;
+    height: auto !important;
+    overflow: visible !important;
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
+  }
+
+  .overflow-x-auto,
+  .overflow-hidden {
+    overflow: visible !important;
+    width: 100% !important;
+    max-width: 100% !important;
   }
 
   /* Hide all UI elements, sidebars, headers, search bars, modals, buttons */
@@ -213,6 +223,7 @@
     max-width: 100% !important;
     margin: 0 !important;
     padding: 0 !important;
+    overflow: visible !important;
     background: #ffffff !important;
     color: #000000 !important;
     border: none !important;
@@ -221,7 +232,7 @@
 
   .printable-area * {
     color: #000000 !important;
-    border-color: #94a3b8 !important;
+    border-color: #64748b !important;
     background-color: transparent !important;
   }
 
@@ -230,45 +241,53 @@
   }
 
   /* Table styling for print */
-  .printable-table {
+  .printable-table,
+  table {
     width: 100% !important;
+    max-width: 100% !important;
     border-collapse: collapse !important;
     color: #000000 !important;
     background: #ffffff !important;
-    font-size: 8pt !important;
-    table-layout: fixed !important;
+    font-size: 7.5pt !important;
+    table-layout: auto !important;
   }
 
   .printable-table th,
-  .printable-table td {
+  .printable-table td,
+  table th,
+  table td {
     border: 1px solid #475569 !important;
-    padding: 3px 4px !important;
+    padding: 2.5px 3px !important;
     color: #000000 !important;
-    word-wrap: break-word !important;
+    word-break: break-word !important;
   }
 
-  .printable-table th {
+  .printable-table th,
+  table th {
     background-color: #f1f5f9 !important;
     font-weight: 700 !important;
     text-align: center !important;
   }
 
-  .printable-table tr {
+  .printable-table tr,
+  table tr {
     page-break-inside: avoid !important;
   }
 
-  .printable-table thead {
+  .printable-table thead,
+  table thead {
     display: table-header-group !important;
   }
 
-  .printable-table tfoot {
+  .printable-table tfoot,
+  table tfoot {
     display: table-footer-group !important;
   }
 
   /* Signatures section */
   .print-signatures {
     page-break-inside: avoid !important;
-    margin-top: 18px !important;
+    margin-top: 14px !important;
     padding: 0 !important;
     border: none !important;
     background: transparent !important;

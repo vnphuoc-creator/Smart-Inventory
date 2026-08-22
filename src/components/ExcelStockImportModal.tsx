@@ -119,106 +119,282 @@ export const ExcelStockImportModal: React.FC<ExcelStockImportModalProps> = ({
 
     try {
       const data = await selectedFile.arrayBuffer();
-      const workbook = XLSX.read(data);
+      const workbook = XLSX.read(data, { cellDates: true });
       const sheetName = workbook.SheetNames[0];
       const worksheet = workbook.Sheets[sheetName];
-      const json: any[] = XLSX.utils.sheet_to_json(worksheet);
 
-      if (!json || json.length === 0) {
+      // Read raw 2D matrix to handle any title / metadata rows at the top
+      const matrix: any[][] = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: '' });
+
+      if (!matrix || matrix.length === 0) {
         setErrorMsg('File Excel không có dữ liệu hoặc định dạng không hợp lệ.');
         setLoading(false);
         return;
       }
 
+      // Step 1: Search for the true header row index in the first 20 rows
+      let headerRowIdx = -1;
+      let colCode = -1;
+      let colName = -1;
+      let colUnit = -1;
+      let colCategory = -1;
+      let colStock = -1;
+      let colPrice = -1;
+      let colMin = -1;
+      let colMax = -1;
+      let colLocation = -1;
+
+      for (let r = 0; r < Math.min(20, matrix.length); r++) {
+        const row = matrix[r];
+        if (!Array.isArray(row)) continue;
+
+        let detectedCode = -1;
+        let detectedName = -1;
+        let detectedUnit = -1;
+        let detectedStock = -1;
+        let detectedPrice = -1;
+        let detectedCategory = -1;
+        let detectedLocation = -1;
+        let detectedMin = -1;
+        let detectedMax = -1;
+
+        row.forEach((cellVal, c) => {
+          const str = String(cellVal || '').toLowerCase().trim();
+          if (!str) return;
+
+          // Code
+          if (
+            str === 'mã số' ||
+            str === 'mã' ||
+            str.includes('mã vật tư') ||
+            str.includes('mã vt') ||
+            str.includes('mã hàng') ||
+            str.includes('mã hiệu') ||
+            str.includes('ký hiệu') ||
+            str === 'code' ||
+            str === 'item code'
+          ) {
+            if (detectedCode === -1) detectedCode = c;
+          }
+          // Name
+          else if (
+            str === 'mặt hàng' ||
+            str.includes('tên vật tư') ||
+            str.includes('tên hàng') ||
+            str.includes('tên & quy cách') ||
+            str.includes('mô tả chung') ||
+            str.includes('quy cách') ||
+            str.includes('danh mục') ||
+            str.includes('chủng loại') ||
+            str === 'tên' ||
+            str === 'name' ||
+            str === 'description'
+          ) {
+            if (detectedName === -1) detectedName = c;
+          }
+          // Unit
+          else if (
+            str === 'đvt' ||
+            str === 'dvt' ||
+            str.includes('đơn vị tính') ||
+            str === 'đơn vị' ||
+            str === 'đv' ||
+            str === 'unit'
+          ) {
+            if (detectedUnit === -1) detectedUnit = c;
+          }
+          // Stock (Cuối kỳ, tồn cuối, số lượng tồn...)
+          else if (
+            str.includes('cuối kỳ') ||
+            str.includes('tồn cuối') ||
+            str.includes('tồn kho') ||
+            str.includes('tồn thực tế') ||
+            str.includes('số lượng tồn') ||
+            str === 'tồn' ||
+            str === 'stock' ||
+            (str.includes('số lượng') && !str.includes('nhập') && !str.includes('xuất') && !str.includes('đầu'))
+          ) {
+            if (detectedStock === -1) detectedStock = c;
+          }
+          // Unit Price
+          else if (
+            str.includes('đơn giá') ||
+            str === 'giá' ||
+            str === 'price' ||
+            str === 'unit price'
+          ) {
+            if (detectedPrice === -1) detectedPrice = c;
+          }
+          // Category
+          else if (
+            str.includes('nhóm') ||
+            str.includes('phân loại') ||
+            str.includes('hạng mục') ||
+            str === 'category'
+          ) {
+            if (detectedCategory === -1) detectedCategory = c;
+          }
+          // Location
+          else if (
+            str.includes('vị trí') ||
+            str.includes('kho') ||
+            str === 'location'
+          ) {
+            if (detectedLocation === -1) detectedLocation = c;
+          }
+          // Min / Max
+          else if (str.includes('tối thiểu') || str === 'min') {
+            detectedMin = c;
+          } else if (str.includes('tối đa') || str === 'max') {
+            detectedMax = c;
+          }
+        });
+
+        // If we found at least (Name or Code) and (Stock or Unit or multiple columns)
+        if ((detectedName !== -1 || detectedCode !== -1) && (detectedStock !== -1 || detectedUnit !== -1 || row.length >= 4)) {
+          headerRowIdx = r;
+          colCode = detectedCode;
+          colName = detectedName;
+          colUnit = detectedUnit;
+          colStock = detectedStock;
+          colPrice = detectedPrice;
+          colCategory = detectedCategory;
+          colLocation = detectedLocation;
+          colMin = detectedMin;
+          colMax = detectedMax;
+          break;
+        }
+      }
+
+      // If stock column wasn't explicitly found in header row (e.g. multi-tier header with "Cuối kỳ -> Số lượng")
+      if (headerRowIdx !== -1 && colStock === -1 && headerRowIdx + 1 < matrix.length) {
+        const subRow = matrix[headerRowIdx + 1];
+        if (Array.isArray(subRow)) {
+          subRow.forEach((subVal, scIdx) => {
+            const subStr = String(subVal || '').toLowerCase().trim();
+            if (subStr === 'sl' || subStr === 'số lượng') {
+              colStock = scIdx;
+            }
+          });
+        }
+      }
+
       const rows: ParsedRow[] = [];
       const matMap = new Map<string, Material>();
-      currentMaterials.forEach((m) => matMap.set(m.code.toUpperCase().trim(), m));
+      currentMaterials.forEach((m) => {
+        matMap.set(m.code.toUpperCase().trim(), m);
+        matMap.set(m.name.toLowerCase().trim(), m);
+      });
 
-      json.forEach((row, idx) => {
-        // Find fields with flexible key matching
-        const rawCode =
-          row['Mã Vật Tư (DN_*)'] ||
-          row['Mã Vật Tư'] ||
-          row['Mã VT'] ||
-          row['Mã hàng'] ||
-          row['Code'] ||
-          row['Mã'];
+      const startRow = headerRowIdx !== -1 ? headerRowIdx + 1 : 0;
 
-        const rawName =
-          row['Tên & Quy Cách Vật Tư'] ||
-          row['Tên Vật Tư'] ||
-          row['Tên hàng'] ||
-          row['Tên vật tư'] ||
-          row['Description'] ||
-          row['Tên'];
+      for (let r = startRow; r < matrix.length; r++) {
+        const row = matrix[r];
+        if (!Array.isArray(row) || row.length === 0) continue;
 
-        const rawUnit =
-          row['Đơn Vị Tính'] ||
-          row['ĐVT'] ||
-          row['DVT'] ||
-          row['Đơn vị'] ||
-          row['Unit'] ||
-          'Cái';
+        let rawCode = colCode !== -1 && row[colCode] !== undefined ? String(row[colCode]).trim() : '';
+        let rawName = colName !== -1 && row[colName] !== undefined ? String(row[colName]).trim() : '';
+        let rawUnit = colUnit !== -1 && row[colUnit] !== undefined ? String(row[colUnit]).trim() : '';
+        let rawStockVal = colStock !== -1 && row[colStock] !== undefined ? row[colStock] : '';
+        let rawPriceVal = colPrice !== -1 && row[colPrice] !== undefined ? row[colPrice] : '';
+        let rawCategoryVal = colCategory !== -1 && row[colCategory] !== undefined ? row[colCategory] : '';
+        let rawLocationVal = colLocation !== -1 && row[colLocation] !== undefined ? row[colLocation] : '';
+        let rawMinVal = colMin !== -1 && row[colMin] !== undefined ? row[colMin] : '';
+        let rawMaxVal = colMax !== -1 && row[colMax] !== undefined ? row[colMax] : '';
 
-        const rawCategory =
-          row['Nhóm Phân Loại'] ||
-          row['Nhóm'] ||
-          row['Phân loại'] ||
-          row['Category'] ||
-          'Vật tư Điện & Phụ kiện tiêu hao';
-
-        const rawStock =
-          row['Số Lượng Tồn Cuối Kỳ'] ||
-          row['Tồn Cuối Kỳ'] ||
-          row['Tồn cuối'] ||
-          row['Tồn kho'] ||
-          row['Số lượng'] ||
-          row['Tồn'] ||
-          row['Stock'] ||
-          0;
-
-        const rawPrice =
-          row['Đơn Giá (VNĐ)'] ||
-          row['Đơn Giá'] ||
-          row['Đơn giá'] ||
-          row['Giá'] ||
-          row['Price'] ||
-          0;
-
-        const rawMin = row['Tồn Tối Thiểu (Min)'] || row['Min'] || 5;
-        const rawMax = row['Tồn Tối Đa (Max)'] || row['Max'] || 100;
-        const rawLoc = row['Vị Trí Kho'] || row['Vị trí'] || 'Kho Tổng AHT';
-
-        if (rawCode || rawName) {
-          let cleanCode = String(rawCode || '').trim();
-          if (!cleanCode.toUpperCase().startsWith('DN_')) {
-            cleanCode = `DN_${cleanCode || `VT_${idx + 1}`}`;
+        // If no explicit columns were matched, auto-detect cell types in this row
+        if (!rawCode && !rawName) {
+          // Look for cell containing DN_
+          const dnCell = row.find((c) => typeof c === 'string' && /^DN_[A-Za-z0-9_]+/i.test(c.trim()));
+          if (dnCell) {
+            rawCode = String(dnCell).trim();
           }
 
-          const existing = matMap.get(cleanCode.toUpperCase());
-          const stockNum = Number(rawStock) || 0;
-          const priceNum = Number(rawPrice) || existing?.unitPrice || 50000;
+          // Look for longest non-numeric string as name
+          let maxLen = 0;
+          row.forEach((cell) => {
+            const str = String(cell || '').trim();
+            if (str.length > maxLen && !/^\d+([.,]\d+)?$/.test(str) && !str.startsWith('DN_')) {
+              maxLen = str.length;
+              rawName = str;
+            }
+          });
+        }
+
+        // Skip total / footer rows
+        const isTotalRow = /^(tổng|tổng\s*cộng|cộng|bằng\s*chữ|stt|người\s*lập|phê\s*duyệt|ngày\s*\d+)/i.test(
+          rawName || rawCode
+        );
+        if (isTotalRow) continue;
+
+        // Clean code & name
+        if (rawCode || rawName) {
+          let cleanCode = String(rawCode || '').trim().toUpperCase();
+
+          // Try finding matched material
+          let existing = matMap.get(cleanCode);
+          if (!existing && rawName) {
+            existing = matMap.get(rawName.toLowerCase().trim());
+          }
+          if (!existing) {
+            // Check partial code match
+            for (const [k, m] of matMap.entries()) {
+              if (cleanCode && k === cleanCode) {
+                existing = m;
+                break;
+              }
+            }
+          }
+
+          if (!cleanCode) {
+            cleanCode = existing ? existing.code : `DN_VT_IMP_${idxPad(rows.length + 1)}`;
+          } else if (!cleanCode.startsWith('DN_')) {
+            cleanCode = `DN_${cleanCode}`;
+          }
+
+          // Parse numeric stock
+          let stockNum = 0;
+          if (rawStockVal !== '') {
+            const cleanedStock = String(rawStockVal)
+              .replace(/[,.](?=\d{3})/g, '')
+              .replace(/,/g, '.')
+              .replace(/[^0-9.-]/g, '');
+            const parsedStock = parseFloat(cleanedStock);
+            if (!isNaN(parsedStock)) stockNum = parsedStock;
+          } else if (existing) {
+            stockNum = existing.initialStock;
+          }
+
+          // Parse numeric price
+          let priceNum = 0;
+          if (rawPriceVal !== '') {
+            const cleanedPrice = String(rawPriceVal).replace(/[^0-9]/g, '');
+            const parsedPrice = parseFloat(cleanedPrice);
+            if (!isNaN(parsedPrice)) priceNum = parsedPrice;
+          }
+          if (!priceNum && existing) priceNum = existing.unitPrice;
+
           const origStock = existing ? existing.initialStock : 0;
 
           rows.push({
             code: cleanCode,
             name: String(rawName || existing?.name || `Vật tư ${cleanCode}`),
             unit: String(rawUnit || existing?.unit || 'Cái'),
-            category: String(rawCategory || existing?.category || 'Vật tư Điện & Phụ kiện tiêu hao'),
+            category: String(rawCategoryVal || existing?.category || 'Vật tư Điện & Phụ kiện tiêu hao'),
             stock: stockNum,
-            unitPrice: priceNum,
-            minStock: Number(rawMin) || 5,
-            maxStock: Number(rawMax) || 100,
-            location: String(rawLoc || existing?.location || 'Kho Tổng AHT'),
+            unitPrice: priceNum || 50000,
+            minStock: Number(rawMinVal) || existing?.minStock || 5,
+            maxStock: Number(rawMaxVal) || existing?.maxStock || 100,
+            location: String(rawLocationVal || existing?.location || 'Kho Tổng AHT'),
             isExisting: !!existing,
             originalStock: origStock,
             diffStock: stockNum - origStock,
           });
         }
-      });
+      }
 
       if (rows.length === 0) {
-        setErrorMsg('Không tìm thấy dòng vật tư hợp lệ trong file.');
+        setErrorMsg('Không tìm thấy dòng vật tư hợp lệ trong file. Vui lòng kiểm tra lại sheet đầu tiên.');
       } else {
         setParsedRows(rows);
       }
@@ -229,6 +405,10 @@ export const ExcelStockImportModal: React.FC<ExcelStockImportModalProps> = ({
       setLoading(false);
     }
   };
+
+  function idxPad(n: number): string {
+    return n < 10 ? `00${n}` : n < 100 ? `0${n}` : `${n}`;
+  }
 
   const handleApply = () => {
     if (parsedRows.length === 0) return;
