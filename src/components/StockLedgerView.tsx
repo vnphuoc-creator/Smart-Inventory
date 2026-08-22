@@ -241,9 +241,6 @@ export const StockLedgerView: React.FC<StockLedgerViewProps> = ({
           <h1 className="text-xl font-bold text-white tracking-tight">
             Tổng Hợp Nhập - Xuất - Tồn & Sổ Thẻ Kho
           </h1>
-          <p className="text-xs text-slate-400 mt-1">
-            Báo cáo tổng hợp Nhập - Xuất - Tồn chuẩn biểu mẫu công ty và sổ thẻ kho điện tử
-          </p>
         </div>
 
         {/* Sub-tab pills */}
@@ -292,17 +289,6 @@ export const StockLedgerView: React.FC<StockLedgerViewProps> = ({
                   }`}
                 >
                   Tháng 8/2026
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleSelectPreset('MONTH')}
-                  className={`px-3 py-1 rounded-lg text-xs font-medium transition-colors ${
-                    datePreset === 'MONTH'
-                      ? 'bg-blue-600 text-white shadow-sm'
-                      : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
-                  }`}
-                >
-                  Tháng này
                 </button>
                 <button
                   type="button"

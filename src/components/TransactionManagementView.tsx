@@ -39,6 +39,7 @@ import {
   PurchaseProposal,
 } from '../types';
 import { formatVND, formatNumber, formatDisplayDate } from '../utils/inventoryEngine';
+import { parseDocxHtml } from '../utils/docxProposalParser';
 import { AHTLogo } from './AHTLogo';
 import { ProposalReconciliationView } from './ProposalReconciliationView';
 
@@ -322,76 +323,23 @@ export const TransactionManagementView: React.FC<TransactionManagementViewProps>
       let detectedTitle = '';
       let detectedReason = '';
 
-      // 1. Client-side extraction from HTML / rawText
-      if (docHtml) {
-        try {
-          const parser = new DOMParser();
-          const doc = parser.parseFromString(docHtml, 'text/html');
-          
-          // Extract proposal number from text
-          const allText = doc.body.textContent || rawText;
-          const propNumMatch = allText.match(/(?:Tờ\s*trình\s*(?:số)?|Số)\s*[:.]?\s*([0-9A-Z_/-]+)/i);
-          if (propNumMatch && propNumMatch[1]) {
-            detectedPropNum = propNumMatch[1].trim();
-          }
-
-          const titleMatch = allText.match(/(?:V\/v|Về\s*việc)\s*[:.]?\s*([^\n\r]+)/i);
-          if (titleMatch && titleMatch[1]) {
-            detectedTitle = titleMatch[1].trim();
-          }
-
-          // Parse table rows
-          const rows = Array.from(doc.querySelectorAll('tr'));
-          for (const row of rows) {
-            const cells = Array.from(row.querySelectorAll('td, th')).map((c) => (c.textContent || '').trim());
-            if (cells.length >= 3) {
-              // Find matching material from cell text
-              for (const cellText of cells) {
-                if (!cellText || cellText.length < 3) continue;
-                // Check if any material code matches exactly
-                const matchByCode = materials.find((m) => m.code.toLowerCase() === cellText.toLowerCase());
-                // Or check if material name is in cellText or vice versa
-                const matchByName = !matchByCode ? materials.find((m) => {
-                  const mName = m.name.toLowerCase();
-                  const cName = cellText.toLowerCase();
-                  return cName.includes(mName) || (mName.length > 5 && mName.includes(cName));
-                }) : null;
-
-                const matchedMat = matchByCode || matchByName;
-                if (matchedMat) {
-                  // Find numeric quantity in other cells
-                  let quantity = 1;
-                  let unitPrice = matchedMat.unitPrice;
-
-                  const numbersInRow = cells
-                    .map((c) => c.replace(/[,.](?=\d{3})/g, '').replace(/,/g, '.'))
-                    .map((c) => parseFloat(c))
-                    .filter((n) => !isNaN(n) && n > 0 && n < 1000000);
-
-                  if (numbersInRow.length > 0) {
-                    // Usually quantity is smaller than price
-                    quantity = numbersInRow.find((n) => n <= 5000) || numbersInRow[0] || 1;
-                  }
-
-                  if (!detectedItems.some((it) => it.materialCode === matchedMat.code)) {
-                    detectedItems.push({
-                      materialCode: matchedMat.code,
-                      quantity: Math.max(1, Math.round(quantity)),
-                      unitPrice: unitPrice,
-                      notes: `Quét từ tệp ${file.name}`,
-                    });
-                  }
-                  break;
-                }
-              }
-            }
-          }
-        } catch (parseErr) {
-          console.warn('Client DOM parsing error:', parseErr);
+      // 1. High-precision client-side extraction from HTML & rawText (Mammoth / DOM Parser)
+      if (docHtml || rawText) {
+        const clientParsed = parseDocxHtml(docHtml, rawText, materials);
+        if (clientParsed.proposalNumber) detectedPropNum = clientParsed.proposalNumber;
+        if (clientParsed.title) detectedTitle = clientParsed.title;
+        if (clientParsed.reason) detectedReason = clientParsed.reason;
+        if (clientParsed.items && clientParsed.items.length > 0) {
+          detectedItems = clientParsed.items.map((it) => ({
+            materialCode: it.materialCode,
+            quantity: it.quantity,
+            unitPrice: it.unitPrice,
+            notes: it.notes,
+          }));
         }
       }
 
-      // 2. Also try Server Gemini API for advanced semantic understanding
+      // 2. Also try Server Gemini API for OCR / advanced layout recognition
       try {
         const res = await fetch('/api/ai/scan-proposal', {
           method: 'POST',
@@ -401,7 +349,7 @@ export const TransactionManagementView: React.FC<TransactionManagementViewProps>
             fileName: file.name,
             fileText: rawText,
             docHtml: docHtml,
-            availableMaterials: materials.slice(0, 150).map((m) => ({
+            availableMaterials: materials.map((m) => ({
               code: m.code,
               name: m.name,
               unit: m.unit,
@@ -416,15 +364,17 @@ export const TransactionManagementView: React.FC<TransactionManagementViewProps>
           if (data.title) detectedTitle = data.title;
           if (data.reason) detectedReason = data.reason;
           if (Array.isArray(data.items) && data.items.length > 0) {
+            // Only override if server found valid items
             detectedItems = data.items.map((it: any) => {
-              const match =
+              const matchedMat =
                 materials.find((m) => m.code === it.materialCode) ||
-                materials.find((m) => m.name.toLowerCase().includes((it.materialName || '').toLowerCase())) ||
-                materials[0];
+                materials.find((m) => m.name.toLowerCase() === (it.materialName || '').toLowerCase().trim()) ||
+                materials.find((m) => m.name.toLowerCase().includes((it.materialName || '').toLowerCase().trim()));
+
               return {
-                materialCode: match ? match.code : materials[0].code,
-                quantity: Number(it.quantity) || 1,
-                unitPrice: Number(it.unitPrice) || (match ? match.unitPrice : 0),
+                materialCode: matchedMat ? matchedMat.code : it.materialCode || `DN_VT_${detectedItems.length + 1}`,
+                quantity: Math.max(1, Number(it.quantity) || 1),
+                unitPrice: Number(it.unitPrice) || (matchedMat ? matchedMat.unitPrice : 0),
                 notes: it.notes || `Tự động quét từ Tờ trình ${data.proposalNumber || ''}`,
               };
             });
@@ -440,7 +390,7 @@ export const TransactionManagementView: React.FC<TransactionManagementViewProps>
       if (detectedReason) setFormReason(detectedReason);
       if (detectedItems.length > 0) {
         setFormItems(detectedItems);
-        setScanFeedback(`✨ Quét thành công! Đã tự động nhận diện Tờ trình "${detectedPropNum || file.name}" và điền ${detectedItems.length} mặt hàng.`);
+        setScanFeedback(`✨ Quét thành công! Đã tự động nhận diện Tờ trình "${detectedPropNum || file.name}" và điền chính xác ${detectedItems.length} mặt hàng kèm số lượng.`);
       } else {
         setScanFeedback(`✨ Đã gắn tệp "${file.name}". Bạn có thể chọn tiếp các mặt hàng cần nhập.`);
       }
@@ -780,6 +730,7 @@ export const TransactionManagementView: React.FC<TransactionManagementViewProps>
           materials={materials}
           transactions={transactions}
           proposals={proposals}
+          calculatedStocks={calculatedStocks}
           onStartImportForProposal={handleStartImportForProposal}
           onUpdateProposal={onUpdateProposal}
           onCreateProposal={onCreateProposal}

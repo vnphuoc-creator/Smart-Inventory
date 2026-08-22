@@ -751,23 +751,25 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                           </td>
                           <td className="py-3 px-3">
                             <div className="font-semibold text-slate-200">{prop.title}</div>
-                            {prop.reason && (
+                            {prop.notes && (
                               <div className="text-[11px] text-slate-400 truncate max-w-xs">
-                                {prop.reason}
+                                {prop.notes}
                               </div>
                             )}
                           </td>
                           <td className="py-3 px-3 text-slate-400">
-                            {formatDisplayDate(prop.proposalDate)}
+                            {formatDisplayDate(prop.date)}
                           </td>
-                          <td className="py-3 px-3 text-slate-300">{prop.proposedByName}</td>
+                          <td className="py-3 px-3 text-slate-300">{prop.creatorName}</td>
                           <td className="py-3 px-3 text-center font-mono">
                             <span className="bg-slate-800 px-2 py-0.5 rounded text-blue-300 font-semibold">
                               {prop.items.length} mục
                             </span>
                           </td>
                           <td className="py-3 px-3 text-right font-mono font-semibold text-emerald-400">
-                            {formatVND(prop.totalEstimatedAmount || 0)}
+                            {formatVND(
+                              prop.items.reduce((sum, item) => sum + item.requestedQuantity * (item.unitPrice || 0), 0)
+                            )}
                           </td>
                           <td className="py-3 px-3 text-center">
                             <button

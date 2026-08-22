@@ -60,7 +60,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
       id: 'ledger',
       label: 'Thẻ Kho & Báo Cáo NXT',
       icon: FileSpreadsheet,
-      description: 'Mẫu TT 99/2025/TT-BTC & PDF',
     },
     // MASTER ADMIN ONLY (vn.phuoc235@gmail.com): Strictly restricted!
     ...(currentUser.email?.toLowerCase().trim() === 'vn.phuoc235@gmail.com'
@@ -166,13 +165,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   </div>
                   <div className="truncate">
                     <div className="text-xs tracking-tight">{item.label}</div>
-                    <div
-                      className={`text-[10px] truncate ${
-                        isActive ? 'text-blue-100' : 'text-slate-400'
-                      }`}
-                    >
-                      {item.description}
-                    </div>
+                    {item.description && (
+                      <div
+                        className={`text-[10px] truncate ${
+                          isActive ? 'text-blue-100' : 'text-slate-400'
+                        }`}
+                      >
+                        {item.description}
+                      </div>
+                    )}
                   </div>
                 </div>
 

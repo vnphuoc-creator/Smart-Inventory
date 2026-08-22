@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import ReactMarkdown from 'react-markdown';
 import {
   Sparkles,
   Send,
@@ -274,8 +275,10 @@ export const AiAssistantView: React.FC<AiAssistantViewProps> = ({
               Đóng báo cáo
             </button>
           </div>
-          <div className="text-xs text-slate-200 leading-relaxed whitespace-pre-line bg-slate-850 p-4 rounded-xl border border-slate-800 font-sans">
-            {analysisResult}
+          <div className="text-xs text-slate-200 leading-relaxed bg-slate-850 p-4 rounded-xl border border-slate-800 font-sans">
+            <div className="prose prose-invert max-w-none text-xs space-y-2">
+              <ReactMarkdown>{analysisResult}</ReactMarkdown>
+            </div>
           </div>
         </div>
       )}
@@ -369,7 +372,13 @@ export const AiAssistantView: React.FC<AiAssistantViewProps> = ({
                       : 'bg-slate-800/90 text-slate-200 rounded-tl-none border border-slate-700/60 leading-relaxed'
                   }`}
                 >
-                  <div className="whitespace-pre-line">{msg.text}</div>
+                  {msg.sender === 'AI' ? (
+                    <div className="prose prose-invert max-w-none text-xs space-y-1.5 leading-relaxed">
+                      <ReactMarkdown>{msg.text}</ReactMarkdown>
+                    </div>
+                  ) : (
+                    <div className="whitespace-pre-line">{msg.text}</div>
+                  )}
                   <div
                     className={`text-[10px] mt-1.5 ${
                       msg.sender === 'USER' ? 'text-blue-200 text-right' : 'text-slate-400'

@@ -66,7 +66,7 @@ ${proposalsSummary || "Không có tờ trình"}
 
 Nhiệm vụ:
 1. Trả lời chi tiết, chính xác, súc tích và mạch lạc bằng tiếng Việt chuyên ngành cơ điện sân bay (có số liệu, mã DN_*, số lượng cụ thể nếu có trong dữ liệu).
-2. Nếu câu hỏi liên quan đến tình trạng tồn kho, mã vật tư, đề xuất nhập/xuất, cảnh báo hết hàng, hoặc tờ trình đề xuất mua sắm, hãy phân tích rõ ràng.
+2. Nếu câu hỏi liên quan đến tình trạng tồn kho, mã vật tư, đề xuất nhập/xuất, cảnh báo hết hàng, hoặc tờ trình đề xuất mua sắm (ví dụ tờ trình số cụ thể như 29, 17, 26, 31, 45, 08,...), hãy phân tích rõ ràng và đưa ra số liệu chính xác.
 3. Cung cấp bộ lọc JSON gợi ý để giao diện tự động lọc bảng dữ liệu tương ứng.
 
 Hãy trả về phản hồi định dạng JSON strictly with this schema:
@@ -109,38 +109,129 @@ Hãy trả về phản hồi định dạng JSON strictly with this schema:
     }
   }
 
-  // Intelligent Local Fallback Engine (Runs when Gemini API is offline or without API key)
-  const qLower = query.toLowerCase();
+  // Intelligent Local Fallback Engine (Parses real payload and gives exact, rich answers)
+  const qLower = query.toLowerCase().trim();
   let intent = "general_qa";
   let textResponse = "";
   const highlightedCodes: string[] = [];
   const suggestedFilters: Record<string, string> = { searchKeyword: "" };
 
-  if (qLower.includes("hết") || qLower.includes("dưới định mức") || qLower.includes("cảnh báo") || qLower.includes("thiếu") || qLower.includes("tồn ít")) {
-    intent = "low_stock_alert";
-    suggestedFilters.stockStatus = "LOW_STOCK";
-    textResponse = `### ⚠️ Cảnh Báo Tồn Kho Dưới Định Mức An Toàn
-Hệ thống đã rà soát toàn bộ danh mục vật tư Đội Điện Nước AHT:
-- **Các vật tư cần ưu tiên bổ sung ngay**: Các mã dây điện \`DN_DD_CV_*\`, aptomat tép \`DN_CC_MCB_*\`, vòi cảm ứng \`DN_VT_VOILA_01\`, ống \`DN_ONG_PPR10_*\`.
-- **Đề xuất**: Lập phiếu đề xuất nhập kho theo các Tờ trình định kỳ (\`17-DNCT/PKT\`, \`26-DNCT/PKT\`, \`31-DNCT/PKT\`) để bổ sung vật tư đạt mức tồn kho tối ưu.`;
+  // Parse structured data from request body if available
+  let parsedMaterials: any[] = [];
+  let parsedProposals: any[] = [];
+  try {
+    if (typeof materialsSummary === "string" && materialsSummary.startsWith("[")) {
+      parsedMaterials = JSON.parse(materialsSummary);
+    }
+  } catch {}
+  try {
+    if (typeof proposalsSummary === "string" && proposalsSummary.startsWith("[")) {
+      parsedProposals = JSON.parse(proposalsSummary);
+    }
+  } catch {}
+
+  // 1. Check if user asks about a specific proposal (e.g. "tờ trình 29", "tờ trình 17", "26-DNCT/PKT", etc.)
+  const propNumMatch = qLower.match(/(?:tờ\s*trình\s*|tt\s*|số\s*)?(\d{1,3}(?:-dnct(?:\/pkt)?)?)/i);
+  const matchedProp = parsedProposals.find((p: any) => {
+    const num = (p.number || "").toLowerCase();
+    const title = (p.title || "").toLowerCase();
+    return (
+      (propNumMatch && num.includes(propNumMatch[1])) ||
+      qLower.includes(num) ||
+      (num.length > 2 && qLower.includes(num.replace(/[^0-9]/g, ''))) ||
+      title.includes(qLower)
+    );
+  });
+
+  if (matchedProp) {
+    intent = "reconcile_proposal";
+    const items = matchedProp.items || [];
+    const itemsListMd = items
+      .map(
+        (it: any, idx: number) =>
+          `${idx + 1}. **${it.code || 'Mã DN_'}** - ${it.name}: Yêu cầu **${it.requested || 0}** ${it.unit || 'Cái'}`
+      )
+      .join("\n");
+
+    textResponse = `### 📋 Báo Cáo Chi Tiết: Tờ Trình ${matchedProp.number}
+- **Nội dung / Trích yếu**: ${matchedProp.title || 'Đề xuất mua sắm vật tư định kỳ'}
+- **Trạng thái**: ${matchedProp.status === 'COMPLETED' ? '✅ Đã nhập đủ 100%' : '⏳ Đang tiến hành nhập kho'}
+- **Tổng số mặt hàng yêu cầu**: **${items.length} mặt hàng**
+
+#### Danh sách vật tư theo tờ trình:
+${itemsListMd || '- Chưa có danh sách chi tiết mặt hàng.'}
+
+*Bạn có thể bấm vào tab **"Xuất - Nhập - Tồn"** > **"Đối Chiếu Tờ Trình"** hoặc tạo Phiếu Nhập Kho gắn Tờ trình ${matchedProp.number} để hệ thống tự động điền toàn bộ danh sách trên.*`;
   } else if (qLower.includes("tờ trình") || qLower.includes("đề xuất") || qLower.includes("đối chiếu")) {
     intent = "reconcile_proposal";
-    textResponse = `### 📋 Đối Chiếu Tờ Trình Nhập Kho
+    if (parsedProposals.length > 0) {
+      const propSummaryText = parsedProposals
+        .slice(0, 6)
+        .map((p: any) => `- **${p.number}**: ${p.title} (${p.items?.length || 0} mặt hàng)`)
+        .join("\n");
+      textResponse = `### 📋 Danh Sách Các Tờ Trình Đang Theo Dõi Trong Hệ Thống
+Hệ thống hiện đang quản lý **${parsedProposals.length} Tờ trình mua sắm**:
+${propSummaryText}
+
+*Bạn có thể hỏi cụ thể về từng số tờ trình (ví dụ: "tờ trình 17", "tờ trình 26", "tờ trình 31",...) để xem chi tiết tiến độ nhập kho và danh mục vật tư.*`;
+    } else {
+      textResponse = `### 📋 Đối Chiếu Tờ Trình Nhập Kho
 Hệ thống đang quản lý các tờ trình trọng điểm:
 - **Tờ trình 17-DNCT/PKT**: Mua sắm dây cáp điện & phụ kiện trạm biến áp T2.
 - **Tờ trình 26-DNCT/PKT**: Thay thế phụ kiện thiết bị vệ sinh cảm ứng TOTO sảnh đến quốc tế.
 - **Tờ trình 31-DNCT/PKT**: Bổ sung thiết bị đóng cắt ACB/MCCB và đồng hồ đa năng MFM383A.
 - **Tờ trình 08-DNCT/PKT**: Hệ thống đèn chiếu sáng Highbay & Exit PCCC.
-- **Tờ trình 45-DNCT/PKT**: Thay thế cụm van bướm ShinYi & phụ kiện đường ống cấp nước.
+- **Tờ trình 45-DNCT/PKT**: Thay thế cụm van bướm ShinYi & phụ kiện đường ống cấp nước.`;
+    }
+  } else if (qLower.includes("hết") || qLower.includes("dưới định mức") || qLower.includes("cảnh báo") || qLower.includes("thiếu") || qLower.includes("tồn ít") || qLower.includes("đặt ngay")) {
+    intent = "low_stock_alert";
+    suggestedFilters.stockStatus = "LOW_STOCK";
+    const lowItems = parsedMaterials.filter(
+      (m: any) => m.status === "LOW_STOCK" || m.status === "OUT_OF_STOCK" || (m.current !== undefined && m.min !== undefined && m.current <= m.min)
+    );
 
-*Bạn có thể bấm vào tab **"Đối Chiếu Tờ Trình"** trong phần Quản Lý Phiếu Kho để theo dõi số lượng đã nhập lũy kế và nhập bổ sung số còn thiếu.*`;
-  } else if (qLower.includes("dn_") || qLower.includes("mã") || qLower.includes("tìm")) {
+    if (lowItems.length > 0) {
+      const topLow = lowItems.slice(0, 8).map((m: any, idx: number) => {
+        const needQty = Math.max(10, (m.min || 5) * 2 - (m.current || 0));
+        return `${idx + 1}. **\`${m.code}\`** (${m.name}): Tồn hiện tại **${m.current}** ${m.unit} (Định mức tối thiểu: ${m.min}) ➜ Gợi ý đặt: **+${needQty} ${m.unit}**`;
+      }).join("\n");
+
+      textResponse = `### ⚠️ Phân Tích Vật Tư Sắp Hết Hàng & Đề Xuất Đặt Mua
+Hệ thống phát hiện **${lowItems.length} mã vật tư** đang ở mức tồn dưới ngưỡng an toàn tối thiểu:
+
+${topLow}
+
+#### 💡 Khuyến nghị hành động:
+1. **Lập ngay Phiếu Đề Xuất Nhập Kho** bổ sung các mã vật tư trọng yếu trên để đảm bảo vận hành 24/7.
+2. Kiểm tra lại các **Tờ trình mua sắm đang mở** xem đã bao gồm các mã này hay chưa.`;
+    } else {
+      textResponse = `### ⚠️ Phân Tích Vật Tư Sắp Hết Hàng
+Hệ thống đã rà soát toàn bộ danh mục vật tư Đội Điện Nước AHT:
+- **Các vật tư cần ưu tiên kiểm tra**: Các mã dây điện \`DN_DD_CV_*\`, aptomat tép \`DN_CC_MCB_*\`, vòi cảm ứng \`DN_VT_VOILA_01\`, ống hàn nhiệt \`DN_ONG_PPR10_*\`.
+- **Đề xuất**: Lập phiếu đề xuất nhập kho theo các Tờ trình định kỳ (\`17-DNCT/PKT\`, \`26-DNCT/PKT\`, \`31-DNCT/PKT\`) để bổ sung vật tư đạt mức tồn kho tối ưu.`;
+    }
+  } else if (qLower.includes("dn_") || qLower.includes("mã")) {
     intent = "search_material";
-    suggestedFilters.searchKeyword = query.replace(/[^\w\d_-]/g, "");
-    textResponse = `### 🔍 Kết Quả Tra Cứu Vật Tư & Tồn Kho
+    const codeMatch = query.match(/dn[_\-][a-z0-9_]+/i);
+    const targetCode = codeMatch ? codeMatch[0].toUpperCase().replace('-', '_') : '';
+    suggestedFilters.searchKeyword = targetCode || query;
+
+    const matchedMat = parsedMaterials.find((m: any) => m.code === targetCode || (m.code && m.code.includes(targetCode)));
+    if (matchedMat) {
+      highlightedCodes.push(matchedMat.code);
+      textResponse = `### 🔍 Thông Tin Chi Tiết Mã Vật Tư: \`${matchedMat.code}\`
+- **Tên vật tư**: **${matchedMat.name}**
+- **Số lượng tồn hiện tại**: **${matchedMat.current} ${matchedMat.unit || 'Cái'}**
+- **Định mức an toàn tối thiểu**: **${matchedMat.min || 0} ${matchedMat.unit || 'Cái'}**
+- **Trạng thái tồn kho**: ${matchedMat.status === 'LOW_STOCK' ? '⚠️ Dưới mức an toàn' : matchedMat.status === 'OUT_OF_STOCK' ? '❌ Hết hàng (Tồn = 0)' : '✅ Đạt định mức an toàn'}
+
+*Bạn có thể bấm vào thẻ kho của vật tư này để theo dõi lịch sử xuất - nhập hoặc lập phiếu giao dịch trực tiếp.*`;
+    } else {
+      textResponse = `### 🔍 Kết Quả Tra Cứu Vật Tư & Tồn Kho
 Đã tìm kiếm theo tiêu chí: \`${query}\`.
 - Toàn bộ danh mục gồm **hơn 600 vật tư chuẩn** với tiền tố \`DN_\` đã được chuẩn hóa vị trí kho, định mức tồn tối thiểu - tối đa và đơn giá cập nhật.
 - Bạn có thể xem thẻ kho chi tiết hoặc lập phiếu xuất/nhập trực tiếp cho từng mã vật tư.`;
+    }
   } else {
     textResponse = `### 🤖 Trợ Lý AI Kho Vật Tư AHT
 Tôi đã tiếp nhận yêu cầu: **"${query}"**.
@@ -225,11 +316,11 @@ Hãy đưa ra báo cáo phân tích chuyên sâu định dạng Markdown gồm:
 
 // AI Proposal Scanner & Document OCR Auto-Fill Endpoint
 app.post("/api/ai/scan-proposal", async (req, res) => {
-  const { fileData, fileName, fileText, availableMaterials } = req.body;
+  const { fileData, fileName, fileText, docHtml, availableMaterials } = req.body;
 
   const ai = getGemini();
 
-  if (ai && (fileData || fileText)) {
+  if (ai && (fileData || fileText || docHtml)) {
     try {
       let contents: any[] = [];
 
@@ -248,23 +339,29 @@ app.post("/api/ai/scan-proposal", async (req, res) => {
       }
 
       const promptText = `Bạn là trợ lý AI chuyên quét và đọc tài liệu Tờ trình / Hóa đơn / Phiếu đề xuất vật tư cơ điện của Cảng Hàng Không Quốc Tế Đà Nẵng (AHT).
-Nhiệm vụ: Trích xuất chính xác thông tin để tự động điền vào Phiếu Nhập Kho:
-1. Số tờ trình (Số hiệu văn bản, ví dụ: "45-DNCT/PKT", "17-DNCT/PKT", "26-DNCT/PKT", "31-DNCT/PKT", "08-DNCT/PKT",...).
+Nhiệm vụ: Trích xuất ĐẦY ĐỦ VÀ CHÍNH XÁC TOÀN BỘ danh sách vật tư trong bảng để tự động điền vào Phiếu Nhập Kho:
+1. Số tờ trình (Số hiệu văn bản, ví dụ: "45-DNCT/PKT", "17-DNCT/PKT", "26-DNCT/PKT", "31-DNCT/PKT", "08-DNCT/PKT", "29-DNCT/PKT",...).
 2. Tên tiêu đề / Diễn giải nội dung mua sắm.
 3. Đơn vị cung cấp / Nhà cung cấp / Đối tác (nếu có).
 4. Ngày lập tờ trình (định dạng YYYY-MM-DD nếu có).
 5. Lý do nhập kho.
-6. Danh sách các mặt hàng / vật tư cần nhập kèm số lượng, đơn vị tính, đơn giá ước tính (nếu có). Cố gắng khớp với mã vật tư tiền tố "DN_" của hệ thống.
+6. Danh sách TOÀN BỘ các mặt hàng / vật tư cần nhập:
+   - quantity: Lấy CHÍNH XÁC số lượng yêu cầu trong cột Số lượng (KHÔNG lấy số thứ tự STT hay đơn giá).
+   - unit: Đơn vị tính (Bộ, Cái, Mét, Cuộn, Cây, Thùng, Hộp, v.v.).
+   - unitPrice: Đơn giá dự toán (nếu có).
+   - materialCode: Tìm mã vật tư khớp trong danh mục có tiền tố "DN_", nếu không có thì để trống.
+   - materialName: Tên và quy cách đầy đủ của vật tư trong tài liệu.
 
 ${fileText ? `Nội dung văn bản nhận diện được:\n${fileText}\n` : ""}
+${docHtml ? `Cấu trúc bảng HTML:\n${docHtml.slice(0, 5000)}\n` : ""}
 
-Danh sách mã vật tư mẫu trong hệ thống:
-${Array.isArray(availableMaterials) ? availableMaterials.slice(0, 50).map((m: any) => `${m.code}: ${m.name}`).join("\n") : "Mã DN_..."}
+Danh sách mã vật tư trong hệ thống:
+${Array.isArray(availableMaterials) ? availableMaterials.slice(0, 100).map((m: any) => `${m.code}: ${m.name} (${m.unit || 'Cái'})`).join("\n") : "Mã DN_..."}
 
 Hãy trả về JSON strictly with this format:
 {
   "success": true,
-  "proposalNumber": "Số tờ trình tìm thấy hoặc tạo mã phù hợp",
+  "proposalNumber": "Số tờ trình",
   "title": "Tiêu đề diễn giải ngắn gọn",
   "partner": "Tên nhà cung cấp hoặc đối tác",
   "reason": "Lý do nhập kho theo tờ trình",
@@ -284,18 +381,20 @@ Hãy trả về JSON strictly with this format:
       contents.push(promptText);
 
       const response = await ai.models.generateContent({
-        model: "gemini-2.5-flash",
+        model: "gemini-3.7-flash",
         contents: contents,
         config: {
           responseMimeType: "application/json",
           systemInstruction:
-            "Bạn là chuyên gia OCR và phân tích tờ trình mua sắm vật tư kỹ thuật cơ điện AHT.",
+            "Bạn là chuyên gia OCR và phân tích tờ trình mua sắm vật tư kỹ thuật cơ điện AHT. Nhiệm vụ tối quan trọng: trích xuất ĐẦY ĐỦ TOÀN BỘ các dòng vật tư trong bảng, lấy đúng Số lượng (quantity) yêu cầu từ cột Số lượng (không lấy nhầm STT hay đơn giá), và cố gắng khớp với mã vật tư DN_ trong danh mục.",
         },
       });
 
       const outputText = response.text || "{}";
       const parsed = JSON.parse(outputText);
-      return res.json(parsed);
+      if (parsed && parsed.items && Array.isArray(parsed.items) && parsed.items.length > 0) {
+        return res.json(parsed);
+      }
     } catch (err: unknown) {
       console.warn("Gemini Proposal Scan error, switching to heuristic parsing:", err);
     }
@@ -304,10 +403,14 @@ Hãy trả về JSON strictly with this format:
   // Smart Heuristic & Pattern Extraction Fallback (when offline or quota reached)
   const fullText = (fileText || fileName || "").toString();
   
-  // Extract proposal number like XX-DNCT/PKT or similar
+  // Extract proposal number like XX-DNCT/PKT, XX/TTr-DNCT or similar
   const proposalMatch = fullText.match(/(\d{1,3}[-\/][A-Za-z0-9_\/]+)/i);
   const detectedProposalNumber = proposalMatch ? proposalMatch[1].toUpperCase() : `TT-${Math.floor(10 + Math.random() * 89)}-DNCT/PKT`;
   
+  // Heuristic extract title / reason
+  const titleMatch = fullText.match(/(?:V\/v|Về\s*việc)\s*[:.]?\s*([^\n\r]+)/i);
+  const detectedTitle = titleMatch && titleMatch[1] ? titleMatch[1].trim() : `Mua sắm vật tư theo Tờ trình ${detectedProposalNumber}`;
+
   // Heuristic extract partner
   let detectedPartner = "Công ty TNHH Thiết Bị & Chiếu Sáng Miền Trung";
   if (fullText.toLowerCase().includes("cadivi") || fullText.toLowerCase().includes("cáp")) {
@@ -318,46 +421,70 @@ Hãy trả về JSON strictly with this format:
     detectedPartner = "Nhà Phân Phối Thiết Bị Điện Công Nghiệp Schneider Electric";
   }
 
-  // Heuristic items generation from available catalog
+  // Extract items by scanning full text lines
   let matchedItems: any[] = [];
   if (Array.isArray(availableMaterials) && availableMaterials.length > 0) {
-    // If text mentions keyword, pick matching items
     const textLower = fullText.toLowerCase();
-    matchedItems = availableMaterials.filter((m: any) => {
-      const nameLower = (m.name || "").toLowerCase();
+    
+    // Check if any material code is explicitly mentioned in the text
+    for (const m of availableMaterials) {
       const codeLower = (m.code || "").toLowerCase();
-      return textLower.includes(codeLower) || 
-             (textLower.includes("cáp") && nameLower.includes("cáp")) ||
-             (textLower.includes("dây") && nameLower.includes("dây")) ||
-             (textLower.includes("đèn") && nameLower.includes("đèn")) ||
-             (textLower.includes("ống") && nameLower.includes("ống")) ||
-             (textLower.includes("van") && nameLower.includes("van")) ||
-             (textLower.includes("mcb") && nameLower.includes("mcb"));
-    }).slice(0, 5).map((m: any, idx: number) => ({
-      materialCode: m.code,
-      materialName: m.name,
-      quantity: 10 + idx * 5,
-      unit: m.unit || "Cái",
-      unitPrice: m.unitPrice || 150000,
-      notes: `Nhập tự động theo mục ${idx + 1} Tờ trình ${detectedProposalNumber}`,
-    }));
+      const nameLower = (m.name || "").toLowerCase();
+      if (codeLower && textLower.includes(codeLower)) {
+        if (!matchedItems.some((it) => it.materialCode === m.code)) {
+          matchedItems.push({
+            materialCode: m.code,
+            materialName: m.name,
+            quantity: 10,
+            unit: m.unit || "Cái",
+            unitPrice: m.unitPrice || 150000,
+            notes: `Trích xuất từ Tờ trình ${detectedProposalNumber}`,
+          });
+        }
+      }
+    }
+
+    // If no code directly matched, match by strong keywords
+    if (matchedItems.length === 0) {
+      const keywordMatches = availableMaterials.filter((m: any) => {
+        const nameLower = (m.name || "").toLowerCase();
+        return (
+          (textLower.includes("cáp") && nameLower.includes("cáp")) ||
+          (textLower.includes("dây") && nameLower.includes("dây")) ||
+          (textLower.includes("đèn") && nameLower.includes("đèn")) ||
+          (textLower.includes("ống") && nameLower.includes("ống")) ||
+          (textLower.includes("van") && nameLower.includes("van")) ||
+          (textLower.includes("mcb") && nameLower.includes("mcb")) ||
+          (textLower.includes("vòi") && nameLower.includes("vòi"))
+        );
+      });
+
+      matchedItems = keywordMatches.slice(0, 10).map((m: any, idx: number) => ({
+        materialCode: m.code,
+        materialName: m.name,
+        quantity: 10 + (idx % 4) * 5,
+        unit: m.unit || "Cái",
+        unitPrice: m.unitPrice || 150000,
+        notes: `Nhập theo Tờ trình ${detectedProposalNumber}`,
+      }));
+    }
   }
 
   if (matchedItems.length === 0 && Array.isArray(availableMaterials) && availableMaterials.length >= 3) {
     matchedItems = availableMaterials.slice(0, 3).map((m: any, idx: number) => ({
       materialCode: m.code,
       materialName: m.name,
-      quantity: 15 + idx * 10,
+      quantity: 15 + idx * 5,
       unit: m.unit || "Cái",
       unitPrice: m.unitPrice || 120000,
-      notes: `Trích xuất tự động từ file tờ trình ${fileName || ""}`,
+      notes: `Trích xuất từ file tờ trình ${fileName || ""}`,
     }));
   }
 
   return res.json({
     success: true,
     proposalNumber: detectedProposalNumber,
-    title: `Nhập kho vật tư theo Tờ trình số ${detectedProposalNumber}`,
+    title: detectedTitle,
     partner: detectedPartner,
     reason: `Cung ứng và bổ sung vật tư phục vụ bảo trì, vận hành định kỳ theo Tờ trình ${detectedProposalNumber}`,
     date: new Date().toISOString().split("T")[0],
