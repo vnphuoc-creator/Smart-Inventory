@@ -1256,11 +1256,11 @@ export const TransactionManagementView: React.FC<TransactionManagementViewProps>
                   </button>
                 </div>
 
-                <div className="bg-slate-850 border border-slate-800 rounded-xl overflow-hidden">
+                <div className="bg-slate-850 border border-slate-800 rounded-xl overflow-visible">
                   <table className="w-full text-left text-xs text-slate-300">
-                    <thead className="bg-slate-900 border-b border-slate-800 text-[11px] font-semibold text-slate-400 uppercase">
+                    <thead className="bg-slate-900 border-b border-slate-800 text-[11px] font-semibold text-slate-400 uppercase rounded-t-xl">
                       <tr>
-                        <th className="py-2.5 px-3">Vật Tư (Mã DN_*)</th>
+                        <th className="py-2.5 px-3 min-w-[280px]">Vật Tư (Mã DN_* hoặc Tên)</th>
                         <th className="py-2.5 px-2 text-center">Tồn Hiện Tại</th>
                         <th className="py-2.5 px-3 text-right">Số Lượng</th>
                         <th className="py-2.5 px-3 text-right">Đơn Giá (VNĐ)</th>

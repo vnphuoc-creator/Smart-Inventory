@@ -322,10 +322,37 @@ export const ExcelStockImportModal: React.FC<ExcelStockImportModalProps> = ({
         }
 
         // Skip total / footer rows
-        const isTotalRow = /^(tổng|tổng\s*cộng|cộng|bằng\s*chữ|stt|người\s*lập|phê\s*duyệt|ngày\s*\d+)/i.test(
-          rawName || rawCode
-        );
+        const isTotalRow =
+          /^(tổng|tổng\s*cộng|cộng|bằng\s*chữ|stt|người\s*lập|phê\s*duyệt|ngày\s*\d+|kế\s*toán|thủ\s*kho|chữ\s*ký|đà\s*nẵng)/i.test(
+            (rawName || '').trim()
+          ) || /^(tổng|tổng\s*cộng|cộng)/i.test((rawCode || '').trim());
         if (isTotalRow) continue;
+
+        // Check if this row is a section / category subtotal header (e.g. "Công cụ dụng cụ", "Vật tư tiêu hao", "Hóa chất", etc.)
+        const isCategoryHeader =
+          (!rawCode || rawCode.trim() === '') &&
+          (!rawUnit || rawUnit.trim() === '') &&
+          (/^(công cụ|dụng cụ|vật tư|hệ thống|nhóm|thiết bị|hóa chất|chiếu sáng|phụ tùng|bảo hộ|tiểu mục|hạng mục|phần|loại)/i.test(
+            rawName.trim()
+          ) ||
+            rawName.trim().length <= 3);
+
+        const isKnownCategoryName =
+          /^(công cụ dụng cụ|vật tư điện|vật tư nước|vật tư phụ|vật tư cơ điện|hóa chất|thiết bị|công cụ|dụng cụ)/i.test(
+            rawName.trim()
+          ) &&
+          (!rawCode || (!rawCode.startsWith('DN_') && !rawCode.startsWith('CD_')));
+
+        if (isCategoryHeader || isKnownCategoryName) continue;
+
+        // Must have either a valid Code OR a valid Name with a valid Unit
+        const hasValidCode = rawCode && rawCode.trim().length >= 3 && !/^\d+$/.test(rawCode.trim());
+        const hasValidUnit = rawUnit && rawUnit.trim().length >= 1;
+
+        if (!hasValidCode && !hasValidUnit) {
+          // Not a genuine material item row (e.g. empty line or summary separator)
+          continue;
+        }
 
         // Clean code & name
         if (rawCode || rawName) {
@@ -348,7 +375,7 @@ export const ExcelStockImportModal: React.FC<ExcelStockImportModalProps> = ({
 
           if (!cleanCode) {
             cleanCode = existing ? existing.code : `DN_VT_IMP_${idxPad(rows.length + 1)}`;
-          } else if (!cleanCode.startsWith('DN_')) {
+          } else if (!cleanCode.startsWith('DN_') && !cleanCode.startsWith('CD_')) {
             cleanCode = `DN_${cleanCode}`;
           }
 
