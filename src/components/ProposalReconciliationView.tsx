@@ -30,6 +30,7 @@ import {
   ProposalItem,
 } from '../types';
 import { formatVND, formatNumber, formatDisplayDate } from '../utils/inventoryEngine';
+import { SearchableMaterialSelect } from './SearchableMaterialSelect';
 
 interface ProposalReconciliationViewProps {
   currentUser: User;
@@ -766,17 +767,49 @@ export const ProposalReconciliationView: React.FC<ProposalReconciliationViewProp
             <form onSubmit={handleSaveNewProposal} className="p-5 overflow-y-auto space-y-4 text-xs">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-slate-300 font-medium mb-1">
-                    Số Tờ Trình Phê Duyệt <span className="text-rose-400">*</span>
-                  </label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-slate-300 font-medium">
+                      Số Tờ Trình Phê Duyệt <span className="text-rose-400">*</span>
+                    </label>
+                    <span className="text-[11px] text-blue-400 font-normal">
+                      (Gõ số tự động format -DNCT/PKT)
+                    </span>
+                  </div>
                   <input
                     type="text"
                     value={newPropNumber}
                     onChange={(e) => setNewPropNumber(e.target.value)}
-                    placeholder="Ví dụ: 48-DNCT/PKT, 52-DNCT/PKT..."
+                    onBlur={() => {
+                      const trimmed = newPropNumber.trim();
+                      if (/^\d{1,4}$/.test(trimmed)) {
+                        setNewPropNumber(`${trimmed}-DNCT/PKT`);
+                      }
+                    }}
+                    placeholder="Ví dụ: 17, 29, 26 hoặc 48-DNCT/PKT..."
                     className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2 text-white font-mono focus:outline-none focus:border-blue-500"
                     required
                   />
+                  {/* Quick select proposal numbers */}
+                  <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
+                    <span className="text-[10px] text-slate-400">Gợi ý nhanh:</span>
+                    {['29', '17', '26', '31', '08', '45'].map((num) => {
+                      const propCode = `${num}-DNCT/PKT`;
+                      return (
+                        <button
+                          key={num}
+                          type="button"
+                          onClick={() => setNewPropNumber(propCode)}
+                          className={`text-[10px] font-mono px-2 py-0.5 rounded border transition-colors ${
+                            newPropNumber === propCode
+                              ? 'bg-blue-600 text-white border-blue-500'
+                              : 'bg-slate-800 text-slate-300 border-slate-700 hover:border-blue-500 hover:text-white'
+                          }`}
+                        >
+                          {propCode}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
 
                 <div>
@@ -867,18 +900,24 @@ export const ProposalReconciliationView: React.FC<ProposalReconciliationViewProp
                     <tbody className="divide-y divide-slate-800">
                       {newPropItems.map((item, idx) => (
                         <tr key={idx} className="hover:bg-slate-800/40">
-                          <td className="py-2.5 px-3">
-                            <select
+                          <td className="py-2.5 px-3 min-w-[280px]">
+                            <SearchableMaterialSelect
                               value={item.materialCode}
-                              onChange={(e) => handleNewItemChange(idx, 'materialCode', e.target.value)}
-                              className="w-full bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-blue-500"
-                            >
-                              {materials.map((m) => (
-                                <option key={m.code} value={m.code}>
-                                  {m.code} - {m.name} ({m.unit})
-                                </option>
-                              ))}
-                            </select>
+                              materials={materials}
+                              calculatedStocks={calculatedStocks}
+                              onChange={(newCode, selectedMat) => {
+                                const updated = [...newPropItems];
+                                updated[idx] = {
+                                  ...updated[idx],
+                                  materialCode: newCode,
+                                  materialName: selectedMat ? selectedMat.name : updated[idx].materialName,
+                                  unit: selectedMat ? selectedMat.unit : updated[idx].unit,
+                                  unitPrice: selectedMat ? selectedMat.unitPrice : updated[idx].unitPrice,
+                                };
+                                setNewPropItems(updated);
+                              }}
+                              placeholder="Gõ tên hoặc mã vật tư..."
+                            />
                           </td>
                           <td className="py-2.5 px-3 text-right">
                             <input
@@ -895,7 +934,7 @@ export const ProposalReconciliationView: React.FC<ProposalReconciliationViewProp
                             <input
                               type="number"
                               min="0"
-                              step="1000"
+                              step="any"
                               value={item.unitPrice || 0}
                               onChange={(e) =>
                                 handleNewItemChange(idx, 'unitPrice', Math.max(0, parseInt(e.target.value) || 0))

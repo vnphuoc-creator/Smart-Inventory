@@ -19,6 +19,19 @@ export interface ExtractedProposalData {
 }
 
 /**
+ * Clean and normalize Vietnamese string for robust matching
+ */
+function normalizeText(str: string): string {
+  return (str || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/**
  * Intelligent fuzzy matcher to map extracted document item name/code to standard DN_* catalog
  */
 export function findBestMaterialMatch(
@@ -26,9 +39,10 @@ export function findBestMaterialMatch(
   itemCode: string,
   materials: Material[]
 ): Material | null {
-  if (!materials || materials.length === 0) return null;
+  if (!materials || materials.length === 0 || !itemName) return null;
 
-  const cleanName = (itemName || '').toLowerCase().trim();
+  const cleanName = itemName.toLowerCase().trim();
+  const normName = normalizeText(itemName);
   const cleanCode = (itemCode || '').toLowerCase().trim();
 
   // 1. Direct code match
@@ -39,7 +53,9 @@ export function findBestMaterialMatch(
 
   // 2. Code substring inside item name
   const codeInName = materials.find(
-    (m) => cleanName.includes(m.code.toLowerCase()) || (m.code.length > 6 && cleanName.includes(m.code.slice(3).toLowerCase()))
+    (m) =>
+      cleanName.includes(m.code.toLowerCase()) ||
+      (m.code.length > 6 && cleanName.includes(m.code.slice(3).toLowerCase()))
   );
   if (codeInName) return codeInName;
 
@@ -47,22 +63,21 @@ export function findBestMaterialMatch(
   const exactName = materials.find((m) => m.name.toLowerCase() === cleanName);
   if (exactName) return exactName;
 
-  // 4. Token overlap scoring
-  const normalize = (str: string) =>
-    str
-      .toLowerCase()
-      .replace(/[^a-z0-9\sàáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđ]/g, ' ')
-      .split(/\s+/)
-      .filter((w) => w.length >= 2);
+  // 4. Exact normalized name match
+  const exactNorm = materials.find((m) => normalizeText(m.name) === normName);
+  if (exactNorm) return exactNorm;
 
-  const itemTokens = normalize(itemName);
+  // 5. Token overlap scoring with high threshold (>= 0.65 to avoid wrong mapping)
+  const itemTokens = normName.split(' ').filter((w) => w.length >= 2);
   if (itemTokens.length === 0) return null;
 
   let bestMatch: Material | null = null;
   let bestScore = 0;
 
   for (const mat of materials) {
-    const matTokens = normalize(mat.name + ' ' + (mat.specification || ''));
+    const matTokens = normalizeText(mat.name + ' ' + (mat.specification || ''))
+      .split(' ')
+      .filter((w) => w.length >= 2);
     if (matTokens.length === 0) continue;
 
     let matchCount = 0;
@@ -73,7 +88,8 @@ export function findBestMaterialMatch(
     }
 
     const score = matchCount / Math.max(itemTokens.length, 3);
-    if (score > bestScore && score >= 0.25) {
+    // Strict threshold: score must be at least 0.65 to avoid incorrect mapping
+    if (score > bestScore && score >= 0.65) {
       bestScore = score;
       bestMatch = mat;
     }
@@ -83,7 +99,31 @@ export function findBestMaterialMatch(
 }
 
 /**
- * Parse HTML tables extracted from .docx by Mammoth
+ * Generate a clean standard code from material name
+ */
+export function generateSuggestedCode(name: string, index: number): string {
+  const norm = normalizeText(name);
+  const words = norm.split(' ').filter((w) => w.length >= 2);
+  let prefix = 'VT';
+  let tag = 'MAT';
+
+  if (words.some((w) => ['dong', 'ho', 'ampe', 'kim', 'may', 'han', 'kiem', 'tra'].includes(w))) {
+    prefix = 'CC';
+  }
+
+  if (words.length > 0) {
+    tag = words
+      .slice(0, 2)
+      .map((w) => w.slice(0, 4).toUpperCase())
+      .join('');
+  }
+
+  const num = (index + 1).toString().padStart(2, '0');
+  return `DN_${prefix}_${tag.slice(0, 5)}_${num}`;
+}
+
+/**
+ * Parse HTML tables or raw text extracted from .docx by Mammoth
  */
 export function parseDocxHtml(
   docHtml: string,
@@ -99,13 +139,18 @@ export function parseDocxHtml(
 
   const allText = (rawText || docHtml || '').replace(/<[^>]+>/g, ' ');
 
-  // 1. Extract proposal number (e.g. 45-DNCT/PKT, 17/TTr-DNCT, 26-DNCT/PKT, 31-DNCT/PKT, 08-DNCT/PKT, etc.)
-  const propNumMatch = allText.match(
-    /(?:tờ\s*trình\s*(?:số)?|số\s*hiệu|số)\s*[:.]?\s*([0-9]{1,3}(?:[/-][a-zA-Z0-9_/-]+)?)/i
-  ) || allText.match(/([0-9]{1,3}[/-][A-Za-z0-9_/-]+)/i);
+  // 1. Extract proposal number (e.g. 29-DNCT/PKT, 29-ĐNCT/PKT, 17-DNCT/PKT, 26-DNCT/PKT, 31-DNCT/PKT, 08-DNCT/PKT, 45-DNCT/PKT, etc.)
+  const propNumMatch =
+    allText.match(
+      /(?:tờ\s*trình\s*(?:số)?|số\s*hiệu|số)\s*[:.]?\s*([0-9]{1,4}(?:[/-][a-zA-Z0-9_/-Đđ]+)?)/i
+    ) || allText.match(/([0-9]{1,4}[/-][A-Za-z0-9_/-Đđ]+)/i);
 
   if (propNumMatch && propNumMatch[1]) {
-    detectedPropNum = propNumMatch[1].trim().toUpperCase();
+    let num = propNumMatch[1].trim().toUpperCase();
+    if (/^\d{1,4}$/.test(num)) {
+      num = `${num}-DNCT/PKT`;
+    }
+    detectedPropNum = num;
   }
 
   // 2. Extract title / subject (V/v: ...)
@@ -123,7 +168,7 @@ export function parseDocxHtml(
     detectedDate = `${y}-${m}-${d}`;
   }
 
-  // 4. Parse HTML table rows
+  // 4. Parse HTML table rows from Mammoth HTML
   if (docHtml) {
     try {
       const parser = new DOMParser();
@@ -141,16 +186,17 @@ export function parseDocxHtml(
         let unitCol = -1;
         let qtyCol = -1;
         let priceCol = -1;
+        let totalCol = -1;
         let noteCol = -1;
         let headerRowIndex = -1;
 
-        for (let rIdx = 0; rIdx < Math.min(3, rows.length); rIdx++) {
+        for (let rIdx = 0; rIdx < Math.min(4, rows.length); rIdx++) {
           const headerCells = Array.from(rows[rIdx].querySelectorAll('th, td')).map((c) =>
             (c.textContent || '').toLowerCase().trim()
           );
 
           headerCells.forEach((text, cIdx) => {
-            if (text.includes('stt') || text === 'tt' || text === 'no') sttCol = cIdx;
+            if (text.includes('stt') || text === 'tt' || text === 'no' || text === 'số tt') sttCol = cIdx;
             else if (text.includes('mã') || text.includes('ký hiệu')) codeCol = cIdx;
             else if (
               text.includes('tên') ||
@@ -158,29 +204,32 @@ export function parseDocxHtml(
               text.includes('quy cách') ||
               text.includes('danh mục') ||
               text.includes('hàng hóa') ||
-              text.includes('nội dung')
+              text.includes('nội dung') ||
+              text.includes('chủng loại')
             ) {
               nameCol = cIdx;
-            } else if (text.includes('đvt') || text.includes('đơn vị')) unitCol = cIdx;
+            } else if (text.includes('đvt') || text.includes('đơn vị') || text === 'đv') unitCol = cIdx;
             else if (
               text.includes('số lượng') ||
               text.includes('sl') ||
               text.includes('khối lượng') ||
-              text.includes('yêu cầu')
+              text.includes('yêu cầu') ||
+              text.includes('đề xuất')
             ) {
               qtyCol = cIdx;
-            } else if (text.includes('đơn giá') || text.includes('giá')) priceCol = cIdx;
-            else if (text.includes('ghi chú') || text.includes('note')) noteCol = cIdx;
+            } else if (text.includes('đơn giá') || text === 'giá' || text.includes('đơn giá (vnđ)')) priceCol = cIdx;
+            else if (text.includes('thành tiền') || text.includes('tổng tiền')) totalCol = cIdx;
+            else if (text.includes('ghi chú') || text.includes('note') || text.includes('mục đích')) noteCol = cIdx;
           });
 
-          if (nameCol !== -1 && (qtyCol !== -1 || unitCol !== -1)) {
+          if (nameCol !== -1 && (qtyCol !== -1 || unitCol !== -1 || headerCells.length >= 4)) {
             headerRowIndex = rIdx;
             break;
           }
         }
 
         // Process data rows
-        const startRow = headerRowIndex !== -1 ? headerRowIndex + 1 : 0;
+        const startRow = headerRowIndex !== -1 ? headerRowIndex + 1 : 1;
         for (let rIdx = startRow; rIdx < rows.length; rIdx++) {
           const cells = Array.from(rows[rIdx].querySelectorAll('td, th')).map((c) =>
             (c.textContent || '').trim()
@@ -195,9 +244,9 @@ export function parseDocxHtml(
           let rawPriceStr = priceCol !== -1 && cells[priceCol] ? cells[priceCol] : '';
           let rawNote = noteCol !== -1 && cells[noteCol] ? cells[noteCol] : '';
 
-          // If header wasn't clearly identified, deduce values from cell characteristics
+          // Deduce values if header indices were missed
           if (!rawName) {
-            // Find longest text cell
+            // Find longest text cell that is not purely numeric
             let maxLen = 0;
             cells.forEach((c, idx) => {
               if (idx !== sttCol && c.length > maxLen && !/^\d+([.,]\d+)?$/.test(c)) {
@@ -207,56 +256,67 @@ export function parseDocxHtml(
             });
           }
 
+          if (!rawUnit) {
+            const unitCell = cells.find((c) =>
+              /^(cái|bộ|mét|m|cuộn|cây|thùng|hộp|kg|lít|bình|quả|viên|chiếc|ống|thanh|khung|sợi|tấm|đôi|cặp|túi|can)$/i.test(
+                c.trim()
+              )
+            );
+            if (unitCell) rawUnit = unitCell.trim();
+          }
+
           if (!rawQtyStr) {
-            // Find numeric cell that is not STT and not large price
+            // Find numeric cell between 1 and 100,000 that is not STT and not large unit price
             for (let idx = 0; idx < cells.length; idx++) {
-              if (idx === sttCol || idx === codeCol) continue;
+              if (idx === sttCol || idx === codeCol || idx === priceCol || idx === totalCol) continue;
               const val = cells[idx].replace(/,/g, '.').replace(/\s/g, '');
               const num = parseFloat(val);
-              if (!isNaN(num) && num > 0 && num <= 10000 && num !== rIdx) {
+              if (!isNaN(num) && num > 0 && num <= 100000 && num !== rIdx) {
                 rawQtyStr = cells[idx];
                 break;
               }
             }
           }
 
-          if (!rawUnit) {
-            const unitCell = cells.find((c) =>
-              /^(cái|bộ|mét|m|cuộn|cây|thùng|hộp|kg|lít|bình|quả|viên|chiếc|ống)$/i.test(c.trim())
-            );
-            if (unitCell) rawUnit = unitCell.trim();
+          // Parse actual quantity
+          let qty = 1;
+          if (rawQtyStr) {
+            const cleanedQty = rawQtyStr
+              .replace(/[,.](?=\d{3})/g, '') // remove thousand separators
+              .replace(/,/g, '.');
+            const parsedQ = parseFloat(cleanedQty);
+            if (!isNaN(parsedQ) && parsedQ > 0) {
+              qty = parsedQ;
+            }
           }
 
-          if (rawName && rawName.length >= 2 && !/^(stt|tổng|cộng|bằng chữ)/i.test(rawName)) {
-            // Parse cleaned numeric quantity
-            let qty = 1;
-            if (rawQtyStr) {
-              const cleanedQty = rawQtyStr
-                .replace(/[,.](?=\d{3})/g, '') // remove thousand dots/commas
-                .replace(/,/g, '.');
-              const parsedQ = parseFloat(cleanedQty);
-              if (!isNaN(parsedQ) && parsedQ > 0) {
-                qty = parsedQ;
-              }
-            }
+          // Parse price
+          let price = 0;
+          if (rawPriceStr) {
+            const cleanedPrice = rawPriceStr.replace(/[^0-9]/g, '');
+            const parsedP = parseFloat(cleanedPrice);
+            if (!isNaN(parsedP)) price = parsedP;
+          }
 
-            // Parse price
-            let price = 0;
-            if (rawPriceStr) {
-              const cleanedPrice = rawPriceStr.replace(/[^0-9]/g, '');
-              const parsedP = parseFloat(cleanedPrice);
-              if (!isNaN(parsedP)) price = parsedP;
-            }
+          // Ignore summary / total rows
+          const isTotalRow = /^(tổng|tổng\s*cộng|cộng|bằng\s*chữ|stt|thuế)/i.test(rawName);
 
-            // Find matching material from catalog
+          if (rawName && rawName.length >= 2 && !isTotalRow) {
+            // Match with catalog
             const matchedMat = findBestMaterialMatch(rawName, rawCode, materials);
+            const assignedCode = matchedMat
+              ? matchedMat.code
+              : rawCode || generateSuggestedCode(rawName, detectedItems.length);
+            const assignedName = matchedMat ? matchedMat.name : rawName;
+            const assignedUnit = rawUnit || (matchedMat ? matchedMat.unit : 'Cái');
+            const assignedPrice = price || (matchedMat ? matchedMat.unitPrice : 0);
 
             detectedItems.push({
-              materialCode: matchedMat ? matchedMat.code : rawCode || `DN_VT_${detectedItems.length + 1}`,
-              materialName: matchedMat ? matchedMat.name : rawName,
+              materialCode: assignedCode,
+              materialName: assignedName,
               quantity: qty,
-              unit: rawUnit || (matchedMat ? matchedMat.unit : 'Cái'),
-              unitPrice: price || (matchedMat ? matchedMat.unitPrice : 0),
+              unit: assignedUnit,
+              unitPrice: assignedPrice,
               notes: rawNote || `Quét từ Tờ trình ${detectedPropNum || ''}`,
             });
           }
@@ -267,13 +327,13 @@ export function parseDocxHtml(
     }
   }
 
-  // 5. Fallback: Parse plain text lines if no table rows were extracted
+  // 5. Fallback line parser for plain text
   if (detectedItems.length === 0 && allText) {
     const lines = allText.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
     for (const line of lines) {
-      // Look for lines like "1. Dây cáp điện CV-4.0 - SL: 50 Cái - Đơn giá: 25.000"
-      // or "DN_DD_CV_40 | Dây CV 4.0 | 50 | Mét"
-      const itemMatch = line.match(/^(\d{1,2})[.\s\-]+([^\d\n\r]+?)(?:[-:|,\t]+|\s{2,})(?:(?:sl|số\s*lượng|khối\s*lượng)[:\s]*)?(\d+(?:[.,]\d+)?)\s*([a-zA-Zà-ỹÀ-Ỹ]+)?/i);
+      const itemMatch = line.match(
+        /^(\d{1,2})[.\s\-]+([^\d\n\r]+?)(?:[-:|,\t]+|\s{2,})(?:(?:sl|số\s*lượng|khối\s*lượng)[:\s]*)?(\d+(?:[.,]\d+)?)\s*([a-zA-Zà-ỹÀ-Ỹ]+)?/i
+      );
       if (itemMatch) {
         const rawName = itemMatch[2].trim();
         const rawQtyStr = itemMatch[3];
@@ -284,12 +344,14 @@ export function parseDocxHtml(
           const matchedMat = findBestMaterialMatch(rawName, '', materials);
 
           detectedItems.push({
-            materialCode: matchedMat ? matchedMat.code : `DN_VT_${detectedItems.length + 1}`,
+            materialCode: matchedMat
+              ? matchedMat.code
+              : generateSuggestedCode(rawName, detectedItems.length),
             materialName: matchedMat ? matchedMat.name : rawName,
             quantity: qty,
             unit: rawUnit || (matchedMat ? matchedMat.unit : 'Cái'),
             unitPrice: matchedMat ? matchedMat.unitPrice : 0,
-            notes: `Trích xuất từ dòng văn bản`,
+            notes: `Trích xuất từ văn bản Tờ trình ${detectedPropNum || ''}`,
           });
         }
       }
@@ -298,9 +360,13 @@ export function parseDocxHtml(
 
   return {
     proposalNumber: detectedPropNum,
-    title: detectedTitle || (detectedPropNum ? `Đề xuất mua sắm theo Tờ trình ${detectedPropNum}` : ''),
+    title:
+      detectedTitle ||
+      (detectedPropNum ? `Đề xuất mua sắm theo Tờ trình ${detectedPropNum}` : ''),
     partner: detectedPartner,
-    reason: detectedReason || (detectedPropNum ? `Bổ sung vật tư theo Tờ trình ${detectedPropNum}` : ''),
+    reason:
+      detectedReason ||
+      (detectedPropNum ? `Bổ sung vật tư theo Tờ trình ${detectedPropNum}` : ''),
     date: detectedDate,
     items: detectedItems,
   };

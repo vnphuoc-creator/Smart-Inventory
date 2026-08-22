@@ -301,23 +301,59 @@ export const MaterialCatalogueView: React.FC<MaterialCatalogueViewProps> = ({
       {/* Filter and search toolbar */}
       <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-3">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
-          {/* Keyword Search */}
+          {/* Keyword Search with Real-Time Suggestions */}
           <div className="relative lg:col-span-2">
-            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 z-10" />
             <input
               type="text"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Tìm theo mã vật tư, tên, quy cách, vị trí..."
+              placeholder="Gõ mã hoặc tên vật tư để tìm & xem gợi ý..."
               className="w-full bg-slate-800 border border-slate-700 rounded-xl pl-9 pr-8 py-2 text-xs text-white placeholder-slate-400 focus:outline-none focus:border-blue-500"
             />
             {searchTerm && (
               <button
                 onClick={() => setSearchTerm('')}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white"
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white z-10"
               >
                 <X className="w-3.5 h-3.5" />
               </button>
+            )}
+
+            {/* Real-time search suggestions popover */}
+            {searchTerm.trim().length >= 2 && filteredMaterials.length > 0 && (
+              <div className="absolute left-0 top-full mt-1.5 w-full bg-slate-900 border border-slate-700 rounded-xl shadow-2xl z-40 overflow-hidden divide-y divide-slate-800/60 max-h-56 overflow-y-auto">
+                <div className="px-3 py-1.5 bg-slate-850 text-[10px] text-slate-400 font-semibold uppercase flex items-center justify-between">
+                  <span>Gợi ý vật tư phù hợp ({Math.min(8, filteredMaterials.length)})</span>
+                  <span className="text-blue-400">Nhấp để chọn</span>
+                </div>
+                {filteredMaterials.slice(0, 8).map((m) => (
+                  <div
+                    key={m.id}
+                    onClick={() => setSearchTerm(m.code)}
+                    className="p-2.5 hover:bg-slate-800 cursor-pointer flex items-center justify-between text-xs transition-colors"
+                  >
+                    <div className="overflow-hidden pr-2">
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono font-bold text-blue-400 text-[11px] shrink-0">
+                          {m.code}
+                        </span>
+                        <span className="text-slate-100 truncate">{m.name}</span>
+                      </div>
+                      {m.specification && (
+                        <div className="text-[10px] text-slate-400 truncate mt-0.5">
+                          {m.specification}
+                        </div>
+                      )}
+                    </div>
+                    <div className="text-right shrink-0">
+                      <span className="font-mono text-emerald-400 font-semibold">
+                        {m.currentStock} {m.unit}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
             )}
           </div>
 
@@ -788,7 +824,7 @@ export const MaterialCatalogueView: React.FC<MaterialCatalogueViewProps> = ({
                   <input
                     type="number"
                     min="0"
-                    step="1000"
+                    step="any"
                     value={formData.unitPrice}
                     onChange={(e) =>
                       setFormData({ ...formData, unitPrice: Math.max(0, parseInt(e.target.value) || 0) })

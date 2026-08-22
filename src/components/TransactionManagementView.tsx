@@ -42,6 +42,7 @@ import { formatVND, formatNumber, formatDisplayDate } from '../utils/inventoryEn
 import { parseDocxHtml } from '../utils/docxProposalParser';
 import { AHTLogo } from './AHTLogo';
 import { ProposalReconciliationView } from './ProposalReconciliationView';
+import { SearchableMaterialSelect } from './SearchableMaterialSelect';
 
 interface TransactionManagementViewProps {
   currentUser: User;
@@ -1049,16 +1050,51 @@ export const TransactionManagementView: React.FC<TransactionManagementViewProps>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-slate-300 font-medium mb-1">
-                        Số Tờ Trình Đề Xuất
-                      </label>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="block text-slate-300 font-medium">
+                          Số Tờ Trình Đề Xuất
+                        </label>
+                        <span className="text-[11px] text-blue-400 font-normal">
+                          (Chỉ cần gõ số, tự động thêm -DNCT/PKT)
+                        </span>
+                      </div>
                       <input
                         type="text"
                         value={formProposalNumber}
-                        onChange={(e) => setFormProposalNumber(e.target.value)}
-                        placeholder="Ví dụ: 17-DNCT/PKT, 26-DNCT/PKT..."
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setFormProposalNumber(val);
+                        }}
+                        onBlur={() => {
+                          const trimmed = formProposalNumber.trim();
+                          if (/^\d{1,4}$/.test(trimmed)) {
+                            setFormProposalNumber(`${trimmed}-DNCT/PKT`);
+                          }
+                        }}
+                        placeholder="Ví dụ: 17, 29, 26 hoặc 17-DNCT/PKT..."
                         className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2 text-white font-mono focus:outline-none focus:border-blue-500 text-xs"
                       />
+                      {/* Quick select proposal numbers */}
+                      <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
+                        <span className="text-[10px] text-slate-400">Gợi ý nhanh:</span>
+                        {['29', '17', '26', '31', '08', '45'].map((num) => {
+                          const propCode = `${num}-DNCT/PKT`;
+                          return (
+                            <button
+                              key={num}
+                              type="button"
+                              onClick={() => setFormProposalNumber(propCode)}
+                              className={`text-[10px] font-mono px-2 py-0.5 rounded border transition-colors ${
+                                formProposalNumber === propCode
+                                  ? 'bg-blue-600 text-white border-blue-500'
+                                  : 'bg-slate-800 text-slate-300 border-slate-700 hover:border-blue-500 hover:text-white'
+                              }`}
+                            >
+                              {propCode}
+                            </button>
+                          );
+                        })}
+                      </div>
                     </div>
                     <div>
                       <label className="block text-slate-300 font-medium mb-1">Lý Do Nhập Kho</label>
@@ -1242,18 +1278,22 @@ export const TransactionManagementView: React.FC<TransactionManagementViewProps>
                         return (
                           <tr key={idx} className="hover:bg-slate-800/40">
                             {/* Material Select */}
-                            <td className="py-2.5 px-3">
-                              <select
+                            <td className="py-2.5 px-3 min-w-[280px]">
+                              <SearchableMaterialSelect
                                 value={item.materialCode}
-                                onChange={(e) => handleItemChange(idx, 'materialCode', e.target.value)}
-                                className="w-full bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-blue-500"
-                              >
-                                {materials.map((m) => (
-                                  <option key={m.code} value={m.code}>
-                                    {m.code} - {m.name} ({m.unit})
-                                  </option>
-                                ))}
-                              </select>
+                                materials={materials}
+                                calculatedStocks={calculatedStocks}
+                                onChange={(newCode, selectedMat) => {
+                                  const updated = [...formItems];
+                                  updated[idx] = {
+                                    ...updated[idx],
+                                    materialCode: newCode,
+                                    unitPrice: selectedMat ? selectedMat.unitPrice : updated[idx].unitPrice,
+                                  };
+                                  setFormItems(updated);
+                                }}
+                                placeholder="Gõ tên hoặc mã vật tư..."
+                              />
                             </td>
 
                             {/* Current Stock info */}
@@ -1300,7 +1340,7 @@ export const TransactionManagementView: React.FC<TransactionManagementViewProps>
                               <input
                                 type="number"
                                 min="0"
-                                step="1000"
+                                step="any"
                                 value={item.unitPrice}
                                 onChange={(e) =>
                                   handleItemChange(
