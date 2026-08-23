@@ -132,61 +132,178 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </div>
 
         {/* Main Vertical Navigation Menu */}
-        <nav className="flex-1 overflow-y-auto p-3 space-y-1.5 no-scrollbar">
-          <div className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400">
-            Menu Quản Lý
+        <nav className="flex-1 overflow-y-auto p-3 space-y-4 no-scrollbar">
+          {/* Section 1: Quản lý vận hành kho */}
+          <div className="space-y-1">
+            <div className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+              Vận Hành &amp; Kho Hàng
+            </div>
+
+            {[
+              {
+                id: 'dashboard',
+                label: 'Tổng Quan',
+                icon: LayoutDashboard,
+                description: 'Báo cáo & thao tác nhanh',
+              },
+              {
+                id: 'transactions',
+                label: 'Xuất - Nhập Kho',
+                icon: ArrowLeftRight,
+                badge: pendingApprovalsCount > 0 ? `${pendingApprovalsCount}` : undefined,
+                badgeColor: 'bg-amber-500 text-slate-950 font-bold',
+                description: 'Lập phiếu, duyệt & Tờ trình',
+              },
+              {
+                id: 'materials',
+                label: 'Tra Cứu Vật Tư',
+                icon: Package,
+                description: 'Định mức & quy cách (>600 mã DN)',
+              },
+              {
+                id: 'ledger',
+                label: 'Thẻ Kho & Báo Cáo',
+                icon: FileSpreadsheet,
+                description: 'Nhật ký xuất nhập tồn',
+              },
+            ].map((item) => {
+              const Icon = item.icon;
+              const isActive = activeTab === item.id;
+
+              return (
+                <button
+                  key={item.id}
+                  id={`sidebar-nav-${item.id}`}
+                  onClick={() => {
+                    onTabChange(item.id);
+                    if (isOpenMobile) onToggleMobile();
+                  }}
+                  className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-left transition-all group ${
+                    isActive
+                      ? 'bg-blue-600 text-white font-bold shadow-md shadow-blue-600/25'
+                      : 'text-slate-300 hover:bg-slate-800/80 hover:text-white font-medium'
+                  }`}
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div
+                      className={`p-1.5 rounded-lg transition-colors ${
+                        isActive ? 'bg-white/20 text-white' : 'bg-slate-800 text-slate-400 group-hover:text-blue-400'
+                      }`}
+                    >
+                      <Icon className="w-4 h-4 shrink-0" />
+                    </div>
+                    <div className="truncate">
+                      <div className="text-xs tracking-tight">{item.label}</div>
+                      {item.description && (
+                        <div
+                          className={`text-[10px] truncate ${
+                            isActive ? 'text-blue-100' : 'text-slate-400'
+                          }`}
+                        >
+                          {item.description}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {item.badge && (
+                    <span
+                      className={`text-[10px] px-2 py-0.5 rounded-full shrink-0 font-sans ${item.badgeColor}`}
+                    >
+                      {item.badge}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
           </div>
 
-          {navItems.map((item) => {
-            const Icon = item.icon;
-            const isActive = activeTab === item.id;
+          {/* Section 2: Công cụ thông minh & Quản trị */}
+          <div className="space-y-1">
+            <div className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+              Công Cụ &amp; Hệ Thống
+            </div>
 
-            return (
-              <button
-                key={item.id}
-                id={`sidebar-nav-${item.id}`}
-                onClick={() => {
-                  onTabChange(item.id);
-                  if (isOpenMobile) onToggleMobile();
-                }}
-                className={`w-full flex items-center justify-between px-3.5 py-3 rounded-xl text-left transition-all group ${
-                  isActive
-                    ? 'bg-blue-600 text-white font-bold shadow-md shadow-blue-600/25'
-                    : 'text-slate-300 hover:bg-slate-800/80 hover:text-white font-medium'
-                }`}
-              >
-                <div className="flex items-center gap-3 min-w-0">
-                  <div
-                    className={`p-1.5 rounded-lg transition-colors ${
-                      isActive ? 'bg-white/20 text-white' : 'bg-slate-800 text-slate-400 group-hover:text-blue-400'
-                    }`}
-                  >
-                    <Icon className="w-4 h-4 shrink-0" />
-                  </div>
-                  <div className="truncate">
-                    <div className="text-xs tracking-tight">{item.label}</div>
-                    {item.description && (
-                      <div
-                        className={`text-[10px] truncate ${
-                          isActive ? 'text-blue-100' : 'text-slate-400'
-                        }`}
-                      >
-                        {item.description}
-                      </div>
-                    )}
-                  </div>
-                </div>
+            {[
+              {
+                id: 'ai',
+                label: 'Trợ Lý AI Kho',
+                icon: Sparkles,
+                badge: 'AI',
+                badgeColor: 'bg-gradient-to-r from-purple-500 to-indigo-500 text-white font-bold',
+                description: 'Hỏi đáp tồn kho & phân tích',
+              },
+              ...(currentUser.email?.toLowerCase().trim() === 'vn.phuoc235@gmail.com'
+                ? [
+                    {
+                      id: 'users',
+                      label: 'Phân Quyền Người Dùng',
+                      icon: ShieldCheck,
+                      badge: 'Admin',
+                      badgeColor: 'bg-blue-600/30 text-blue-300 border border-blue-500/40',
+                      description: 'Quản lý tài khoản',
+                    },
+                    {
+                      id: 'settings',
+                      label: 'Cài Đặt Hệ Thống',
+                      icon: Settings,
+                      badge: 'Admin',
+                      badgeColor: 'bg-emerald-600/30 text-emerald-300 border border-emerald-500/40',
+                      description: 'Logo, ĐVT & Import',
+                    },
+                  ]
+                : []),
+            ].map((item) => {
+              const Icon = item.icon;
+              const isActive = activeTab === item.id;
 
-                {item.badge && (
-                  <span
-                    className={`text-[10px] px-2 py-0.5 rounded-full shrink-0 font-sans ${item.badgeColor}`}
-                  >
-                    {item.badge}
-                  </span>
-                )}
-              </button>
-            );
-          })}
+              return (
+                <button
+                  key={item.id}
+                  id={`sidebar-nav-${item.id}`}
+                  onClick={() => {
+                    onTabChange(item.id);
+                    if (isOpenMobile) onToggleMobile();
+                  }}
+                  className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-left transition-all group ${
+                    isActive
+                      ? 'bg-blue-600 text-white font-bold shadow-md shadow-blue-600/25'
+                      : 'text-slate-300 hover:bg-slate-800/80 hover:text-white font-medium'
+                  }`}
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div
+                      className={`p-1.5 rounded-lg transition-colors ${
+                        isActive ? 'bg-white/20 text-white' : 'bg-slate-800 text-slate-400 group-hover:text-blue-400'
+                      }`}
+                    >
+                      <Icon className="w-4 h-4 shrink-0" />
+                    </div>
+                    <div className="truncate">
+                      <div className="text-xs tracking-tight">{item.label}</div>
+                      {item.description && (
+                        <div
+                          className={`text-[10px] truncate ${
+                            isActive ? 'text-blue-100' : 'text-slate-400'
+                          }`}
+                        >
+                          {item.description}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {item.badge && (
+                    <span
+                      className={`text-[10px] px-2 py-0.5 rounded-full shrink-0 font-sans ${item.badgeColor}`}
+                    >
+                      {item.badge}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
         </nav>
 
         {/* Bottom User Profile & Actions (Single logged-in user, no dropdown switch list) */}

@@ -161,6 +161,90 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </div>
       </div>
 
+      {/* 3 Quick Action Hub Cards for New & Regular Users */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {/* Quick Action 1: Xuất Kho */}
+        <div
+          onClick={() => onOpenCreateTransaction('EXPORT')}
+          className="bg-slate-900 border border-amber-500/30 hover:border-amber-500 rounded-2xl p-4 sm:p-5 transition-all duration-200 cursor-pointer group shadow-sm hover:shadow-amber-500/10 hover:shadow-lg flex flex-col justify-between"
+        >
+          <div className="flex items-start justify-between gap-3">
+            <div className="w-10 h-10 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-400 flex items-center justify-center group-hover:scale-110 transition-transform shrink-0">
+              <ArrowUpRight className="w-5 h-5" />
+            </div>
+            <span className="text-[11px] bg-amber-500/20 text-amber-300 font-semibold px-2.5 py-0.5 rounded-full border border-amber-500/30">
+              Xuất vật tư
+            </span>
+          </div>
+          <div className="mt-3">
+            <h3 className="text-sm font-bold text-white group-hover:text-amber-300 transition-colors">
+              Lập Phiếu Xuất Kho
+            </h3>
+            <p className="text-xs text-slate-400 mt-1 leading-relaxed">
+              Cấp phát vật tư phục vụ công tác sửa chữa, bảo dưỡng &amp; vận hành kỹ thuật.
+            </p>
+          </div>
+          <div className="mt-3 pt-3 border-t border-slate-800 flex items-center justify-between text-xs text-amber-400 font-medium">
+            <span>Tạo phiếu xuất ngay</span>
+            <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+          </div>
+        </div>
+
+        {/* Quick Action 2: Nhập Kho */}
+        <div
+          onClick={() => onOpenCreateTransaction('IMPORT')}
+          className="bg-slate-900 border border-blue-500/30 hover:border-blue-500 rounded-2xl p-4 sm:p-5 transition-all duration-200 cursor-pointer group shadow-sm hover:shadow-blue-500/10 hover:shadow-lg flex flex-col justify-between"
+        >
+          <div className="flex items-start justify-between gap-3">
+            <div className="w-10 h-10 rounded-xl bg-blue-500/15 border border-blue-500/30 text-blue-400 flex items-center justify-center group-hover:scale-110 transition-transform shrink-0">
+              <ArrowDownRight className="w-5 h-5" />
+            </div>
+            <span className="text-[11px] bg-blue-500/20 text-blue-300 font-semibold px-2.5 py-0.5 rounded-full border border-blue-500/30">
+              Nhập hàng mới
+            </span>
+          </div>
+          <div className="mt-3">
+            <h3 className="text-sm font-bold text-white group-hover:text-blue-300 transition-colors">
+              Lập Phiếu Nhập Kho
+            </h3>
+            <p className="text-xs text-slate-400 mt-1 leading-relaxed">
+              Nhập vật tư theo Tờ trình mua sắm, nhận diện và đối chiếu tự động.
+            </p>
+          </div>
+          <div className="mt-3 pt-3 border-t border-slate-800 flex items-center justify-between text-xs text-blue-400 font-medium">
+            <span>Tạo phiếu nhập ngay</span>
+            <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+          </div>
+        </div>
+
+        {/* Quick Action 3: Tra Cứu Tồn Kho */}
+        <div
+          onClick={() => onNavigateTab('materials')}
+          className="bg-slate-900 border border-indigo-500/30 hover:border-indigo-500 rounded-2xl p-4 sm:p-5 transition-all duration-200 cursor-pointer group shadow-sm hover:shadow-indigo-500/10 hover:shadow-lg flex flex-col justify-between"
+        >
+          <div className="flex items-start justify-between gap-3">
+            <div className="w-10 h-10 rounded-xl bg-indigo-500/15 border border-indigo-500/30 text-indigo-400 flex items-center justify-center group-hover:scale-110 transition-transform shrink-0">
+              <Package className="w-5 h-5" />
+            </div>
+            <span className="text-[11px] bg-indigo-500/20 text-indigo-300 font-semibold px-2.5 py-0.5 rounded-full border border-indigo-500/30">
+              Tra cứu nhanh
+            </span>
+          </div>
+          <div className="mt-3">
+            <h3 className="text-sm font-bold text-white group-hover:text-indigo-300 transition-colors">
+              Kiểm Tra Tồn Kho &amp; Vị Trí
+            </h3>
+            <p className="text-xs text-slate-400 mt-1 leading-relaxed">
+              Tra cứu &gt;600 mã chuẩn DN_*, số lượng khả dụng, định mức min và vị trí kệ tủ.
+            </p>
+          </div>
+          <div className="mt-3 pt-3 border-t border-slate-800 flex items-center justify-between text-xs text-indigo-400 font-medium">
+            <span>Tra cứu danh mục</span>
+            <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+          </div>
+        </div>
+      </div>
+
       {/* 5 KPI Metric Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
         {/* Total Material Types */}
