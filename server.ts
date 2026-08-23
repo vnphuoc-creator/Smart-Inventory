@@ -119,6 +119,8 @@ Hãy trả về phản hồi định dạng JSON strictly with this schema:
   // Parse structured data from request body if available
   let parsedMaterials: any[] = [];
   let parsedProposals: any[] = [];
+  const reqMatched: any[] = Array.isArray(req.body.matchedMaterials) ? req.body.matchedMaterials : [];
+
   try {
     if (typeof materialsSummary === "string" && materialsSummary.startsWith("[")) {
       parsedMaterials = JSON.parse(materialsSummary);
@@ -129,6 +131,16 @@ Hãy trả về phản hồi định dạng JSON strictly with this schema:
       parsedProposals = JSON.parse(proposalsSummary);
     }
   } catch {}
+
+  // Merge direct matches into top of parsedMaterials
+  if (reqMatched.length > 0) {
+    const existingCodes = new Set(parsedMaterials.map((m: any) => m.code));
+    reqMatched.forEach((rm) => {
+      if (!existingCodes.has(rm.code)) {
+        parsedMaterials.unshift(rm);
+      }
+    });
+  }
 
   // 1. Check if user asks about a specific proposal (e.g. "tờ trình 29", "tờ trình 17", "26-DNCT/PKT", etc.)
   const propNumMatch = qLower.match(/(?:tờ\s*trình\s*|tt\s*|số\s*)?(\d{1,3}(?:-dnct(?:\/pkt)?)?)/i);
@@ -210,20 +222,37 @@ Hệ thống đã rà soát toàn bộ danh mục vật tư Đội Điện Nư�
 - **Các vật tư cần ưu tiên kiểm tra**: Các mã dây điện \`DN_DD_CV_*\`, aptomat tép \`DN_CC_MCB_*\`, vòi cảm ứng \`DN_VT_VOILA_01\`, ống hàn nhiệt \`DN_ONG_PPR10_*\`.
 - **Đề xuất**: Lập phiếu đề xuất nhập kho theo các Tờ trình định kỳ (\`17-DNCT/PKT\`, \`26-DNCT/PKT\`, \`31-DNCT/PKT\`) để bổ sung vật tư đạt mức tồn kho tối ưu.`;
     }
-  } else if (qLower.includes("dn_") || qLower.includes("mã")) {
+  } else if (qLower.includes("dn_") || qLower.includes("mã") || qLower.includes("còn bao nhiêu") || qLower.includes("vật tư") || qLower.includes("kiểm tra")) {
     intent = "search_material";
     const codeMatch = query.match(/dn[_\-][a-z0-9_]+/i);
     const targetCode = codeMatch ? codeMatch[0].toUpperCase().replace('-', '_') : '';
     suggestedFilters.searchKeyword = targetCode || query;
 
-    const matchedMat = parsedMaterials.find((m: any) => m.code === targetCode || (m.code && m.code.includes(targetCode)));
+    const matchedMat = parsedMaterials.find((m: any) => {
+      const c = (m.code || "").toUpperCase();
+      const n = (m.name || "").toLowerCase();
+      return (
+        (targetCode && (c === targetCode || c.includes(targetCode) || targetCode.includes(c))) ||
+        (qLower.length > 3 && (n.includes(qLower) || qLower.includes(n)))
+      );
+    });
+
     if (matchedMat) {
       highlightedCodes.push(matchedMat.code);
+      const statusText =
+        matchedMat.status === 'OUT_OF_STOCK'
+          ? '❌ Hết hàng (Tồn = 0)'
+          : matchedMat.status === 'LOW_STOCK'
+          ? '⚠️ Dưới mức an toàn (Cần nhập bổ sung)'
+          : '✅ Đạt định mức an toàn';
+
       textResponse = `### 🔍 Thông Tin Chi Tiết Mã Vật Tư: \`${matchedMat.code}\`
 - **Tên vật tư**: **${matchedMat.name}**
-- **Số lượng tồn hiện tại**: **${matchedMat.current} ${matchedMat.unit || 'Cái'}**
-- **Định mức an toàn tối thiểu**: **${matchedMat.min || 0} ${matchedMat.unit || 'Cái'}**
-- **Trạng thái tồn kho**: ${matchedMat.status === 'LOW_STOCK' ? '⚠️ Dưới mức an toàn' : matchedMat.status === 'OUT_OF_STOCK' ? '❌ Hết hàng (Tồn = 0)' : '✅ Đạt định mức an toàn'}
+- **Số lượng tồn hiện tại**: **${matchedMat.current ?? 0} ${matchedMat.unit || 'Cái'}** ${matchedMat.available !== undefined ? `(Khả dụng: **${matchedMat.available} ${matchedMat.unit || 'Cái'}**)` : ''}
+- **Định mức an toàn**: Tối thiểu **${matchedMat.min || 0} ${matchedMat.unit || 'Cái'}** ${matchedMat.max ? `— Tối đa **${matchedMat.max} ${matchedMat.unit || 'Cái'}**` : ''}
+- **Trạng thái tồn kho**: ${statusText}
+${matchedMat.location ? `- **Vị trí lưu kho**: 📍 **${matchedMat.location}**` : ''}
+${matchedMat.unitPrice ? `- **Đơn giá tham chiếu**: **${matchedMat.unitPrice.toLocaleString('vi-VN')} đ / ${matchedMat.unit || 'Cái'}**` : ''}
 
 *Bạn có thể bấm vào thẻ kho của vật tư này để theo dõi lịch sử xuất - nhập hoặc lập phiếu giao dịch trực tiếp.*`;
     } else {
