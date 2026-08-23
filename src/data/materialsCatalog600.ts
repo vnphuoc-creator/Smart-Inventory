@@ -435,6 +435,106 @@ function generateComprehensiveCatalog(): Material[] {
     });
   });
 
+  // 2.6 Đồng hồ đo lường & Giám sát điện năng đa năng (8 mã) -> DN_VT_DHDDN_01..08
+  const meterDevices = [
+    {
+      code: 'DN_VT_DHDDN_01',
+      name: 'Đồng hồ đa năng kỹ thuật số Selec MFM383A (LCD 3 hàng số)',
+      spec: 'Đo điện áp V, dòng điện A, tần số Hz, công suất P/Q/S, hệ số PF, điện năng kWh/kVARh màn hình LCD 3 pha 4 dây',
+      location: 'Tủ Thiết Bị Đo Lường E10',
+      stock: 15,
+      min: 4,
+      max: 30,
+      price: 2450000,
+    },
+    {
+      code: 'DN_VT_DHDDN_02',
+      name: 'Đồng hồ đa năng giám sát điện năng Schneider EasyLogic PM2220 (RS485 Modbus)',
+      spec: 'Đồng hồ đo điện năng đa chức năng kỹ thuật số Class 0.5S truyền thông RS485 Modbus RTU tích hợp hệ thống SCADA trạm biến áp',
+      location: 'Tủ Thiết Bị Đo Lường E10',
+      stock: 12,
+      min: 3,
+      max: 25,
+      price: 4850000,
+    },
+    {
+      code: 'DN_VT_DHDDN_03',
+      name: 'Đồng hồ phân tích chất lượng điện năng Schneider PowerLogic PM5350',
+      spec: 'Phân tích sóng hài THD đến bậc 31, cảnh báo sự cố điện áp & dòng điện độ chính xác cao Class 0.2S',
+      location: 'Tủ Thiết Bị Đo Lường E10',
+      stock: 6,
+      min: 2,
+      max: 12,
+      price: 12500000,
+    },
+    {
+      code: 'DN_VT_DHDDN_04',
+      name: 'Đồng hồ vạn năng hiện số điện tử Kyoritsu 1009',
+      spec: 'Đồng hồ vạn năng DMM đo AC/DC 600V, dòng 10A, điện trở, tụ điện, tần số, kiểm tra diode & thông mạch',
+      location: 'Tủ Thiết Bị Đo Kiểm E10',
+      stock: 10,
+      min: 3,
+      max: 20,
+      price: 1150000,
+    },
+    {
+      code: 'DN_VT_DHDDN_05',
+      name: 'Đồng hồ ampe kìm đo dòng điện xoay chiều Kyoritsu 2002PA (2000A AC)',
+      spec: 'Ampe kìm chuyên dụng trạm biến áp dòng đo lên đến 2000A AC, hàm kẹp đường kính lớn 55mm',
+      location: 'Tủ Thiết Bị Đo Kiểm E10',
+      stock: 8,
+      min: 2,
+      max: 15,
+      price: 2850000,
+    },
+    {
+      code: 'DN_VT_DHDDN_06',
+      name: 'Đồng hồ ampe kìm đo dòng rò độ nhạy cao Kyoritsu 2433R (True RMS)',
+      spec: 'Ampe kìm đo dòng rò bảo vệ chống giật dải đo từ 40mA / 400mA / 400A AC True RMS độ phân giải 0.01mA',
+      location: 'Tủ Thiết Bị Đo Kiểm E10',
+      stock: 5,
+      min: 2,
+      max: 10,
+      price: 6800000,
+    },
+    {
+      code: 'DN_VT_DHDDN_07',
+      name: 'Đồng hồ đo điện trở cách điện Megomet Kyoritsu 3005A (250V/500V/1000V)',
+      spec: 'Máy đo điện trở cách điện cáp điện & động cơ điện áp thử 250V/500V/1000V dải đo đến 2000MΩ',
+      location: 'Tủ Thiết Bị Đo Kiểm E10',
+      stock: 6,
+      min: 2,
+      max: 12,
+      price: 4950000,
+    },
+    {
+      code: 'DN_VT_DHDDN_08',
+      name: 'Đồng hồ đo điện trở tiếp địa hệ thống chống sét Kyoritsu 4105A',
+      spec: 'Thiết bị đo điện trở đất 2 cực / 3 cực dải đo 20Ω / 200Ω / 2000Ω kiểm định kim thu sét & cọc tiếp địa',
+      location: 'Tủ Thiết Bị Đo Kiểm E10',
+      stock: 5,
+      min: 2,
+      max: 10,
+      price: 5450000,
+    },
+  ];
+  meterDevices.forEach((dev) => {
+    items.push({
+      id: `mat_dn_meter_${idCounter++}`,
+      code: dev.code,
+      name: dev.name,
+      category: 'Thiết bị Điện & Trạm trung thế',
+      unit: 'Cái',
+      specification: dev.spec,
+      location: dev.location,
+      initialStock: dev.stock,
+      minStock: dev.min,
+      maxStock: dev.max,
+      unitPrice: dev.price,
+      allocatedStaffEmails: [staff[0], staff[1], staff[2]],
+    });
+  });
+
   // =========================================================================
   // 3. PHÂN HỆ HỆ THỐNG CHIẾU SÁNG & ĐÈN CÔNG TRÌNH (~100 MÃ)
   // =========================================================================

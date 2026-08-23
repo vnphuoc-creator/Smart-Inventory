@@ -67,17 +67,15 @@ export function App() {
   const isMasterAdmin = currentUser?.email?.toLowerCase().trim() === 'vn.phuoc235@gmail.com';
 
   const [materials, setMaterials] = useState<Material[]>(() => {
-    const saved = localStorage.getItem('smart_materials_v11');
+    const saved = localStorage.getItem('smart_materials_v12');
     if (saved) {
       try {
         const parsed: Material[] = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length >= INITIAL_MATERIALS.length) {
-          // Check if codes follow the standard format DN_VT or DN_CC
-          const regex = /^DN_(VT|CC)_[A-Z0-9]{5}_\d{2,4}$/;
-          const hasInvalid = parsed.some((m) => !regex.test(m.code));
-          if (!hasInvalid) {
-            return parsed;
-          }
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          // Merge with any newly added initial materials that might be missing
+          const existingCodes = new Set(parsed.map((m) => m.code));
+          const missingInitials = INITIAL_MATERIALS.filter((m) => !existingCodes.has(m.code));
+          return [...parsed, ...missingInitials];
         }
       } catch {
         return INITIAL_MATERIALS;
@@ -86,9 +84,14 @@ export function App() {
     return INITIAL_MATERIALS;
   });
 
-  // Sync materials to localStorage
+  // Sync materials to localStorage and ensure all initial catalog materials exist
   React.useEffect(() => {
-    localStorage.setItem('smart_materials_v11', JSON.stringify(materials));
+    const existingCodes = new Set(materials.map((m) => m.code));
+    const missingInitials = INITIAL_MATERIALS.filter((m) => !existingCodes.has(m.code));
+    if (missingInitials.length > 0) {
+      setMaterials((prev) => [...prev, ...missingInitials]);
+    }
+    localStorage.setItem('smart_materials_v12', JSON.stringify(materials));
   }, [materials]);
 
   const [proposals, setProposals] = useState<PurchaseProposal[]>(() => {
@@ -167,11 +170,6 @@ export function App() {
       setToast(null);
     }, 4000);
   };
-
-  // Sync to local storage
-  React.useEffect(() => {
-    localStorage.setItem('smart_materials_v9', JSON.stringify(materials));
-  }, [materials]);
 
   React.useEffect(() => {
     localStorage.setItem('smart_transactions_v6', JSON.stringify(transactions));

@@ -52,6 +52,23 @@ export const SmartSearchBar: React.FC<SmartSearchBarProps> = ({
     // Fast local NLP first
     const { filters, explanation } = parseNaturalLanguageQuery(rawQ, MATERIAL_CATEGORIES);
 
+    // Check direct matching materials in current materials catalog
+    const qLower = rawQ.toLowerCase().trim();
+    const codeMatch = rawQ.match(/dn[_\-][a-z0-9_]+/i);
+    const targetCode = codeMatch ? codeMatch[0].toUpperCase().replace('-', '_') : '';
+    
+    const matchedMaterials = materials.filter((m) => {
+      const c = m.code.toUpperCase();
+      const n = m.name.toLowerCase();
+      return (targetCode && (c === targetCode || c.includes(targetCode))) || (qLower.length > 3 && n.includes(qLower));
+    });
+
+    let directExplanation = explanation;
+    if (matchedMaterials.length > 0) {
+      const first = matchedMaterials[0];
+      directExplanation = `🔍 Tìm thấy mã **${first.code}**: **${first.name}** (Tồn định mức: ${first.initialStock} ${first.unit} | Vị trí: ${first.location || 'Kho'})`;
+    }
+
     // Call server Gemini API for smart query interpretation
     setLoadingAi(true);
     try {
@@ -60,10 +77,25 @@ export const SmartSearchBar: React.FC<SmartSearchBarProps> = ({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           query: rawQ,
-          materialsSummary: `Tổng số mã vật tư DN_: ${materials.length}. Danh sách mẫu: ${materials
-            .slice(0, 8)
-            .map((m) => `${m.code} (${m.name})`)
-            .join(', ')}`,
+          matchedMaterials: matchedMaterials.slice(0, 5).map((m) => ({
+            code: m.code,
+            name: m.name,
+            current: m.initialStock,
+            min: m.minStock,
+            max: m.maxStock,
+            unit: m.unit,
+            unitPrice: m.unitPrice,
+            location: m.location,
+          })),
+          materialsSummary: JSON.stringify(
+            [...matchedMaterials, ...materials.slice(0, 50)].map((m) => ({
+              code: m.code,
+              name: m.name,
+              current: m.initialStock,
+              min: m.minStock,
+              unit: m.unit,
+            }))
+          ),
           transactionsSummary: `Tổng số giao dịch: ${transactions.length}. Chờ duyệt: ${
             transactions.filter((t) => t.status === 'PENDING').length
           }`,
@@ -90,15 +122,15 @@ export const SmartSearchBar: React.FC<SmartSearchBarProps> = ({
             targetTab ||
             (rawQ.includes('phiếu') || rawQ.includes('chờ duyệt') ? 'transactions' : 'materials');
 
-          onApplyFilters(mergedFilters, data.textResponse || explanation, destinationTab);
+          onApplyFilters(mergedFilters, data.textResponse || directExplanation, destinationTab);
         } else {
-          onApplyFilters(filters, explanation, targetTab || 'materials');
+          onApplyFilters(filters, directExplanation, targetTab || 'materials');
         }
       } else {
-        onApplyFilters(filters, explanation, targetTab || 'materials');
+        onApplyFilters(filters, directExplanation, targetTab || 'materials');
       }
     } catch {
-      onApplyFilters(filters, explanation, targetTab || 'materials');
+      onApplyFilters(filters, directExplanation, targetTab || 'materials');
     } finally {
       setLoadingAi(false);
       onClose();
