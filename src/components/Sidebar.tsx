@@ -204,8 +204,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 <div className="text-xs font-bold text-white truncate">
                   {currentUser.fullName}
                 </div>
-                <div className="text-[10px] text-slate-400 truncate">
-                  {currentUser.role === 'ADMIN' ? 'Ban Quản Lý (Admin)' : (currentUser.department || 'Nhân viên')}
+                <div className="text-[10px] text-slate-400 font-mono truncate">
+                  {currentUser.email}
                 </div>
               </div>
             </div>
@@ -233,6 +233,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 <span>Đăng xuất</span>
               </button>
             </div>
+          </div>
+
+          {/* System Version Indicator in Bottom Left */}
+          <div className="mt-2.5 px-2 flex items-center justify-between text-[10px] text-slate-400 font-mono">
+            <span className="flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+              <span>Version 1.0</span>
+            </span>
+            <span className="text-slate-400">AHT &bull; ĐNCT</span>
           </div>
         </div>
       </aside>

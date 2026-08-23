@@ -250,15 +250,6 @@ export const MaterialCatalogueView: React.FC<MaterialCatalogueViewProps> = ({
 
         <div className="flex items-center gap-2 shrink-0 flex-wrap sm:flex-nowrap">
           <button
-            onClick={() => window.print()}
-            className="no-print bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 px-3 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors"
-            title="In PDF Báo cáo Danh mục và Tồn kho Vật tư Chuẩn AHT"
-          >
-            <Printer className="w-4 h-4 text-blue-400" />
-            <span>In PDF Báo Cáo</span>
-          </button>
-
-          <button
             id="btn-export-materials-csv"
             onClick={handleExportCSV}
             className="no-print bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 px-3 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors"

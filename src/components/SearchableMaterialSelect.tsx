@@ -47,7 +47,7 @@ export const SearchableMaterialSelect: React.FC<SearchableMaterialSelectProps> =
   // Filter materials based on search term
   const filteredMaterials = useMemo(() => {
     if (!searchTerm.trim()) {
-      return materials.slice(0, 60); // Show top 60 initially
+      return materials; // Allow scrolling through all materials
     }
 
     const term = searchTerm.toLowerCase().trim();
@@ -63,31 +63,29 @@ export const SearchableMaterialSelect: React.FC<SearchableMaterialSelectProps> =
     const words = term.split(/\s+/).filter(Boolean);
     const normWords = normTerm.split(/\s+/).filter(Boolean);
 
-    return materials
-      .filter((m) => {
-        const rawCode = m.code.toLowerCase();
-        const rawName = m.name.toLowerCase();
-        const rawSpec = (m.specification || '').toLowerCase();
-        const rawCat = (m.category || '').toLowerCase();
+    return materials.filter((m) => {
+      const rawCode = m.code.toLowerCase();
+      const rawName = m.name.toLowerCase();
+      const rawSpec = (m.specification || '').toLowerCase();
+      const rawCat = (m.category || '').toLowerCase();
 
-        const normName = normalize(m.name);
-        const normSpec = normalize(m.specification || '');
+      const normName = normalize(m.name);
+      const normSpec = normalize(m.specification || '');
 
-        // Direct code match
-        if (rawCode.includes(term)) return true;
+      // Direct code match
+      if (rawCode.includes(term)) return true;
 
-        // Direct name match
-        if (rawName.includes(term) || normName.includes(normTerm)) return true;
+      // Direct name match
+      if (rawName.includes(term) || normName.includes(normTerm)) return true;
 
-        // All words match
-        const allWordsMatch = normWords.every(
-          (w) => normName.includes(w) || normSpec.includes(w) || rawCode.includes(w)
-        );
-        if (allWordsMatch) return true;
+      // All words match
+      const allWordsMatch = normWords.every(
+        (w) => normName.includes(w) || normSpec.includes(w) || rawCode.includes(w)
+      );
+      if (allWordsMatch) return true;
 
-        return rawSpec.includes(term) || rawCat.includes(term);
-      })
-      .slice(0, 60);
+      return rawSpec.includes(term) || rawCat.includes(term);
+    });
   }, [materials, searchTerm]);
 
   // Reset highlight on search change

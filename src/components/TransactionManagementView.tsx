@@ -386,15 +386,44 @@ export const TransactionManagementView: React.FC<TransactionManagementViewProps>
         // Continue with client-side detected items
       }
 
+      // If server or client didn't extract items, or matched a known system proposal:
+      const matchedSystemProposal = proposals.find((p) => {
+        if (!detectedPropNum && !file.name) return false;
+        const targetNum = (detectedPropNum || '').toLowerCase().trim();
+        const fName = file.name.toLowerCase();
+        const pNum = p.proposalNumber.toLowerCase().trim();
+        const pDigits = pNum.replace(/[^0-9]/g, '');
+        const targetDigits = targetNum.replace(/[^0-9]/g, '');
+
+        if (targetNum && pNum === targetNum) return true;
+        if (targetDigits && targetDigits === pDigits) return true;
+        if (fName.includes(pNum) || (pDigits && fName.includes(pDigits))) return true;
+        return false;
+      });
+
+      if (matchedSystemProposal) {
+        if (!detectedPropNum) detectedPropNum = matchedSystemProposal.proposalNumber;
+        if (!detectedTitle) detectedTitle = `Nhập kho theo Tờ trình ${matchedSystemProposal.proposalNumber} - ${matchedSystemProposal.title}`;
+        if (!detectedReason) detectedReason = matchedSystemProposal.notes || matchedSystemProposal.title || `Căn cứ Tờ trình ${matchedSystemProposal.proposalNumber}`;
+        if (detectedItems.length === 0) {
+          detectedItems = matchedSystemProposal.items.map((it) => ({
+            materialCode: it.materialCode,
+            quantity: it.requestedQuantity,
+            unitPrice: it.unitPrice,
+            notes: `Nhập theo Tờ trình ${matchedSystemProposal.proposalNumber}`,
+          }));
+        }
+      }
+
       // Apply detected fields to form
       if (detectedPropNum) setFormProposalNumber(detectedPropNum);
       if (detectedTitle) setFormTitle(detectedTitle);
       if (detectedReason) setFormReason(detectedReason);
       if (detectedItems.length > 0) {
         setFormItems(detectedItems);
-        setScanFeedback(`✨ Quét thành công! Đã tự động nhận diện Tờ trình "${detectedPropNum || file.name}" và điền chính xác ${detectedItems.length} mặt hàng kèm số lượng.`);
+        setScanFeedback(`✨ Quét thành công! Đã tự động nhận diện Tờ trình "${detectedPropNum || file.name}" và nạp chính xác ${detectedItems.length} mặt hàng.`);
       } else {
-        setScanFeedback(`✨ Đã gắn tệp "${file.name}". Bạn có thể chọn tiếp các mặt hàng cần nhập.`);
+        setScanFeedback(`✨ Đã gắn tệp "${file.name}". Bạn có thể chọn tiếp các mặt hàng cần nhập hoặc nạp từ danh mục.`);
       }
 
       setIsScanningProposal(false);
@@ -1245,16 +1274,36 @@ export const TransactionManagementView: React.FC<TransactionManagementViewProps>
                       </div>
                     </div>
 
-                    {!matchedProposalProgress.isComplete && matchedProposalProgress.missing.length > 0 && (
+                    <div className="flex flex-wrap items-center gap-2">
                       <button
                         type="button"
-                        onClick={handleAutoFillMissingItems}
-                        className="bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-[11px] px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5 shrink-0 shadow-sm"
+                        onClick={() => {
+                          if (!matchedProposal) return;
+                          setFormItems(
+                            matchedProposal.items.map((it) => ({
+                              materialCode: it.materialCode,
+                              quantity: it.requestedQuantity,
+                              unitPrice: it.unitPrice,
+                              notes: `Nhập theo Tờ trình ${matchedProposal.proposalNumber}`,
+                            }))
+                          );
+                        }}
+                        className="bg-blue-600 hover:bg-blue-500 text-white font-semibold text-[11px] px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5 shrink-0 shadow-sm"
                       >
                         <Sparkles className="w-3 h-3 text-amber-300" />
-                        Nạp các vật tư còn thiếu ({matchedProposalProgress.missing.length})
+                        Nạp toàn bộ {matchedProposal.items.length} vật tư
                       </button>
-                    )}
+                      {!matchedProposalProgress.isComplete && matchedProposalProgress.missing.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={handleAutoFillMissingItems}
+                          className="bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-[11px] px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5 shrink-0 shadow-sm"
+                        >
+                          <Clock className="w-3 h-3 text-amber-300" />
+                          Nạp {matchedProposalProgress.missing.length} vật tư còn thiếu
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
               )}
