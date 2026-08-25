@@ -119,6 +119,7 @@ Hãy trả về phản hồi định dạng JSON strictly with this schema:
   // Parse structured data from request body if available
   let parsedMaterials: any[] = [];
   let parsedProposals: any[] = [];
+  let parsedTransactions: any[] = [];
   const reqMatched: any[] = Array.isArray(req.body.matchedMaterials) ? req.body.matchedMaterials : [];
 
   try {
@@ -129,6 +130,11 @@ Hãy trả về phản hồi định dạng JSON strictly with this schema:
   try {
     if (typeof proposalsSummary === "string" && proposalsSummary.startsWith("[")) {
       parsedProposals = JSON.parse(proposalsSummary);
+    }
+  } catch {}
+  try {
+    if (typeof transactionsSummary === "string" && transactionsSummary.startsWith("[")) {
+      parsedTransactions = JSON.parse(transactionsSummary);
     }
   } catch {}
 
@@ -142,38 +148,75 @@ Hãy trả về phản hồi định dạng JSON strictly with this schema:
     });
   }
 
-  // 1. Check if user asks about a specific proposal (e.g. "tờ trình 29", "tờ trình 17", "26-DNCT/PKT", etc.)
-  const propNumMatch = qLower.match(/(?:tờ\s*trình\s*|tt\s*|số\s*)?(\d{1,3}(?:-dnct(?:\/pkt)?)?)/i);
-  const matchedProp = parsedProposals.find((p: any) => {
-    const num = (p.number || "").toLowerCase();
-    const title = (p.title || "").toLowerCase();
-    return (
-      (propNumMatch && num.includes(propNumMatch[1])) ||
-      qLower.includes(num) ||
-      (num.length > 2 && qLower.includes(num.replace(/[^0-9]/g, ''))) ||
-      title.includes(qLower)
-    );
-  });
+  // 1. Check if user asks about a specific proposal or transaction
+  const queryNumbers = qLower.match(/\b\d{1,3}\b/g) || [];
+  
+  let matchedProp: any = null;
+  if (queryNumbers.length > 0) {
+    // Try exact digit matching first
+    matchedProp = parsedProposals.find((p: any) => {
+      const num = (p.number || "").toLowerCase();
+      const pDigits = (num.match(/\d+/) || [""])[0];
+      return queryNumbers.some((qn) => qn === pDigits || num.includes(qn));
+    });
+
+    // If still not found in proposals, check in transactions
+    if (!matchedProp && parsedTransactions.length > 0) {
+      const txMatch = parsedTransactions.find((t: any) => {
+        const tProp = (t.proposalNumber || "").toLowerCase();
+        const tTitle = (t.title || "").toLowerCase();
+        const tCode = (t.code || "").toLowerCase();
+        return queryNumbers.some((qn) => tProp.includes(qn) || tTitle.includes(qn) || tCode.includes(qn));
+      });
+
+      if (txMatch) {
+        matchedProp = {
+          number: txMatch.proposalNumber || `Tờ trình ${queryNumbers[0]}-DNCT/PKT`,
+          title: txMatch.title,
+          status: txMatch.status,
+          items: (txMatch.items || []).map((it: any) => ({
+            code: it.code,
+            name: it.name,
+            requested: it.qty,
+            unit: it.unit,
+            unitPrice: it.unitPrice,
+          })),
+        };
+      }
+    }
+  }
+
+  // Generic matching if no numbers or not matched yet
+  if (!matchedProp && (qLower.includes("tờ trình") || qLower.includes("tt ") || qLower.includes("dnct"))) {
+    matchedProp = parsedProposals.find((p: any) => {
+      const num = (p.number || "").toLowerCase();
+      const title = (p.title || "").toLowerCase();
+      return qLower.includes(num) || title.split(" ").some((w: string) => w.length > 3 && qLower.includes(w));
+    });
+  }
 
   if (matchedProp) {
     intent = "reconcile_proposal";
     const items = matchedProp.items || [];
     const itemsListMd = items
       .map(
-        (it: any, idx: number) =>
-          `${idx + 1}. **${it.code || 'Mã DN_'}** - ${it.name}: Yêu cầu **${it.requested || 0}** ${it.unit || 'Cái'}`
+        (it: any, idx: number) => {
+          const formattedPrice = it.unitPrice ? `${Number(it.unitPrice).toLocaleString('vi-VN')} đ` : '';
+          const totalAmt = it.requested && it.unitPrice ? `${(Number(it.requested) * Number(it.unitPrice)).toLocaleString('vi-VN')} đ` : '';
+          return `${idx + 1}. **\`${it.code || 'Mã DN_'}\`** — **${it.name}**\n   - Số lượng: **${it.requested || 0} ${it.unit || 'Cái'}** ${formattedPrice ? `| Đơn giá: **${formattedPrice}**` : ''} ${totalAmt ? `| Thành tiền: **${totalAmt}**` : ''}`;
+        }
       )
-      .join("\n");
+      .join("\n\n");
 
-    textResponse = `### 📋 Báo Cáo Chi Tiết: Tờ Trình ${matchedProp.number}
-- **Nội dung / Trích yếu**: ${matchedProp.title || 'Đề xuất mua sắm vật tư định kỳ'}
-- **Trạng thái**: ${matchedProp.status === 'COMPLETED' ? '✅ Đã nhập đủ 100%' : '⏳ Đang tiến hành nhập kho'}
-- **Tổng số mặt hàng yêu cầu**: **${items.length} mặt hàng**
+    textResponse = `### 📋 Báo Cáo Chi Tiết: Tờ Trình \`${matchedProp.number}\`
+- **Nội dung / Trích yếu**: **${matchedProp.title || 'Đề xuất mua sắm vật tư định kỳ'}**
+- **Trạng thái**: **${matchedProp.status === 'COMPLETED' ? '✅ Đã hoàn tất nhập kho 100%' : matchedProp.status === 'APPROVED' ? 'Lãnh đạo đã phê duyệt' : '⏳ Chờ phê duyệt / Đang nhập kho'}**
+- **Tổng số mặt hàng**: **${items.length} danh mục vật tư**
 
-#### Danh sách vật tư theo tờ trình:
+#### 📦 Danh sách chi tiết từng vật tư trong Tờ trình:
 ${itemsListMd || '- Chưa có danh sách chi tiết mặt hàng.'}
 
-*Bạn có thể bấm vào tab **"Xuất - Nhập - Tồn"** > **"Đối Chiếu Tờ Trình"** hoặc tạo Phiếu Nhập Kho gắn Tờ trình ${matchedProp.number} để hệ thống tự động điền toàn bộ danh sách trên.*`;
+💡 *Bạn có thể bấm vào tab **"Xuất - Nhập Kho"** > chọn **Lập Phiếu Nhập Theo Tờ Trình** hoặc xem trong mục **"Đối Chiếu Tờ Trình"** để quản lý chi tiết.*`;
   } else if (qLower.includes("tờ trình") || qLower.includes("đề xuất") || qLower.includes("đối chiếu")) {
     intent = "reconcile_proposal";
     if (parsedProposals.length > 0) {

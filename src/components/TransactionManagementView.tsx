@@ -26,6 +26,11 @@ import {
   Sparkles,
   Loader2,
   Copy,
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
+  MoveHorizontal,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import {
@@ -123,6 +128,53 @@ export const TransactionManagementView: React.FC<TransactionManagementViewProps>
       notes: string;
     }>
   >([]);
+
+  // Modal Items Table Scroll Synchronization
+  const modalItemsTableRef = useRef<HTMLDivElement>(null);
+  const modalItemsTopScrollRef = useRef<HTMLDivElement>(null);
+  const isSyncingModalScroll = useRef(false);
+  const [modalItemsScrollProgress, setModalItemsScrollProgress] = useState(0);
+
+  const handleModalItemsScroll = () => {
+    if (!modalItemsTableRef.current) return;
+    const { scrollLeft, scrollWidth, clientWidth } = modalItemsTableRef.current;
+    const max = scrollWidth - clientWidth;
+    if (max > 0) {
+      setModalItemsScrollProgress((scrollLeft / max) * 100);
+    }
+    if (modalItemsTopScrollRef.current && !isSyncingModalScroll.current) {
+      isSyncingModalScroll.current = true;
+      modalItemsTopScrollRef.current.scrollLeft = scrollLeft;
+      requestAnimationFrame(() => {
+        isSyncingModalScroll.current = false;
+      });
+    }
+  };
+
+  const handleModalItemsTopScroll = () => {
+    if (!modalItemsTopScrollRef.current || !modalItemsTableRef.current) return;
+    const { scrollLeft } = modalItemsTopScrollRef.current;
+    if (!isSyncingModalScroll.current) {
+      isSyncingModalScroll.current = true;
+      modalItemsTableRef.current.scrollLeft = scrollLeft;
+      requestAnimationFrame(() => {
+        isSyncingModalScroll.current = false;
+      });
+    }
+  };
+
+  const handleModalItemsScrollBy = (amount: number) => {
+    if (modalItemsTableRef.current) {
+      modalItemsTableRef.current.scrollBy({ left: amount, behavior: 'smooth' });
+    }
+  };
+
+  const handleModalItemsScrollToPercent = (pct: number) => {
+    if (modalItemsTableRef.current) {
+      const max = modalItemsTableRef.current.scrollWidth - modalItemsTableRef.current.clientWidth;
+      modalItemsTableRef.current.scrollTo({ left: (max * pct) / 100, behavior: 'smooth' });
+    }
+  };
 
   // Open create modal with prefilled data if requested
   React.useEffect(() => {
@@ -1455,7 +1507,7 @@ export const TransactionManagementView: React.FC<TransactionManagementViewProps>
                 </div>
               )}
 
-              {/* Items Table Section */}
+              {/* Items Table Section with Top Horizontal Scrollbar & Sticky Header */}
               <div className="space-y-2 pt-2">
                 <div className="flex items-center justify-between">
                   <span className="font-semibold text-slate-200 text-xs uppercase tracking-wider">
@@ -1471,16 +1523,103 @@ export const TransactionManagementView: React.FC<TransactionManagementViewProps>
                   </button>
                 </div>
 
-                <div className="bg-slate-850 border border-slate-800 rounded-xl overflow-x-auto">
-                  <table className="w-full text-left text-xs text-slate-300 min-w-[760px]">
-                    <thead className="bg-slate-900 border-b border-slate-800 text-[11px] font-semibold text-slate-400 uppercase rounded-t-xl">
+                {/* Top Horizontal Scrollbar & Fast Nav for Modal Items */}
+                <div className="bg-slate-800/90 px-3 py-1.5 rounded-xl border border-slate-700/80 flex flex-wrap items-center justify-between gap-2 text-xs">
+                  <div className="flex items-center gap-1.5 text-slate-300 font-medium">
+                    <MoveHorizontal className="w-3.5 h-3.5 text-blue-400" />
+                    <span className="text-[11px]">Trượt ngang nhanh:</span>
+                    <div className="flex items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => handleModalItemsScrollToPercent(0)}
+                        className="p-1 rounded bg-slate-700 hover:bg-slate-600 text-slate-300 hover:text-white"
+                        title="Về đầu dòng (Trái)"
+                      >
+                        <ChevronsLeft className="w-3 h-3" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleModalItemsScrollBy(-200)}
+                        className="p-1 rounded bg-slate-700 hover:bg-slate-600 text-slate-300 hover:text-white"
+                        title="Cuộn sang trái"
+                      >
+                        <ChevronLeft className="w-3 h-3" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleModalItemsScrollBy(200)}
+                        className="p-1 rounded bg-slate-700 hover:bg-slate-600 text-slate-300 hover:text-white"
+                        title="Cuộn sang phải"
+                      >
+                        <ChevronRight className="w-3 h-3" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleModalItemsScrollToPercent(100)}
+                        className="p-1 rounded bg-slate-700 hover:bg-slate-600 text-slate-300 hover:text-white"
+                        title="Đến cuối dòng (Phải)"
+                      >
+                        <ChevronsRight className="w-3 h-3" />
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 flex-1 max-w-xs">
+                    <input
+                      type="range"
+                      min="0"
+                      max="100"
+                      value={Math.round(modalItemsScrollProgress)}
+                      onChange={(e) => handleModalItemsScrollToPercent(Number(e.target.value))}
+                      className="w-full accent-blue-500 cursor-pointer h-1.5 bg-slate-700 rounded-lg"
+                      title="Kéo trượt nhanh bảng vật tư"
+                    />
+                    <span className="text-[10px] text-slate-400 font-mono w-8 text-right">
+                      {Math.round(modalItemsScrollProgress)}%
+                    </span>
+                  </div>
+
+                  <div className="text-[11px] text-slate-400 font-mono">
+                    <strong className="text-white">{formItems.length}</strong> vật tư
+                  </div>
+                </div>
+
+                {/* Direct Top Scroll Track for Modal Items */}
+                <div
+                  ref={modalItemsTopScrollRef}
+                  onScroll={handleModalItemsTopScroll}
+                  className="overflow-x-auto overflow-y-hidden bg-slate-900 border border-slate-800 rounded-md h-2 custom-top-scrollbar"
+                >
+                  <div className="w-[850px] h-1"></div>
+                </div>
+
+                {/* Table Container with Sticky Header */}
+                <div
+                  ref={modalItemsTableRef}
+                  onScroll={handleModalItemsScroll}
+                  className="bg-slate-850 border border-slate-800 rounded-xl overflow-x-auto overflow-y-auto max-h-[380px] relative"
+                >
+                  <table className="w-full text-left text-xs text-slate-300 min-w-[760px] border-separate border-spacing-0">
+                    <thead className="sticky top-0 z-10 bg-slate-900 shadow-sm border-b border-slate-800">
                       <tr>
-                        <th className="py-2.5 px-3 min-w-[340px] sm:min-w-[420px]">Vật Tư & Quy Cách (Mã Chuẩn DN_*)</th>
-                        <th className="py-2.5 px-2 text-center w-24">Tồn Hiện Tại</th>
-                        <th className="py-2.5 px-3 text-right w-28">Số Lượng</th>
-                        <th className="py-2.5 px-3 text-right w-32">Đơn Giá (VNĐ)</th>
-                        <th className="py-2.5 px-3 text-right w-36">Thành Tiền</th>
-                        <th className="py-2.5 px-2 text-center w-12">Xóa</th>
+                        <th className="sticky top-0 z-10 bg-slate-900 py-2.5 px-3 min-w-[340px] sm:min-w-[420px] font-semibold text-slate-300 uppercase border-b border-slate-800">
+                          Vật Tư & Quy Cách (Mã Chuẩn DN_*)
+                        </th>
+                        <th className="sticky top-0 z-10 bg-slate-900 py-2.5 px-2 text-center w-24 font-semibold text-slate-300 uppercase border-b border-slate-800">
+                          Tồn Hiện Tại
+                        </th>
+                        <th className="sticky top-0 z-10 bg-slate-900 py-2.5 px-3 text-right w-28 font-semibold text-slate-300 uppercase border-b border-slate-800">
+                          Số Lượng
+                        </th>
+                        <th className="sticky top-0 z-10 bg-slate-900 py-2.5 px-3 text-right w-32 font-semibold text-slate-300 uppercase border-b border-slate-800">
+                          Đơn Giá (VNĐ)
+                        </th>
+                        <th className="sticky top-0 z-10 bg-slate-900 py-2.5 px-3 text-right w-36 font-semibold text-slate-300 uppercase border-b border-slate-800">
+                          Thành Tiền
+                        </th>
+                        <th className="sticky top-0 z-10 bg-slate-900 py-2.5 px-2 text-center w-12 font-semibold text-slate-300 uppercase border-b border-slate-800">
+                          Xóa
+                        </th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-800">

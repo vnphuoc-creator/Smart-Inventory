@@ -22,6 +22,11 @@ import {
   ShieldCheck,
   Database,
   Image as ImageIcon,
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
+  MoveHorizontal,
 } from 'lucide-react';
 import { STANDARD_UNITS } from '../data/seedData';
 import { User, Material, InventoryTransaction, PurchaseProposal, ProposalItem, TransactionItem, TransactionType, TransactionStatus } from '../types';
@@ -235,6 +240,96 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     const updated = [...editPropItems];
     updated[index] = { ...updated[index], [field]: value };
     setEditPropItems(updated);
+  };
+
+  // Scroll sync for Edit Proposal items
+  const editPropTableRef = useRef<HTMLDivElement>(null);
+  const editPropTopScrollRef = useRef<HTMLDivElement>(null);
+  const isSyncingEditPropScroll = useRef(false);
+  const [editPropScrollProgress, setEditPropScrollProgress] = useState(0);
+
+  const handleEditPropTableScroll = () => {
+    if (!editPropTableRef.current) return;
+    const { scrollLeft, scrollWidth, clientWidth } = editPropTableRef.current;
+    const max = scrollWidth - clientWidth;
+    if (max > 0) setEditPropScrollProgress((scrollLeft / max) * 100);
+    if (editPropTopScrollRef.current && !isSyncingEditPropScroll.current) {
+      isSyncingEditPropScroll.current = true;
+      editPropTopScrollRef.current.scrollLeft = scrollLeft;
+      requestAnimationFrame(() => {
+        isSyncingEditPropScroll.current = false;
+      });
+    }
+  };
+
+  const handleEditPropTopScroll = () => {
+    if (!editPropTopScrollRef.current || !editPropTableRef.current) return;
+    const { scrollLeft } = editPropTopScrollRef.current;
+    if (!isSyncingEditPropScroll.current) {
+      isSyncingEditPropScroll.current = true;
+      editPropTableRef.current.scrollLeft = scrollLeft;
+      requestAnimationFrame(() => {
+        isSyncingEditPropScroll.current = false;
+      });
+    }
+  };
+
+  const handleEditPropScrollBy = (amount: number) => {
+    if (editPropTableRef.current) {
+      editPropTableRef.current.scrollBy({ left: amount, behavior: 'smooth' });
+    }
+  };
+
+  const handleEditPropScrollToPercent = (pct: number) => {
+    if (editPropTableRef.current) {
+      const max = editPropTableRef.current.scrollWidth - editPropTableRef.current.clientWidth;
+      editPropTableRef.current.scrollTo({ left: (max * pct) / 100, behavior: 'smooth' });
+    }
+  };
+
+  // Scroll sync for Edit Transaction items
+  const editTxTableRef = useRef<HTMLDivElement>(null);
+  const editTxTopScrollRef = useRef<HTMLDivElement>(null);
+  const isSyncingEditTxScroll = useRef(false);
+  const [editTxScrollProgress, setEditTxScrollProgress] = useState(0);
+
+  const handleEditTxTableScroll = () => {
+    if (!editTxTableRef.current) return;
+    const { scrollLeft, scrollWidth, clientWidth } = editTxTableRef.current;
+    const max = scrollWidth - clientWidth;
+    if (max > 0) setEditTxScrollProgress((scrollLeft / max) * 100);
+    if (editTxTopScrollRef.current && !isSyncingEditTxScroll.current) {
+      isSyncingEditTxScroll.current = true;
+      editTxTopScrollRef.current.scrollLeft = scrollLeft;
+      requestAnimationFrame(() => {
+        isSyncingEditTxScroll.current = false;
+      });
+    }
+  };
+
+  const handleEditTxTopScroll = () => {
+    if (!editTxTopScrollRef.current || !editTxTableRef.current) return;
+    const { scrollLeft } = editTxTopScrollRef.current;
+    if (!isSyncingEditTxScroll.current) {
+      isSyncingEditTxScroll.current = true;
+      editTxTableRef.current.scrollLeft = scrollLeft;
+      requestAnimationFrame(() => {
+        isSyncingEditTxScroll.current = false;
+      });
+    }
+  };
+
+  const handleEditTxScrollBy = (amount: number) => {
+    if (editTxTableRef.current) {
+      editTxTableRef.current.scrollBy({ left: amount, behavior: 'smooth' });
+    }
+  };
+
+  const handleEditTxScrollToPercent = (pct: number) => {
+    if (editTxTableRef.current) {
+      const max = editTxTableRef.current.scrollWidth - editTxTableRef.current.clientWidth;
+      editTxTableRef.current.scrollTo({ left: (max * pct) / 100, behavior: 'smooth' });
+    }
   };
 
   // Transaction Edit Modal State (Admin)
@@ -1535,18 +1630,102 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                   </button>
                 </div>
 
-                <div className="bg-slate-850 border border-slate-800 rounded-xl overflow-hidden">
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left text-xs text-slate-300 min-w-[620px]">
-                      <thead className="bg-slate-900 border-b border-slate-800 text-[11px] font-semibold text-slate-400 uppercase">
-                        <tr>
-                          <th className="py-2.5 px-3">Vật Tư (Mã DN_*)</th>
-                          <th className="py-2.5 px-3 text-right w-28">Số Lượng</th>
-                          <th className="py-2.5 px-3 text-right w-32">Đơn Giá (VNĐ)</th>
-                          <th className="py-2.5 px-3 text-right w-32">Thành Tiền</th>
-                          <th className="py-2.5 px-2 text-center w-12">Xóa</th>
-                        </tr>
-                      </thead>
+                {/* Top Horizontal Scrollbar & Fast Nav for Edit Proposal */}
+                <div className="bg-slate-800/90 px-3 py-1.5 rounded-xl border border-slate-700/80 flex flex-wrap items-center justify-between gap-2 text-xs">
+                  <div className="flex items-center gap-1.5 text-slate-300 font-medium">
+                    <MoveHorizontal className="w-3.5 h-3.5 text-blue-400" />
+                    <span className="text-[11px]">Trượt ngang:</span>
+                    <div className="flex items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => handleEditPropScrollToPercent(0)}
+                        className="p-1 rounded bg-slate-700 hover:bg-slate-600 text-slate-300 hover:text-white"
+                        title="Về đầu"
+                      >
+                        <ChevronsLeft className="w-3 h-3" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleEditPropScrollBy(-200)}
+                        className="p-1 rounded bg-slate-700 hover:bg-slate-600 text-slate-300 hover:text-white"
+                        title="Sang trái"
+                      >
+                        <ChevronLeft className="w-3 h-3" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleEditPropScrollBy(200)}
+                        className="p-1 rounded bg-slate-700 hover:bg-slate-600 text-slate-300 hover:text-white"
+                        title="Sang phải"
+                      >
+                        <ChevronRight className="w-3 h-3" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleEditPropScrollToPercent(100)}
+                        className="p-1 rounded bg-slate-700 hover:bg-slate-600 text-slate-300 hover:text-white"
+                        title="Đến cuối"
+                      >
+                        <ChevronsRight className="w-3 h-3" />
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 flex-1 max-w-xs">
+                    <input
+                      type="range"
+                      min="0"
+                      max="100"
+                      value={Math.round(editPropScrollProgress)}
+                      onChange={(e) => handleEditPropScrollToPercent(Number(e.target.value))}
+                      className="w-full accent-blue-500 cursor-pointer h-1.5 bg-slate-700 rounded-lg"
+                      title="Kéo trượt nhanh bảng"
+                    />
+                    <span className="text-[10px] text-slate-400 font-mono w-8 text-right">
+                      {Math.round(editPropScrollProgress)}%
+                    </span>
+                  </div>
+
+                  <div className="text-[11px] text-slate-400 font-mono">
+                    <strong className="text-white">{editPropItems.length}</strong> vật tư
+                  </div>
+                </div>
+
+                {/* Direct Top Scroll Track */}
+                <div
+                  ref={editPropTopScrollRef}
+                  onScroll={handleEditPropTopScroll}
+                  className="overflow-x-auto overflow-y-hidden bg-slate-900 border border-slate-800 rounded-md h-2 custom-top-scrollbar"
+                >
+                  <div className="w-[700px] h-1"></div>
+                </div>
+
+                {/* Items Table with Sticky Header */}
+                <div
+                  ref={editPropTableRef}
+                  onScroll={handleEditPropTableScroll}
+                  className="bg-slate-850 border border-slate-800 rounded-xl overflow-x-auto overflow-y-auto max-h-[350px] relative"
+                >
+                  <table className="w-full text-left text-xs text-slate-300 min-w-[620px] border-separate border-spacing-0">
+                    <thead className="sticky top-0 z-10 bg-slate-900 shadow-sm border-b border-slate-800 text-[11px] font-semibold text-slate-400 uppercase">
+                      <tr>
+                        <th className="sticky top-0 z-10 bg-slate-900 py-2.5 px-3 border-b border-slate-800">
+                          Vật Tư (Mã DN_*)
+                        </th>
+                        <th className="sticky top-0 z-10 bg-slate-900 py-2.5 px-3 text-right w-28 border-b border-slate-800">
+                          Số Lượng
+                        </th>
+                        <th className="sticky top-0 z-10 bg-slate-900 py-2.5 px-3 text-right w-32 border-b border-slate-800">
+                          Đơn Giá (VNĐ)
+                        </th>
+                        <th className="sticky top-0 z-10 bg-slate-900 py-2.5 px-3 text-right w-32 border-b border-slate-800">
+                          Thành Tiền
+                        </th>
+                        <th className="sticky top-0 z-10 bg-slate-900 py-2.5 px-2 text-center w-12 border-b border-slate-800">
+                          Xóa
+                        </th>
+                      </tr>
+                    </thead>
                       <tbody className="divide-y divide-slate-800">
                         {editPropItems.map((item, idx) => {
                           const rowTotal = (Number(item.requestedQuantity) || 0) * (Number(item.unitPrice) || 0);
@@ -1614,7 +1793,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                       </tbody>
                     </table>
                   </div>
-                </div>
 
                 <div className="flex items-center justify-between px-2 pt-1 text-xs">
                   <span className="text-slate-400">Tổng giá trị dự kiến:</span>
@@ -1804,18 +1982,102 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                   </button>
                 </div>
 
-                <div className="bg-slate-850 border border-slate-800 rounded-xl overflow-hidden">
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left text-xs text-slate-300 min-w-[620px]">
-                      <thead className="bg-slate-900 border-b border-slate-800 text-[11px] font-semibold text-slate-400 uppercase">
-                        <tr>
-                          <th className="py-2.5 px-3">Vật Tư (Mã DN_*)</th>
-                          <th className="py-2.5 px-3 text-right w-28">Số Lượng</th>
-                          <th className="py-2.5 px-3 text-right w-32">Đơn Giá (VNĐ)</th>
-                          <th className="py-2.5 px-3 text-right w-32">Thành Tiền</th>
-                          <th className="py-2.5 px-2 text-center w-12">Xóa</th>
-                        </tr>
-                      </thead>
+                {/* Top Horizontal Scrollbar & Fast Nav for Edit Transaction */}
+                <div className="bg-slate-800/90 px-3 py-1.5 rounded-xl border border-slate-700/80 flex flex-wrap items-center justify-between gap-2 text-xs">
+                  <div className="flex items-center gap-1.5 text-slate-300 font-medium">
+                    <MoveHorizontal className="w-3.5 h-3.5 text-blue-400" />
+                    <span className="text-[11px]">Trượt ngang:</span>
+                    <div className="flex items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => handleEditTxScrollToPercent(0)}
+                        className="p-1 rounded bg-slate-700 hover:bg-slate-600 text-slate-300 hover:text-white"
+                        title="Về đầu"
+                      >
+                        <ChevronsLeft className="w-3 h-3" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleEditTxScrollBy(-200)}
+                        className="p-1 rounded bg-slate-700 hover:bg-slate-600 text-slate-300 hover:text-white"
+                        title="Sang trái"
+                      >
+                        <ChevronLeft className="w-3 h-3" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleEditTxScrollBy(200)}
+                        className="p-1 rounded bg-slate-700 hover:bg-slate-600 text-slate-300 hover:text-white"
+                        title="Sang phải"
+                      >
+                        <ChevronRight className="w-3 h-3" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleEditTxScrollToPercent(100)}
+                        className="p-1 rounded bg-slate-700 hover:bg-slate-600 text-slate-300 hover:text-white"
+                        title="Đến cuối"
+                      >
+                        <ChevronsRight className="w-3 h-3" />
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 flex-1 max-w-xs">
+                    <input
+                      type="range"
+                      min="0"
+                      max="100"
+                      value={Math.round(editTxScrollProgress)}
+                      onChange={(e) => handleEditTxScrollToPercent(Number(e.target.value))}
+                      className="w-full accent-blue-500 cursor-pointer h-1.5 bg-slate-700 rounded-lg"
+                      title="Kéo trượt nhanh bảng"
+                    />
+                    <span className="text-[10px] text-slate-400 font-mono w-8 text-right">
+                      {Math.round(editTxScrollProgress)}%
+                    </span>
+                  </div>
+
+                  <div className="text-[11px] text-slate-400 font-mono">
+                    <strong className="text-white">{editTxItems.length}</strong> vật tư
+                  </div>
+                </div>
+
+                {/* Direct Top Scroll Track */}
+                <div
+                  ref={editTxTopScrollRef}
+                  onScroll={handleEditTxTopScroll}
+                  className="overflow-x-auto overflow-y-hidden bg-slate-900 border border-slate-800 rounded-md h-2 custom-top-scrollbar"
+                >
+                  <div className="w-[700px] h-1"></div>
+                </div>
+
+                {/* Items Table with Sticky Header */}
+                <div
+                  ref={editTxTableRef}
+                  onScroll={handleEditTxTableScroll}
+                  className="bg-slate-850 border border-slate-800 rounded-xl overflow-x-auto overflow-y-auto max-h-[350px] relative"
+                >
+                  <table className="w-full text-left text-xs text-slate-300 min-w-[620px] border-separate border-spacing-0">
+                    <thead className="sticky top-0 z-10 bg-slate-900 shadow-sm border-b border-slate-800 text-[11px] font-semibold text-slate-400 uppercase">
+                      <tr>
+                        <th className="sticky top-0 z-10 bg-slate-900 py-2.5 px-3 border-b border-slate-800">
+                          Vật Tư (Mã DN_*)
+                        </th>
+                        <th className="sticky top-0 z-10 bg-slate-900 py-2.5 px-3 text-right w-28 border-b border-slate-800">
+                          Số Lượng
+                        </th>
+                        <th className="sticky top-0 z-10 bg-slate-900 py-2.5 px-3 text-right w-32 border-b border-slate-800">
+                          Đơn Giá (VNĐ)
+                        </th>
+                        <th className="sticky top-0 z-10 bg-slate-900 py-2.5 px-3 text-right w-32 border-b border-slate-800">
+                          Thành Tiền
+                        </th>
+                        <th className="sticky top-0 z-10 bg-slate-900 py-2.5 px-2 text-center w-12 border-b border-slate-800">
+                          Xóa
+                        </th>
+                      </tr>
+                    </thead>
                       <tbody className="divide-y divide-slate-800">
                         {editTxItems.map((item, idx) => {
                           const rowTotal = (Number(item.quantity) || 0) * (Number(item.unitPrice) || 0);
@@ -1884,7 +2146,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                       </tbody>
                     </table>
                   </div>
-                </div>
 
                 <div className="flex items-center justify-between px-2 pt-1 text-xs">
                   <div className="flex items-center gap-4 text-slate-400">

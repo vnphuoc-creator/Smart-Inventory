@@ -237,48 +237,135 @@ Bạn có thể hỏi tôi bất kỳ thông tin nào về:
   const generateLocalAnswer = (searchQuery: string, matched: CalculatedMaterialStock[]): string => {
     const qLower = searchQuery.toLowerCase().trim();
 
-    // 1. Check if user is asking about Purchase Proposals (Tờ trình)
-    const hasProposalKeyword = qLower.includes('tờ trình') || qLower.includes('tt ') || qLower.includes('dnct') || qLower.includes('mua sắm') || /\b(17|26|31|45|08|21|29|50)\b/.test(qLower);
-    
-    if (hasProposalKeyword && proposals && proposals.length > 0) {
-      // Find matching proposals by number in query
-      const matchedProposals = proposals.filter((p) => {
+    // 1. Check if user is asking about Purchase Proposals (Tờ trình) or Transactions (Phiếu)
+    const hasProposalKeyword =
+      qLower.includes('tờ trình') ||
+      qLower.includes('tt ') ||
+      qLower.includes('dnct') ||
+      qLower.includes('mua sắm') ||
+      qLower.includes('đối chiếu') ||
+      qLower.includes('phiếu') ||
+      /\b\d{1,3}\b/.test(qLower);
+
+    // Extract all numbers from query (e.g. "22" from "tờ trình 22")
+    const extractedNumbers = qLower.match(/\b\d{1,3}\b/g) || [];
+
+    if (hasProposalKeyword) {
+      // 1A. Find matching proposals
+      let matchedProposals = (proposals || []).filter((p) => {
         const pNum = p.proposalNumber.toLowerCase();
         const pTitle = p.title.toLowerCase();
-        // Extract numbers from proposalNumber (e.g., "31" from "31-DNCT/PKT")
         const numMatch = p.proposalNumber.match(/\d+/);
         const digits = numMatch ? numMatch[0] : '';
+        
+        // Exact number match if user typed a specific number
+        if (extractedNumbers.length > 0) {
+          return extractedNumbers.some((num) => num === digits || pNum.includes(num));
+        }
+
         return (
           qLower.includes(pNum) ||
-          (digits && new RegExp(`\\b${digits}\\b`).test(qLower)) ||
           pTitle.split(' ').some((w) => w.length > 3 && qLower.includes(w))
         );
       });
 
+      // 1B. If no proposal found directly in proposals, check in transactions (e.g. transactions having proposalNumber "22-DNCT/PKT")
+      if (matchedProposals.length === 0 && extractedNumbers.length > 0) {
+        const matchingTxs = transactions.filter((t) => {
+          const tProp = (t.proposalNumber || '').toLowerCase();
+          const tTitle = t.title.toLowerCase();
+          const tNotes = (t.notes || '').toLowerCase();
+          const tReason = (t.reason || '').toLowerCase();
+          return extractedNumbers.some((num) =>
+            tProp.includes(num) ||
+            tTitle.includes(num) ||
+            tNotes.includes(num) ||
+            tReason.includes(num)
+          );
+        });
+
+        if (matchingTxs.length > 0) {
+          // Synthesize proposal data from transactions
+          const sampleTx = matchingTxs[0];
+          const propNum = sampleTx.proposalNumber || `Tờ trình ${extractedNumbers[0]}-DNCT/PKT`;
+          
+          // Aggregate items from all matching transactions
+          const synthItemsMap = new Map<string, { code: string; name: string; unit: string; qty: number; price: number }>();
+          matchingTxs.forEach((tx) => {
+            tx.items.forEach((it) => {
+              const existing = synthItemsMap.get(it.materialCode);
+              if (existing) {
+                existing.qty += it.quantity;
+              } else {
+                synthItemsMap.set(it.materialCode, {
+                  code: it.materialCode,
+                  name: it.materialName,
+                  unit: it.unit,
+                  qty: it.quantity,
+                  price: it.unitPrice,
+                });
+              }
+            });
+          });
+
+          const synthProposal: PurchaseProposal = {
+            id: `synth-${propNum}`,
+            proposalNumber: propNum,
+            title: sampleTx.title || sampleTx.reason || `Tờ trình đề xuất mua sắm ${propNum}`,
+            date: sampleTx.date,
+            createdAt: sampleTx.createdAt || sampleTx.date,
+            creatorName: sampleTx.creatorName,
+            creatorEmail: sampleTx.creatorEmail,
+            department: 'Đội Điện Nước Công Trình',
+            status: 'COMPLETED',
+            items: Array.from(synthItemsMap.values()).map((it) => ({
+              materialCode: it.code,
+              materialName: it.name,
+              unit: it.unit,
+              requestedQuantity: it.qty,
+              unitPrice: it.price,
+            })),
+          };
+
+          matchedProposals = [synthProposal];
+        }
+      }
+
       if (matchedProposals.length > 0) {
         const proposalReports = matchedProposals.map((prop) => {
           // Calculate import progress for this proposal from transactions
+          const propNumDigits = (prop.proposalNumber.match(/\d+/) || [''])[0];
           const relatedImportTxs = transactions.filter(
             (t) =>
               t.type === 'IMPORT' &&
               t.status === 'APPROVED' &&
               (t.proposalNumber === prop.proposalNumber ||
+                (propNumDigits && t.proposalNumber?.includes(propNumDigits)) ||
                 t.notes?.includes(prop.proposalNumber) ||
                 t.title.includes(prop.proposalNumber))
           );
 
-          const itemReports = prop.items.map((item) => {
+          const itemReports = prop.items.map((item, idx) => {
             const importedQty = relatedImportTxs.reduce((sum, tx) => {
               const txItem = tx.items.find((i) => i.materialCode === item.materialCode);
               return sum + (txItem ? txItem.quantity : 0);
             }, 0);
 
+            const totalItemAmount = (Number(item.requestedQuantity) || 0) * (Number(item.unitPrice) || 0);
             const remaining = Math.max(0, item.requestedQuantity - importedQty);
-            const statusIcon = remaining === 0 ? '✅ Đã nhập đủ' : importedQty > 0 ? `⚠️ Đã nhập ${importedQty}/${item.requestedQuantity}` : '⏳ Chưa nhập';
+            const statusIcon = remaining === 0 || prop.status === 'COMPLETED'
+              ? '✅ Đã nhập đủ'
+              : importedQty > 0
+              ? `⚠️ Đã nhập ${importedQty}/${item.requestedQuantity}`
+              : '⏳ Chưa nhập';
 
-            return `- **\`${item.materialCode}\`** — **${item.materialName}**\n  - Đề xuất: **${item.requestedQuantity} ${item.unit}** | Đã nhập: **${importedQty} ${item.unit}** | Còn thiếu: **${remaining} ${item.unit}** [${statusIcon}]`;
+            return `${idx + 1}. **\`${item.materialCode}\`** — **${item.materialName}**\n   - Đề xuất: **${item.requestedQuantity} ${item.unit}** | Đơn giá: **${formatVND(item.unitPrice)}** | Thành tiền: **${formatVND(totalItemAmount)}**\n   - Tiến độ thực tế: **${importedQty > 0 ? importedQty : item.requestedQuantity} ${item.unit}** [${statusIcon}]`;
           });
 
+          const totalProposalAmount = prop.items.reduce(
+            (sum, item) => sum + (Number(item.requestedQuantity) || 0) * (Number(item.unitPrice) || 0),
+            0
+          );
           const totalRequested = prop.items.reduce((s, i) => s + i.requestedQuantity, 0);
           const totalImported = prop.items.reduce((sum, item) => {
             const imported = relatedImportTxs.reduce((s, tx) => {
@@ -288,7 +375,7 @@ Bạn có thể hỏi tôi bất kỳ thông tin nào về:
             return sum + Math.min(item.requestedQuantity, imported);
           }, 0);
 
-          const isFullyDone = totalImported >= totalRequested && totalRequested > 0;
+          const isFullyDone = prop.status === 'COMPLETED' || (totalImported >= totalRequested && totalRequested > 0);
           const statusBadge = isFullyDone
             ? '✅ **ĐÃ HOÀN TẤT NHẬP KHO (100%)**'
             : totalImported > 0
@@ -296,15 +383,16 @@ Bạn có thể hỏi tôi bất kỳ thông tin nào về:
             : '⏳ **CHƯA NHẬP KHO (0%)**';
 
           return `### 📑 Tiến Độ Đối Chiếu: Tờ Trình \`${prop.proposalNumber}\`
-- **Nội dung**: **${prop.title}**
-- **Ngày lập**: ${prop.date} | Người tạo: **${prop.creatorName}** (${prop.department})
-- **Trạng thái phê duyệt**: **${prop.status === 'COMPLETED' ? 'Đã hoàn thành' : prop.status === 'APPROVED' ? 'Lãnh đạo đã phê duyệt' : 'Chờ phê duyệt'}**
+- **Nội dung / Lý do**: **${prop.title}**
+- **Ngày lập**: ${prop.date} | Người tạo: **${prop.creatorName}** (${prop.department || 'Đội Điện Nước Công Trình'})
+- **Trạng thái phê duyệt**: **${prop.status === 'COMPLETED' ? 'Đã hoàn thành nhập kho' : prop.status === 'APPROVED' ? 'Lãnh đạo đã phê duyệt' : 'Chờ phê duyệt'}**
+- **Tổng số mặt hàng**: **${prop.items.length} danh mục vật tư** (Tổng giá trị dự toán: **${formatVND(totalProposalAmount)}**)
 - **Tiến độ nhập hàng thực tế**: ${statusBadge}
 
 #### 📦 Chi tiết từng danh mục vật tư trong Tờ trình:
 ${itemReports.join('\n\n')}
 
-💡 *Gợi ý*: Bấm vào tab **Xuất - Nhập Kho** > chọn **Lập Phiếu Nhập Theo Tờ Trình** để tạo phiếu nhập kho tự động với số lượng còn thiếu.`;
+💡 *Gợi ý*: Bấm vào tab **Xuất - Nhập Kho** > chọn **Lập Phiếu Nhập Theo Tờ Trình** hoặc xem trong mục **Đối Chiếu Tờ Trình** để quản lý chi tiết.`;
         });
 
         return proposalReports.join('\n\n---\n\n');
@@ -439,18 +527,37 @@ Tôi đã tiếp nhận truy vấn của bạn: **"${searchQuery}"**.
             status: s.stockStatus,
           })),
           materialsSummary: JSON.stringify(prioritizedMaterials),
-          transactionsSummary: `Tổng số phiếu: ${transactions.length}. Phiếu chờ duyệt: ${
-            transactions.filter((t) => t.status === 'PENDING').length
-          }`,
+          transactionsSummary: JSON.stringify(
+            transactions.map((t) => ({
+              code: t.code,
+              type: t.type,
+              proposalNumber: t.proposalNumber,
+              title: t.title,
+              date: t.date,
+              creatorName: t.creatorName,
+              status: t.status,
+              items: t.items.map((i) => ({
+                code: i.materialCode,
+                name: i.materialName,
+                qty: i.quantity,
+                unit: i.unit,
+                unitPrice: i.unitPrice,
+              })),
+            }))
+          ),
           proposalsSummary: JSON.stringify(
             proposals.map((p) => ({
               number: p.proposalNumber,
               title: p.title,
+              date: p.date,
+              creatorName: p.creatorName,
               status: p.status,
               items: p.items.map((i) => ({
                 code: i.materialCode,
                 name: i.materialName,
+                unit: i.unit,
                 requested: i.requestedQuantity,
+                unitPrice: i.unitPrice,
               })),
             }))
           ),
