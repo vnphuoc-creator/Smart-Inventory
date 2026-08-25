@@ -68,7 +68,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       ? [
           {
             id: 'error_transactions',
-            label: 'Quản Lý Chứng Từ Sai',
+            label: 'Sửa & Xóa Chứng Từ Sai',
             icon: FileX2,
             badge: 'Admin',
             badgeColor: 'bg-rose-600/30 text-rose-300 border border-rose-500/40',

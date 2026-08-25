@@ -6,6 +6,7 @@ import { MaterialCatalogueView } from './components/MaterialCatalogueView';
 import { TransactionManagementView } from './components/TransactionManagementView';
 import { StockLedgerView } from './components/StockLedgerView';
 import { UserManagementView } from './components/UserManagementView';
+import { DocumentManagementView } from './components/DocumentManagementView';
 import { SettingsView } from './components/SettingsView';
 import { AiAssistantView } from './components/AiAssistantView';
 import { SmartSearchBar } from './components/SmartSearchBar';
@@ -65,6 +66,7 @@ export function App() {
   }, [users]);
 
   const isMasterAdmin = currentUser?.email?.toLowerCase().trim() === 'vn.phuoc235@gmail.com';
+  const isAdmin = currentUser?.role === 'ADMIN';
 
   const [materials, setMaterials] = useState<Material[]>(() => {
     const saved = localStorage.getItem('smart_materials_v12');
@@ -535,6 +537,38 @@ export function App() {
               transactions={transactions}
               initialMaterialCode={preselectedMaterialCode}
             />
+          )}
+
+          {activeTab === 'error_transactions' && (
+            isAdmin ? (
+              <DocumentManagementView
+                currentUser={currentUser}
+                allUsers={users}
+                materials={materials}
+                transactions={transactions}
+                proposals={proposals}
+                onUpdateTransaction={handleUpdateTransaction}
+                onDeleteTransaction={handleDeleteTransaction}
+                onResetDemoData={handleResetDemoData}
+                onClearAllTransactions={handleClearAllTransactionsAndProposals}
+              />
+            ) : (
+              <div className="bg-slate-900 border border-red-500/30 rounded-2xl p-8 text-center max-w-lg mx-auto my-12">
+                <div className="w-16 h-16 rounded-full bg-red-500/10 text-red-400 flex items-center justify-center mx-auto mb-4 border border-red-500/20">
+                  <ShieldAlert className="w-8 h-8" />
+                </div>
+                <h3 className="text-xl font-bold text-white mb-2">Quyền Truy Cập Bị Giới Hạn</h3>
+                <p className="text-slate-400 text-sm mb-6 leading-relaxed">
+                  Mục Sửa &amp; Xóa Chứng Từ Sai chỉ dành riêng cho tài khoản Quản trị viên (Admin).
+                </p>
+                <button
+                  onClick={() => setActiveTab('dashboard')}
+                  className="px-6 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-sm font-semibold transition shadow-lg shadow-blue-600/30"
+                >
+                  Quay lại Bảng Điều Khiển
+                </button>
+              </div>
+            )
           )}
 
           {activeTab === 'users' && (
