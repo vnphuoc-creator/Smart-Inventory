@@ -119,23 +119,19 @@ export const Navbar: React.FC<NavbarProps> = ({
             </button>
 
             {/* Mobile Logo display */}
-            <div className="lg:hidden flex items-center gap-1">
-              <button
-                type="button"
-                onClick={() => onTabChange('dashboard')}
+            <div className="lg:hidden flex items-center">
+              <a
+                href={window.location.href}
+                onClick={(e) => {
+                  if (e.button === 0 && !e.ctrlKey && !e.metaKey) {
+                    e.preventDefault();
+                    onTabChange('dashboard');
+                  }
+                }}
                 title="Bấm để trở về Trang Chủ (Bảng Điều Khiển)"
                 className="flex items-center cursor-pointer hover:opacity-90 transition-opacity focus:outline-none"
               >
                 <AHTLogo className="h-7" showPlane={false} allowUpload={false} />
-              </button>
-              <a
-                href={window.location.href}
-                target="_blank"
-                rel="noopener noreferrer"
-                title="Mở hệ thống trong Tab mới"
-                className="p-1 text-slate-400 hover:text-blue-400 rounded-lg hover:bg-slate-800 transition"
-              >
-                <ExternalLink className="w-3.5 h-3.5" />
               </a>
             </div>
 
@@ -278,6 +274,18 @@ export const Navbar: React.FC<NavbarProps> = ({
                         <span>Đổi mật khẩu tài khoản</span>
                       </button>
                     )}
+
+                    {/* Open in New Tab (Cleanly hidden in menu) */}
+                    <a
+                      href={window.location.href}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={() => setShowUserDropdown(false)}
+                      className="w-full text-left px-3 py-2.5 rounded-xl text-xs text-slate-200 hover:bg-slate-800 hover:text-white flex items-center gap-2.5 transition-colors font-medium"
+                    >
+                      <ExternalLink className="w-4 h-4 text-sky-400" />
+                      <span>Mở giao diện trong Tab mới</span>
+                    </a>
 
                     {/* Quick Theme toggle in menu */}
                     {onToggleTheme && (

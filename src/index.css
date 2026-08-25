@@ -12,6 +12,35 @@
   }
 }
 
+/* Custom Visible & Easy-to-Drag Scrollbars */
+::-webkit-scrollbar {
+  height: 10px;
+  width: 10px;
+}
+::-webkit-scrollbar-track {
+  background: #0f172a;
+  border-radius: 6px;
+}
+::-webkit-scrollbar-thumb {
+  background: #334155;
+  border-radius: 6px;
+  border: 2px solid #0f172a;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #3b82f6;
+}
+
+.light-theme ::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+.light-theme ::-webkit-scrollbar-thumb {
+  background: #94a3b8;
+  border: 2px solid #f1f5f9;
+}
+.light-theme ::-webkit-scrollbar-thumb:hover {
+  background: #2563eb;
+}
+
 /* ========================================================================= */
 /* LIGHT THEME STYLING OVERRIDES (MODERN ENTERPRISE AESTHETICS)              */
 /* ========================================================================= */

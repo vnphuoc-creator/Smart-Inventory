@@ -112,28 +112,20 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {/* Top Brand / Logo Header */}
         <div className="p-4 sm:p-5 border-b border-slate-800 flex flex-col gap-3 bg-slate-950/60">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-1.5">
-              <button
-                type="button"
-                onClick={() => {
+            <a
+              href={window.location.href}
+              onClick={(e) => {
+                if (e.button === 0 && !e.ctrlKey && !e.metaKey) {
+                  e.preventDefault();
                   onTabChange('dashboard');
                   if (isOpenMobile) onToggleMobile();
-                }}
-                title="Bấm để trở về Trang Chủ (Bảng Điều Khiển)"
-                className="flex items-center cursor-pointer hover:opacity-90 transition-opacity focus:outline-none"
-              >
-                <AHTLogo className="h-9" allowUpload={false} />
-              </button>
-              <a
-                href={window.location.href}
-                target="_blank"
-                rel="noopener noreferrer"
-                title="Mở hệ thống trong Tab mới"
-                className="p-1.5 text-slate-400 hover:text-blue-400 rounded-lg hover:bg-slate-800 transition"
-              >
-                <ExternalLink className="w-3.5 h-3.5" />
-              </a>
-            </div>
+                }
+              }}
+              title="Bấm để trở về Trang Chủ (Bảng Điều Khiển)"
+              className="flex items-center cursor-pointer hover:opacity-90 transition-opacity focus:outline-none"
+            >
+              <AHTLogo className="h-9" allowUpload={false} />
+            </a>
             <button
               onClick={onToggleMobile}
               className="lg:hidden text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800"

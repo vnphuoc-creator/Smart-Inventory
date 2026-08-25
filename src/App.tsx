@@ -232,6 +232,20 @@ export function App() {
     showToast(`Đã lưu thành công vật tư "${materialToSave.code}" vào danh mục.`);
   };
 
+  // Handler: Update / Edit Transaction (Admin)
+  const handleUpdateTransaction = (updatedTx: InventoryTransaction) => {
+    setTransactions((prev) => {
+      const idx = prev.findIndex((t) => t.id === updatedTx.id);
+      if (idx >= 0) {
+        const next = [...prev];
+        next[idx] = updatedTx;
+        return next;
+      }
+      return [updatedTx, ...prev];
+    });
+    showToast(`Đã cập nhật chỉnh sửa phiếu "${updatedTx.code}". Tồn kho đã được tính toán lại!`);
+  };
+
   // Handler: Delete Material
   const handleDeleteMaterial = (materialId: string) => {
     const mat = materials.find((m) => m.id === materialId);
@@ -537,6 +551,7 @@ export function App() {
                 transactions={transactions}
                 proposals={proposals}
                 onUpdateProposal={handleUpdateProposal}
+                onUpdateTransaction={handleUpdateTransaction}
                 onDeleteProposal={handleDeleteProposal}
                 onDeleteTransaction={handleDeleteTransaction}
                 onResetDemoData={handleResetDemoData}

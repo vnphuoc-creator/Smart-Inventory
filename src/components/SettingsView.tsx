@@ -24,7 +24,7 @@ import {
   Image as ImageIcon,
 } from 'lucide-react';
 import { STANDARD_UNITS } from '../data/seedData';
-import { User, Material, InventoryTransaction, PurchaseProposal, ProposalItem } from '../types';
+import { User, Material, InventoryTransaction, PurchaseProposal, ProposalItem, TransactionItem, TransactionType, TransactionStatus } from '../types';
 import { formatVND, formatNumber, formatDisplayDate } from '../utils/inventoryEngine';
 import { AHTLogo } from './AHTLogo';
 import { ExcelStockImportModal } from './ExcelStockImportModal';
@@ -39,6 +39,7 @@ interface SettingsViewProps {
   onUpdateMaterials?: (materials: Material[]) => void;
   onUpdateUsers?: (users: User[]) => void;
   onUpdateProposal?: (proposal: PurchaseProposal) => void;
+  onUpdateTransaction?: (transaction: InventoryTransaction) => void;
   onDeleteProposal?: (proposalId: string) => void;
   onDeleteTransaction?: (txId: string) => void;
   onResetDemoData?: () => void;
@@ -54,6 +55,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   onUpdateMaterials,
   onUpdateUsers,
   onUpdateProposal,
+  onUpdateTransaction,
   onDeleteProposal,
   onDeleteTransaction,
   onResetDemoData,
@@ -233,6 +235,134 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     const updated = [...editPropItems];
     updated[index] = { ...updated[index], [field]: value };
     setEditPropItems(updated);
+  };
+
+  // Transaction Edit Modal State (Admin)
+  const [editingTx, setEditingTx] = useState<InventoryTransaction | null>(null);
+  const [editTxCode, setEditTxCode] = useState('');
+  const [editTxType, setEditTxType] = useState<TransactionType>('IMPORT');
+  const [editTxProposalNumber, setEditTxProposalNumber] = useState('');
+  const [editTxTitle, setEditTxTitle] = useState('');
+  const [editTxDate, setEditTxDate] = useState('');
+  const [editTxCreatorName, setEditTxCreatorName] = useState('');
+  const [editTxStatus, setEditTxStatus] = useState<TransactionStatus>('APPROVED');
+  const [editTxReason, setEditTxReason] = useState('');
+  const [editTxNotes, setEditTxNotes] = useState('');
+  const [editTxItems, setEditTxItems] = useState<TransactionItem[]>([]);
+
+  const handleOpenEditTransaction = (tx: InventoryTransaction) => {
+    setEditingTx(tx);
+    setEditTxCode(tx.code);
+    setEditTxType(tx.type);
+    setEditTxProposalNumber(tx.proposalNumber || '');
+    setEditTxTitle(tx.title);
+    setEditTxDate(tx.date);
+    setEditTxCreatorName(tx.creatorName || currentUser.fullName);
+    setEditTxStatus(tx.status);
+    setEditTxReason(tx.reason || '');
+    setEditTxNotes(tx.notes || '');
+    setEditTxItems(
+      tx.items && tx.items.length > 0
+        ? tx.items.map((i) => ({ ...i }))
+        : [
+            {
+              materialCode: materials[0]?.code || 'DN_CC_00ACB_01',
+              materialName: materials[0]?.name || 'Vật tư',
+              unit: materials[0]?.unit || 'Cái',
+              quantity: 1,
+              unitPrice: materials[0]?.unitPrice || 0,
+              totalAmount: materials[0]?.unitPrice || 0,
+              currentStockAtCreation: 0,
+            },
+          ]
+    );
+  };
+
+  const handleSaveEditedTransaction = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingTx) return;
+    if (!editTxCode.trim()) {
+      alert('Vui lòng nhập mã phiếu (Ví dụ: PN-... hoặc PX-...)');
+      return;
+    }
+    if (!editTxTitle.trim()) {
+      alert('Vui lòng nhập tên / diễn giải phiếu');
+      return;
+    }
+    if (editTxItems.length === 0) {
+      alert('Phiếu phải có ít nhất 1 mặt hàng vật tư');
+      return;
+    }
+
+    const processedItems: TransactionItem[] = editTxItems.map((item) => {
+      const q = Math.max(1, Number(item.quantity) || 1);
+      const p = Math.max(0, Number(item.unitPrice) || 0);
+      return {
+        ...item,
+        quantity: q,
+        unitPrice: p,
+        totalAmount: q * p,
+        currentStockAtCreation: item.currentStockAtCreation || 0,
+      };
+    });
+
+    const totalQuantity = processedItems.reduce((sum, item) => sum + item.quantity, 0);
+    const totalAmount = processedItems.reduce((sum, item) => sum + item.totalAmount, 0);
+
+    const updatedTx: InventoryTransaction = {
+      ...editingTx,
+      code: editTxCode.trim(),
+      type: editTxType,
+      proposalNumber: editTxProposalNumber.trim() || undefined,
+      title: editTxTitle.trim(),
+      date: editTxDate,
+      creatorName: editTxCreatorName.trim(),
+      status: editTxStatus,
+      reason: editTxReason.trim(),
+      notes: editTxNotes.trim(),
+      items: processedItems,
+      totalQuantity,
+      totalAmount,
+    };
+
+    if (onUpdateTransaction) {
+      onUpdateTransaction(updatedTx);
+    }
+    setEditingTx(null);
+    setUnitToast(`Đã cập nhật chỉnh sửa phiếu "${updatedTx.code}" thành công!`);
+    setTimeout(() => setUnitToast(null), 3500);
+  };
+
+  const handleAddEditTxItemRow = () => {
+    setEditTxItems([
+      ...editTxItems,
+      {
+        materialCode: materials[0]?.code || 'DN_CC_00ACB_01',
+        materialName: materials[0]?.name || 'Vật tư mới',
+        unit: materials[0]?.unit || 'Cái',
+        quantity: 1,
+        unitPrice: materials[0]?.unitPrice || 0,
+        totalAmount: materials[0]?.unitPrice || 0,
+        currentStockAtCreation: 0,
+      },
+    ]);
+  };
+
+  const handleRemoveEditTxItemRow = (index: number) => {
+    if (editTxItems.length <= 1) return;
+    setEditTxItems(editTxItems.filter((_, idx) => idx !== index));
+  };
+
+  const handleEditTxItemChange = (index: number, field: keyof TransactionItem, value: any) => {
+    const updated = [...editTxItems];
+    const current = { ...updated[index], [field]: value };
+    if (field === 'quantity' || field === 'unitPrice') {
+      const q = field === 'quantity' ? Number(value) || 0 : current.quantity;
+      const p = field === 'unitPrice' ? Number(value) || 0 : current.unitPrice;
+      current.totalAmount = q * p;
+    }
+    updated[index] = current;
+    setEditTxItems(updated);
   };
 
   // Security guard: Admin only
@@ -996,14 +1126,26 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                             </span>
                           </td>
                           <td className="py-3 px-3 text-center">
-                            <button
-                              type="button"
-                              onClick={() => setTxToDelete(tx)}
-                              className="px-2.5 py-1 rounded-lg bg-rose-900/30 hover:bg-rose-800/60 text-rose-300 border border-rose-500/30 text-[11px] font-bold inline-flex items-center gap-1 transition"
-                            >
-                              <Trash2 className="w-3 h-3 text-rose-400" />
-                              <span>Xóa</span>
-                            </button>
+                            <div className="flex items-center justify-center gap-1.5">
+                              <button
+                                type="button"
+                                onClick={() => handleOpenEditTransaction(tx)}
+                                className="px-2.5 py-1 rounded-lg bg-blue-900/30 hover:bg-blue-800/60 text-blue-300 border border-blue-500/30 text-[11px] font-bold inline-flex items-center gap-1 transition"
+                                title="Chỉnh sửa thông tin phiếu nhập / xuất kho"
+                              >
+                                <Edit3 className="w-3 h-3 text-blue-400" />
+                                <span>Sửa</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setTxToDelete(tx)}
+                                className="px-2.5 py-1 rounded-lg bg-rose-900/30 hover:bg-rose-800/60 text-rose-300 border border-rose-500/30 text-[11px] font-bold inline-flex items-center gap-1 transition"
+                                title="Xóa phiếu khỏi hệ thống"
+                              >
+                                <Trash2 className="w-3 h-3 text-rose-400" />
+                                <span>Xóa</span>
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       ))}
@@ -1502,6 +1644,281 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 >
                   <Save className="w-4 h-4" />
                   <span>Lưu Thay Đổi Tờ Trình</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Edit Transaction Modal (Admin) */}
+      {editingTx && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in overflow-y-auto">
+          <div className="w-full max-w-3xl max-h-[90vh] bg-slate-900 border border-slate-700 rounded-2xl p-6 shadow-2xl space-y-5 overflow-y-auto my-auto">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3.5">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-blue-500/10 border border-blue-500/30 flex items-center justify-center text-blue-400">
+                  <Edit3 className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-white">Chỉnh Sửa Phiếu Nhập / Xuất Kho</h3>
+                  <p className="text-xs text-slate-400">
+                    Sửa đổi mã chứng từ, phân loại, số tờ trình, số lượng và danh mục vật tư xuất/nhập
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEditingTx(null)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveEditedTransaction} className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1">
+                    Mã Chứng Từ <span className="text-rose-400">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={editTxCode}
+                    onChange={(e) => setEditTxCode(e.target.value)}
+                    placeholder="PN-260825-001 hoặc PX-260825-001"
+                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white font-mono focus:outline-none focus:border-blue-500 font-bold"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1">
+                    Loại Giao Dịch <span className="text-rose-400">*</span>
+                  </label>
+                  <select
+                    value={editTxType}
+                    onChange={(e) => setEditTxType(e.target.value as 'IMPORT' | 'EXPORT')}
+                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-500 font-semibold"
+                  >
+                    <option value="IMPORT">NHẬP KHO (IMPORT)</option>
+                    <option value="EXPORT">XUẤT KHO (EXPORT)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1">
+                    Số Tờ Trình Đề Xuất
+                  </label>
+                  <input
+                    type="text"
+                    value={editTxProposalNumber}
+                    onChange={(e) => setEditTxProposalNumber(e.target.value)}
+                    placeholder="Ví dụ: 29-DNCT/PKT"
+                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white font-mono focus:outline-none focus:border-blue-500"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">
+                  Tiêu Đề / Diễn Giải Phiếu <span className="text-rose-400">*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={editTxTitle}
+                  onChange={(e) => setEditTxTitle(e.target.value)}
+                  placeholder="Ví dụ: Nhập kho vật tư máy cắt ACB theo tờ trình 29..."
+                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-500"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1">
+                    Ngày Giao Dịch <span className="text-rose-400">*</span>
+                  </label>
+                  <input
+                    type="date"
+                    required
+                    value={editTxDate}
+                    onChange={(e) => setEditTxDate(e.target.value)}
+                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1">
+                    Người Lập Phiếu
+                  </label>
+                  <input
+                    type="text"
+                    value={editTxCreatorName}
+                    onChange={(e) => setEditTxCreatorName(e.target.value)}
+                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1">
+                    Trạng Thái Phê Duyệt
+                  </label>
+                  <select
+                    value={editTxStatus}
+                    onChange={(e) => setEditTxStatus(e.target.value as any)}
+                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-500"
+                  >
+                    <option value="APPROVED">Đã Duyệt (APPROVED)</option>
+                    <option value="PENDING">Chờ Duyệt (PENDING)</option>
+                    <option value="REJECTED">Từ Chối (REJECTED)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">
+                  Ghi Chú / Lý Do Chi Tiết
+                </label>
+                <input
+                  type="text"
+                  value={editTxNotes}
+                  onChange={(e) => setEditTxNotes(e.target.value)}
+                  placeholder="Ghi chú thêm về đơn vị nhận, địa điểm thi công, vị trí..."
+                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-500"
+                />
+              </div>
+
+              {/* Items List in Transaction */}
+              <div className="space-y-2 pt-2 border-t border-slate-800">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-slate-200 uppercase tracking-wider">
+                    Danh Sách Vật Tư Xuất / Nhập ({editTxItems.length} mục)
+                  </span>
+                  <button
+                    type="button"
+                    onClick={handleAddEditTxItemRow}
+                    className="bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 border border-blue-500/40 px-2.5 py-1 rounded-lg text-xs font-semibold flex items-center gap-1 transition"
+                  >
+                    <Plus className="w-3.5 h-3.5" /> + Thêm vật tư
+                  </button>
+                </div>
+
+                <div className="bg-slate-850 border border-slate-800 rounded-xl overflow-hidden">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-xs text-slate-300 min-w-[620px]">
+                      <thead className="bg-slate-900 border-b border-slate-800 text-[11px] font-semibold text-slate-400 uppercase">
+                        <tr>
+                          <th className="py-2.5 px-3">Vật Tư (Mã DN_*)</th>
+                          <th className="py-2.5 px-3 text-right w-28">Số Lượng</th>
+                          <th className="py-2.5 px-3 text-right w-32">Đơn Giá (VNĐ)</th>
+                          <th className="py-2.5 px-3 text-right w-32">Thành Tiền</th>
+                          <th className="py-2.5 px-2 text-center w-12">Xóa</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-800">
+                        {editTxItems.map((item, idx) => {
+                          const rowTotal = (Number(item.quantity) || 0) * (Number(item.unitPrice) || 0);
+                          return (
+                            <tr key={idx} className="hover:bg-slate-800/40">
+                              <td className="py-2.5 px-3 min-w-[260px]">
+                                <SearchableMaterialSelect
+                                  value={item.materialCode}
+                                  materials={materials}
+                                  onChange={(newCode, selectedMat) => {
+                                    const updated = [...editTxItems];
+                                    updated[idx] = {
+                                      ...updated[idx],
+                                      materialCode: newCode,
+                                      materialName: selectedMat ? selectedMat.name : updated[idx].materialName,
+                                      unit: selectedMat ? selectedMat.unit : updated[idx].unit,
+                                      unitPrice: selectedMat ? selectedMat.unitPrice : updated[idx].unitPrice,
+                                      totalAmount: (Number(updated[idx].quantity) || 1) * (selectedMat ? selectedMat.unitPrice : updated[idx].unitPrice),
+                                    };
+                                    setEditTxItems(updated);
+                                  }}
+                                  placeholder="Chọn hoặc tìm vật tư..."
+                                />
+                              </td>
+                              <td className="py-2.5 px-3 text-right">
+                                <input
+                                  type="number"
+                                  min="1"
+                                  value={item.quantity}
+                                  onChange={(e) =>
+                                    handleEditTxItemChange(idx, 'quantity', Math.max(1, parseInt(e.target.value) || 1))
+                                  }
+                                  className="w-20 bg-slate-800 border border-slate-700 rounded-lg px-2 py-1 text-right font-mono text-white focus:outline-none focus:border-blue-500 text-xs"
+                                />
+                              </td>
+                              <td className="py-2.5 px-3 text-right">
+                                <input
+                                  type="number"
+                                  min="0"
+                                  step="any"
+                                  value={item.unitPrice || 0}
+                                  onChange={(e) =>
+                                    handleEditTxItemChange(idx, 'unitPrice', Math.max(0, parseInt(e.target.value) || 0))
+                                  }
+                                  className="w-28 bg-slate-800 border border-slate-700 rounded-lg px-2 py-1 text-right font-mono text-white focus:outline-none focus:border-blue-500 text-xs"
+                                />
+                              </td>
+                              <td className="py-2.5 px-3 text-right font-mono text-emerald-400 font-semibold text-xs">
+                                {formatVND(rowTotal)}
+                              </td>
+                              <td className="py-2.5 px-2 text-center">
+                                {editTxItems.length > 1 && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleRemoveEditTxItemRow(idx)}
+                                    className="p-1 rounded text-slate-400 hover:text-rose-400 transition"
+                                    title="Xóa dòng này"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between px-2 pt-1 text-xs">
+                  <div className="flex items-center gap-4 text-slate-400">
+                    <span>Tổng số lượng: <strong className="text-white font-mono">{formatNumber(editTxItems.reduce((s, i) => s + (Number(i.quantity) || 0), 0))}</strong></span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-slate-400">Tổng giá trị phiếu:</span>
+                    <span className="font-mono text-sm font-bold text-emerald-400">
+                      {formatVND(
+                        editTxItems.reduce(
+                          (sum, item) => sum + (Number(item.quantity) || 0) * (Number(item.unitPrice) || 0),
+                          0
+                        )
+                      )}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Modal Footer */}
+              <div className="pt-4 border-t border-slate-800 flex items-center justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => setEditingTx(null)}
+                  className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold transition"
+                >
+                  Hủy bỏ
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold shadow-md shadow-blue-600/30 flex items-center gap-1.5 transition"
+                >
+                  <Save className="w-4 h-4" />
+                  <span>Lưu Thay Đổi Phiếu</span>
                 </button>
               </div>
             </form>
