@@ -11,6 +11,7 @@ import {
   Sun,
   Moon,
   CheckCircle2,
+  ExternalLink,
 } from 'lucide-react';
 import { User } from '../types';
 import { AHTLogo } from './AHTLogo';
@@ -118,8 +119,24 @@ export const Navbar: React.FC<NavbarProps> = ({
             </button>
 
             {/* Mobile Logo display */}
-            <div className="lg:hidden flex items-center">
-              <AHTLogo className="h-7" showPlane={false} allowUpload={false} />
+            <div className="lg:hidden flex items-center gap-1">
+              <button
+                type="button"
+                onClick={() => onTabChange('dashboard')}
+                title="Bấm để trở về Trang Chủ (Bảng Điều Khiển)"
+                className="flex items-center cursor-pointer hover:opacity-90 transition-opacity focus:outline-none"
+              >
+                <AHTLogo className="h-7" showPlane={false} allowUpload={false} />
+              </button>
+              <a
+                href={window.location.href}
+                target="_blank"
+                rel="noopener noreferrer"
+                title="Mở hệ thống trong Tab mới"
+                className="p-1 text-slate-400 hover:text-blue-400 rounded-lg hover:bg-slate-800 transition"
+              >
+                <ExternalLink className="w-3.5 h-3.5" />
+              </a>
             </div>
 
             <div className="hidden sm:block truncate">
@@ -128,7 +145,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               </h1>
               <p className="text-[11px] text-blue-300 font-medium truncate flex items-center gap-1.5">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse inline-block"></span>
-                Vận hành kỹ thuật 24/7 &bull; Quản lý xuất nhập tồn
+                Quản lý Xuất - Nhập - Tồn Vật Tư Kỹ Thuật
               </p>
             </div>
           </div>

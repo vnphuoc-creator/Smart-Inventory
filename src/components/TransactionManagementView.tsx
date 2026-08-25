@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import mammoth from 'mammoth';
 import {
   ArrowRightLeft,
@@ -89,6 +89,11 @@ export const TransactionManagementView: React.FC<TransactionManagementViewProps>
   const [viewingDoc, setViewingDoc] = useState<{ url: string; html?: string; name?: string } | null>(null);
   const [docZoom, setDocZoom] = useState<number>(100);
   const [txToDelete, setTxToDelete] = useState<InventoryTransaction | null>(null);
+
+  // Top & Bottom Horizontal Scroll Synchronization
+  const topScrollRef = useRef<HTMLDivElement>(null);
+  const bottomScrollRef = useRef<HTMLDivElement>(null);
+  const [tableContentWidth, setTableContentWidth] = useState<number>(1200);
 
   // Approval Modal state
   const [approvingTx, setApprovingTx] = useState<InventoryTransaction | null>(null);
@@ -552,9 +557,7 @@ export const TransactionManagementView: React.FC<TransactionManagementViewProps>
     const isAutoApprove = currentUser.role === 'ADMIN';
     const dateNum = new Date().toISOString().slice(2, 10).replace(/-/g, '');
     const prefix = formType === 'IMPORT' ? 'PN' : 'PX';
-    const code = isAutoApprove
-      ? `${prefix}-${dateNum}-${Math.floor(100 + Math.random() * 900)}`
-      : `DN-${dateNum}-${Math.floor(100 + Math.random() * 900)}`;
+    const code = `${prefix}-${dateNum}-${Math.floor(100 + Math.random() * 900)}`;
 
     const newTx: InventoryTransaction = {
       id: `tx-${Date.now()}`,
@@ -639,6 +642,46 @@ export const TransactionManagementView: React.FC<TransactionManagementViewProps>
       return true;
     });
   }, [transactions, activeTab, searchQuery]);
+
+  // Synchronize scroll width between top and bottom horizontal scrollbars
+  useEffect(() => {
+    const updateWidth = () => {
+      if (bottomScrollRef.current) {
+        setTableContentWidth(bottomScrollRef.current.scrollWidth);
+      }
+    };
+    updateWidth();
+    const timer = setTimeout(updateWidth, 100);
+    window.addEventListener('resize', updateWidth);
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener('resize', updateWidth);
+    };
+  }, [filteredTransactions, activeTab]);
+
+  const handleTopScroll = () => {
+    if (topScrollRef.current && bottomScrollRef.current) {
+      bottomScrollRef.current.scrollLeft = topScrollRef.current.scrollLeft;
+    }
+  };
+
+  const handleBottomScroll = () => {
+    if (topScrollRef.current && bottomScrollRef.current) {
+      topScrollRef.current.scrollLeft = bottomScrollRef.current.scrollLeft;
+    }
+  };
+
+  const handleScrollLeft = () => {
+    if (bottomScrollRef.current) {
+      bottomScrollRef.current.scrollBy({ left: -300, behavior: 'smooth' });
+    }
+  };
+
+  const handleScrollRight = () => {
+    if (bottomScrollRef.current) {
+      bottomScrollRef.current.scrollBy({ left: 300, behavior: 'smooth' });
+    }
+  };
 
   const pendingCount = transactions.filter((t) => t.status === 'PENDING').length;
 
@@ -786,25 +829,63 @@ export const TransactionManagementView: React.FC<TransactionManagementViewProps>
           onDeleteProposal={onDeleteProposal}
         />
       ) : (
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-sm">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs text-slate-300">
-            <thead className="bg-slate-850 border-b border-slate-800 text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
-              <tr>
-                <th className="py-3.5 px-4">Mã Chứng Từ</th>
-                <th className="py-3.5 px-3">Số Tờ Trình</th>
-                <th className="py-3.5 px-3">Loại Phiếu</th>
-                <th className="py-3.5 px-4 min-w-[220px]">Diễn Giải / Tên Phiếu</th>
-                <th className="py-3.5 px-3">Ngày Lập</th>
-                <th className="py-3.5 px-3">Người Lập</th>
-                <th className="py-3.5 px-3 text-right">Tổng SL</th>
-                <th className="py-3.5 px-4 text-right font-semibold text-emerald-400">
-                  Tổng Tiền
-                </th>
-                <th className="py-3.5 px-3 text-center">Trạng Thái</th>
-                <th className="py-3.5 px-4 text-right">Hành Động</th>
-              </tr>
-            </thead>
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-sm flex flex-col">
+          {/* Always-Visible Top Horizontal Scrollbar Helper */}
+          <div className="bg-slate-850 border-b border-slate-800 px-3 py-1.5 flex items-center justify-between gap-2 select-none">
+            <div className="flex items-center gap-2 text-[11px] font-semibold text-blue-400">
+              <ArrowRightLeft className="w-3.5 h-3.5" />
+              <span>Thanh trượt ngang dữ liệu phiếu:</span>
+            </div>
+
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={handleScrollLeft}
+                className="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-[11px] font-medium border border-slate-700 flex items-center gap-1 transition"
+                title="Kéo sang trái"
+              >
+                &larr; Sang trái
+              </button>
+              <button
+                type="button"
+                onClick={handleScrollRight}
+                className="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-[11px] font-medium border border-slate-700 flex items-center gap-1 transition"
+                title="Kéo sang phải"
+              >
+                Sang phải &rarr;
+              </button>
+            </div>
+          </div>
+
+          {/* Synchronized Top Horizontal Scrollbar Track */}
+          <div
+            ref={topScrollRef}
+            onScroll={handleTopScroll}
+            className="overflow-x-auto bg-slate-900/90 border-b border-slate-800/80 px-1 py-0.5"
+            style={{ minHeight: '12px' }}
+          >
+            <div style={{ width: `${Math.max(tableContentWidth, 1100)}px`, height: '1px' }} />
+          </div>
+
+          {/* Table Container with bottom scroll sync */}
+          <div ref={bottomScrollRef} onScroll={handleBottomScroll} className="overflow-x-auto">
+            <table className="w-full text-left text-xs text-slate-300 min-w-[1100px]">
+              <thead className="bg-slate-850 border-b border-slate-800 text-[11px] font-semibold text-slate-400 uppercase tracking-wider sticky top-0 z-10">
+                <tr>
+                  <th className="py-3.5 px-4">Mã Chứng Từ</th>
+                  <th className="py-3.5 px-3">Số Tờ Trình</th>
+                  <th className="py-3.5 px-3">Loại Phiếu</th>
+                  <th className="py-3.5 px-4 min-w-[220px]">Diễn Giải / Tên Phiếu</th>
+                  <th className="py-3.5 px-3">Ngày Lập</th>
+                  <th className="py-3.5 px-3">Người Lập</th>
+                  <th className="py-3.5 px-3 text-right">Tổng SL</th>
+                  <th className="py-3.5 px-4 text-right font-semibold text-emerald-400">
+                    Tổng Tiền
+                  </th>
+                  <th className="py-3.5 px-3 text-center">Trạng Thái</th>
+                  <th className="py-3.5 px-4 text-right">Hành Động</th>
+                </tr>
+              </thead>
             <tbody className="divide-y divide-slate-800">
               {filteredTransactions.length === 0 ? (
                 <tr>

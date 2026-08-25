@@ -71,7 +71,7 @@ export interface PurchaseProposal {
   creatorName: string;
   creatorEmail: string;
   department: string;
-  status: 'PENDING_APPROVAL' | 'APPROVED' | 'COMPLETED' | 'PARTIALLY_IMPORTED';
+  status: 'PENDING_APPROVAL' | 'APPROVED' | 'COMPLETED' | 'PARTIALLY_IMPORTED' | 'DRAFT' | 'SUBMITTED' | 'REJECTED';
   attachmentUrl?: string; // Data URL or Image/PDF link
   attachmentName?: string;
   attachmentType?: 'image' | 'pdf' | 'document';
@@ -106,6 +106,7 @@ export interface InventoryTransaction {
   totalQuantity: number;
   totalAmount: number;
   reason: string;
+  notes?: string;
   approverEmail?: string;
   approverName?: string;
   approvalDate?: string;

@@ -536,6 +536,7 @@ export function App() {
                 materials={materials}
                 transactions={transactions}
                 proposals={proposals}
+                onUpdateProposal={handleUpdateProposal}
                 onDeleteProposal={handleDeleteProposal}
                 onDeleteTransaction={handleDeleteTransaction}
                 onResetDemoData={handleResetDemoData}

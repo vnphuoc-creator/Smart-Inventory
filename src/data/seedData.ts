@@ -443,7 +443,7 @@ export const INITIAL_TRANSACTIONS: InventoryTransaction[] = [
   },
   {
     id: 'tx-3',
-    code: 'DN-2026-0803',
+    code: 'PX-2026-0803',
     proposalNumber: '26-DNCT/PKT',
     type: 'EXPORT',
     title: 'Đề xuất xuất vòi rửa cảm ứng TOTO và xiphong thay thế khu WC tầng 1',
