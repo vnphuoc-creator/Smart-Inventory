@@ -11,6 +11,7 @@ import {
   X,
   Settings,
   ExternalLink,
+  FileX2,
 } from 'lucide-react';
 import { User } from '../types';
 import { AHTLogo } from './AHTLogo';
@@ -62,6 +63,19 @@ export const Sidebar: React.FC<SidebarProps> = ({
       label: 'Thẻ Kho & Báo Cáo NXT',
       icon: FileSpreadsheet,
     },
+    // ADMIN (Quản lý) ONLY: Sửa & Xóa Chứng Từ Sai
+    ...(currentUser.role === 'ADMIN'
+      ? [
+          {
+            id: 'error_transactions',
+            label: 'Quản Lý Chứng Từ Sai',
+            icon: FileX2,
+            badge: 'Admin',
+            badgeColor: 'bg-rose-600/30 text-rose-300 border border-rose-500/40',
+            description: 'Sửa, xóa & hoàn tác phiếu sai',
+          },
+        ]
+      : []),
     // MASTER ADMIN ONLY (vn.phuoc235@gmail.com): Strictly restricted!
     ...(currentUser.email?.toLowerCase().trim() === 'vn.phuoc235@gmail.com'
       ? [
@@ -247,6 +261,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 badgeColor: 'bg-gradient-to-r from-purple-500 to-indigo-500 text-white font-bold',
                 description: 'Hỏi đáp tồn kho & phân tích',
               },
+              ...(currentUser.role === 'ADMIN'
+                ? [
+                    {
+                      id: 'error_transactions',
+                      label: 'Sửa & Xóa Chứng Từ Sai',
+                      icon: FileX2,
+                      badge: 'Admin',
+                      badgeColor: 'bg-rose-600/30 text-rose-300 border border-rose-500/40',
+                      description: 'Sửa, xóa & hoàn tác phiếu sai',
+                    },
+                  ]
+                : []),
               ...(currentUser.email?.toLowerCase().trim() === 'vn.phuoc235@gmail.com'
                 ? [
                     {

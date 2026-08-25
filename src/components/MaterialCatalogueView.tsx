@@ -111,6 +111,7 @@ export const MaterialCatalogueView: React.FC<MaterialCatalogueViewProps> = ({
   const topScrollRef = useRef<HTMLDivElement>(null);
   const isSyncingScroll = useRef(false);
   const [scrollProgress, setScrollProgress] = useState(0);
+  const [tableScrollWidth, setTableScrollWidth] = useState(1200);
 
   const handleTableScroll = useCallback(() => {
     if (!tableContainerRef.current) return;
@@ -130,7 +131,11 @@ export const MaterialCatalogueView: React.FC<MaterialCatalogueViewProps> = ({
 
   const handleTopScroll = useCallback(() => {
     if (!topScrollRef.current || !tableContainerRef.current) return;
-    const { scrollLeft } = topScrollRef.current;
+    const { scrollLeft, scrollWidth, clientWidth } = topScrollRef.current;
+    const maxScroll = scrollWidth - clientWidth;
+    if (maxScroll > 0) {
+      setScrollProgress((scrollLeft / maxScroll) * 100);
+    }
     if (!isSyncingScroll.current) {
       isSyncingScroll.current = true;
       tableContainerRef.current.scrollLeft = scrollLeft;
@@ -212,6 +217,18 @@ export const MaterialCatalogueView: React.FC<MaterialCatalogueViewProps> = ({
         return sortOrder === 'asc' ? cmp : -cmp;
       });
   }, [calculatedStocks, searchTerm, selectedCategory, selectedUnit, selectedStatus, sortBy, sortOrder]);
+
+  // Dynamically update scrollWidth when filtered materials change
+  useEffect(() => {
+    const updateWidth = () => {
+      if (tableContainerRef.current) {
+        setTableScrollWidth(tableContainerRef.current.scrollWidth);
+      }
+    };
+    updateWidth();
+    const timer = setTimeout(updateWidth, 100);
+    return () => clearTimeout(timer);
+  }, [filteredMaterials]);
 
   const handleOpenAdd = () => {
     setEditingMaterial(null);
@@ -566,54 +583,55 @@ export const MaterialCatalogueView: React.FC<MaterialCatalogueViewProps> = ({
         <div
           ref={topScrollRef}
           onScroll={handleTopScroll}
-          className="overflow-x-auto overflow-y-hidden bg-slate-900 border-b border-slate-800/60 h-2.5 custom-top-scrollbar"
+          className="overflow-x-auto overflow-y-hidden bg-slate-900 border-b border-slate-700/80 h-3.5 custom-top-scrollbar cursor-pointer shadow-inner"
+          title="Kéo thanh trượt ngang này để xem tất cả các cột dữ liệu"
         >
-          <div className="w-[1200px] h-1"></div>
+          <div style={{ width: `${Math.max(tableScrollWidth, 1200)}px` }} className="h-1"></div>
         </div>
 
         {/* Scrollable Container with Sticky Table Header */}
         <div
           ref={tableContainerRef}
           onScroll={handleTableScroll}
-          className="overflow-x-auto overflow-y-auto max-h-[calc(100vh-290px)] min-h-[380px] relative"
+          className="overflow-x-auto overflow-y-auto max-h-[calc(100vh-270px)] min-h-[380px] relative shadow-inner"
         >
           <table className="w-full text-left text-xs text-slate-300 min-w-[1100px] border-separate border-spacing-0">
-            <thead className="sticky top-0 z-20 bg-slate-850 shadow-md">
-              <tr className="border-b border-slate-750">
-                <th className="sticky top-0 z-20 bg-slate-850 py-3.5 px-4 font-semibold text-slate-300 uppercase tracking-wider border-b border-slate-750">
+            <thead className="sticky top-0 z-30 bg-slate-900 shadow-md">
+              <tr className="border-b border-slate-700">
+                <th className="sticky top-0 z-30 bg-slate-900 py-3.5 px-4 font-semibold text-slate-200 uppercase tracking-wider border-b border-slate-700">
                   Mã Vật Tư
                 </th>
-                <th className="sticky top-0 z-20 bg-slate-850 py-3.5 px-4 min-w-[220px] font-semibold text-slate-300 uppercase tracking-wider border-b border-slate-750">
+                <th className="sticky top-0 z-30 bg-slate-900 py-3.5 px-4 min-w-[220px] font-semibold text-slate-200 uppercase tracking-wider border-b border-slate-700">
                   Tên & Quy Cách Vật Tư
                 </th>
-                <th className="sticky top-0 z-20 bg-slate-850 py-3.5 px-3 font-semibold text-slate-300 uppercase tracking-wider border-b border-slate-750">
+                <th className="sticky top-0 z-30 bg-slate-900 py-3.5 px-3 font-semibold text-slate-200 uppercase tracking-wider border-b border-slate-700">
                   Nhóm / Vị Trí
                 </th>
-                <th className="sticky top-0 z-20 bg-slate-850 py-3.5 px-3 text-center font-semibold text-slate-300 uppercase tracking-wider border-b border-slate-750">
+                <th className="sticky top-0 z-30 bg-slate-900 py-3.5 px-3 text-center font-semibold text-slate-200 uppercase tracking-wider border-b border-slate-700">
                   ĐVT
                 </th>
-                <th className="sticky top-0 z-20 bg-slate-850 py-3.5 px-3 text-right font-semibold text-slate-300 uppercase tracking-wider border-b border-slate-750">
+                <th className="sticky top-0 z-30 bg-slate-900 py-3.5 px-3 text-right font-semibold text-slate-200 uppercase tracking-wider border-b border-slate-700">
                   Tồn Đầu
                 </th>
-                <th className="sticky top-0 z-20 bg-slate-850 py-3.5 px-3 text-right text-blue-400 font-semibold uppercase tracking-wider border-b border-slate-750">
+                <th className="sticky top-0 z-30 bg-slate-900 py-3.5 px-3 text-right text-blue-400 font-semibold uppercase tracking-wider border-b border-slate-700">
                   Đã Nhập
                 </th>
-                <th className="sticky top-0 z-20 bg-slate-850 py-3.5 px-3 text-right text-amber-400 font-semibold uppercase tracking-wider border-b border-slate-750">
+                <th className="sticky top-0 z-30 bg-slate-900 py-3.5 px-3 text-right text-amber-400 font-semibold uppercase tracking-wider border-b border-slate-700">
                   Đã Xuất
                 </th>
-                <th className="sticky top-0 z-20 bg-slate-800 py-3.5 px-3 text-right font-bold text-white uppercase tracking-wider border-b border-slate-750">
+                <th className="sticky top-0 z-30 bg-slate-800 py-3.5 px-3 text-right font-bold text-white uppercase tracking-wider border-b border-slate-700 shadow-sm">
                   Tồn Hiện Tại
                 </th>
-                <th className="sticky top-0 z-20 bg-slate-850 py-3.5 px-3 text-right font-semibold text-slate-300 uppercase tracking-wider border-b border-slate-750">
+                <th className="sticky top-0 z-30 bg-slate-900 py-3.5 px-3 text-right font-semibold text-slate-200 uppercase tracking-wider border-b border-slate-700">
                   Đơn Giá
                 </th>
-                <th className="sticky top-0 z-20 bg-slate-850 py-3.5 px-4 text-right font-semibold text-emerald-400 uppercase tracking-wider border-b border-slate-750">
+                <th className="sticky top-0 z-30 bg-slate-900 py-3.5 px-4 text-right font-semibold text-emerald-400 uppercase tracking-wider border-b border-slate-700">
                   Tổng Giá Trị
                 </th>
-                <th className="sticky top-0 z-20 bg-slate-850 py-3.5 px-3 text-center font-semibold text-slate-300 uppercase tracking-wider border-b border-slate-750">
+                <th className="sticky top-0 z-30 bg-slate-900 py-3.5 px-3 text-center font-semibold text-slate-200 uppercase tracking-wider border-b border-slate-700">
                   Trạng Thái
                 </th>
-                <th className="sticky top-0 z-20 bg-slate-850 py-3.5 px-4 text-right font-semibold text-slate-300 uppercase tracking-wider border-b border-slate-750">
+                <th className="sticky top-0 z-30 bg-slate-900 py-3.5 px-4 text-right font-semibold text-slate-200 uppercase tracking-wider border-b border-slate-700">
                   Thao Tác
                 </th>
               </tr>

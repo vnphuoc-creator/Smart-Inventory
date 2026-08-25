@@ -517,3 +517,47 @@
     color: #000000 !important;
   }
 }
+
+/* Custom Visible & Easy-to-Drag Top Scrollbars */
+.custom-top-scrollbar {
+  scrollbar-width: auto;
+  scrollbar-color: #3b82f6 #1e293b;
+}
+
+.custom-top-scrollbar::-webkit-scrollbar {
+  height: 12px !important;
+}
+
+.custom-top-scrollbar::-webkit-scrollbar-track {
+  background: #1e293b !important;
+  border-radius: 6px;
+}
+
+.custom-top-scrollbar::-webkit-scrollbar-thumb {
+  background: #3b82f6 !important;
+  border-radius: 6px;
+  border: 2px solid #1e293b !important;
+  cursor: grab;
+}
+
+.custom-top-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #60a5fa !important;
+}
+
+.custom-top-scrollbar::-webkit-scrollbar-thumb:active {
+  background: #2563eb !important;
+  cursor: grabbing;
+}
+
+.light-theme .custom-top-scrollbar {
+  scrollbar-color: #2563eb #e2e8f0;
+}
+
+.light-theme .custom-top-scrollbar::-webkit-scrollbar-track {
+  background: #e2e8f0 !important;
+}
+
+.light-theme .custom-top-scrollbar::-webkit-scrollbar-thumb {
+  background: #2563eb !important;
+  border: 2px solid #e2e8f0 !important;
+}

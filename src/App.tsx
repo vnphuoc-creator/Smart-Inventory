@@ -95,11 +95,15 @@ export function App() {
   }, [materials]);
 
   const [proposals, setProposals] = useState<PurchaseProposal[]>(() => {
-    const saved = localStorage.getItem('smart_proposals_v2');
+    const saved = localStorage.getItem('smart_proposals_v3') || localStorage.getItem('smart_proposals_v2');
     if (saved) {
       try {
         const parsed: PurchaseProposal[] = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          const existingPropNums = new Set(parsed.map((p) => p.proposalNumber));
+          const missingProps = INITIAL_PROPOSALS.filter((p) => !existingPropNums.has(p.proposalNumber));
+          return missingProps.length > 0 ? [...parsed, ...missingProps] : parsed;
+        }
       } catch {
         return INITIAL_PROPOSALS;
       }
@@ -107,18 +111,41 @@ export function App() {
     return INITIAL_PROPOSALS;
   });
 
+  // Keep proposals synced with localStorage and ensure any new seed proposals (like Tờ trình 22) are present
+  React.useEffect(() => {
+    const existingPropNums = new Set(proposals.map((p) => p.proposalNumber));
+    const missingProps = INITIAL_PROPOSALS.filter((p) => !existingPropNums.has(p.proposalNumber));
+    if (missingProps.length > 0) {
+      setProposals((prev) => [...prev, ...missingProps]);
+    }
+    localStorage.setItem('smart_proposals_v3', JSON.stringify(proposals));
+  }, [proposals]);
+
   const [transactions, setTransactions] = useState<InventoryTransaction[]>(() => {
-    const saved = localStorage.getItem('smart_transactions_v6');
+    const saved = localStorage.getItem('smart_transactions_v7') || localStorage.getItem('smart_transactions_v6');
     if (saved) {
       try {
         const parsed: InventoryTransaction[] = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          const existingTxCodes = new Set(parsed.map((t) => t.code));
+          const missingTxs = INITIAL_TRANSACTIONS.filter((t) => !existingTxCodes.has(t.code));
+          return missingTxs.length > 0 ? [...parsed, ...missingTxs] : parsed;
+        }
       } catch {
         return INITIAL_TRANSACTIONS;
       }
     }
     return INITIAL_TRANSACTIONS;
   });
+
+  React.useEffect(() => {
+    const existingTxCodes = new Set(transactions.map((t) => t.code));
+    const missingTxs = INITIAL_TRANSACTIONS.filter((t) => !existingTxCodes.has(t.code));
+    if (missingTxs.length > 0) {
+      setTransactions((prev) => [...prev, ...missingTxs]);
+    }
+    localStorage.setItem('smart_transactions_v7', JSON.stringify(transactions));
+  }, [transactions]);
 
   // Navigation & Modal State
   const [activeTab, setActiveTab] = useState<string>('dashboard');

@@ -64,9 +64,13 @@ ${transactionsSummary || "Không có giao dịch"}
 Dữ liệu tờ trình đề xuất mua sắm:
 ${proposalsSummary || "Không có tờ trình"}
 
-Nhiệm vụ:
-1. Trả lời chi tiết, chính xác, súc tích và mạch lạc bằng tiếng Việt chuyên ngành cơ điện sân bay (có số liệu, mã DN_*, số lượng cụ thể nếu có trong dữ liệu).
-2. Nếu câu hỏi liên quan đến tình trạng tồn kho, mã vật tư, đề xuất nhập/xuất, cảnh báo hết hàng, hoặc tờ trình đề xuất mua sắm (ví dụ tờ trình số cụ thể như 29, 17, 26, 31, 45, 08,...), hãy phân tích rõ ràng và đưa ra số liệu chính xác.
+QUY TẮC BẮT BUỘC KHI TRẢ LỜI:
+1. ĐẶC BIỆT KHI NGƯỜI DÙNG HỎI VỀ TỜ TRÌNH (ví dụ: Tờ trình 22, 17, 26, 29, 31, 45, 08,...):
+   - Bạn PHẢI tìm đúng Tờ trình trong 'Dữ liệu tờ trình đề xuất mua sắm' (ví dụ Tờ trình 22 tương ứng với '22-DNCT/PKT').
+   - Liệt kê ĐẦY ĐỦ VÀ CHÍNH XÁC 100% tất cả các mặt hàng có trong mảng 'items' của tờ trình đó: đúng Mã vật tư (DN_*), đúng Tên vật tư, đúng Số lượng đề xuất (requested), đúng ĐVT (unit) và Đơn giá (nếu có).
+   - TUYỆT ĐỐI KHÔNG đoán mò hoặc nhầm lẫn vật tư của tờ trình này sang tờ trình khác.
+   - Đối chiếu với 'Dữ liệu giao dịch / phiếu kho gần đây' để báo cáo chính xác tiến độ nhập kho thực tế (đã nhập bao nhiêu, còn thiếu bao nhiêu).
+2. Trả lời chi tiết, chính xác, súc tích và mạch lạc bằng tiếng Việt chuyên ngành cơ điện sân bay.
 3. Cung cấp bộ lọc JSON gợi ý để giao diện tự động lọc bảng dữ liệu tương ứng.
 
 Hãy trả về phản hồi định dạng JSON strictly with this schema:

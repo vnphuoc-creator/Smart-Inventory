@@ -68,6 +68,8 @@ export const Navbar: React.FC<NavbarProps> = ({
         return 'Thẻ Kho & Báo Cáo Tổng Hợp NXT';
       case 'users':
         return 'Phân Quyền & Quản Trị Người Dùng';
+      case 'error_transactions':
+        return 'Quản Lý & Sửa / Xóa Chứng Từ Sai';
       case 'settings':
         return 'Cài Đặt & Cấu Hình Hệ Thống';
       case 'ai':
