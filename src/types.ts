@@ -166,3 +166,40 @@ export interface NaturalSearchFilters {
   minPrice?: number;
   maxPrice?: number;
 }
+
+export type ActivityActionType =
+  | 'IMPORT_TX'
+  | 'EXPORT_TX'
+  | 'APPROVE_TX'
+  | 'REJECT_TX'
+  | 'UPDATE_TX'
+  | 'DELETE_TX'
+  | 'CREATE_PROPOSAL'
+  | 'UPDATE_PROPOSAL'
+  | 'DELETE_PROPOSAL'
+  | 'EXCEL_IMPORT'
+  | 'UPDATE_MATERIAL'
+  | 'DELETE_MATERIAL'
+  | 'CLEAR_DATA'
+  | 'RESET_DEMO'
+  | 'LOGIN'
+  | 'LOGOUT'
+  | 'PASSWORD_CHANGE';
+
+export interface ActivityLog {
+  id: string;
+  timestamp: string; // ISO 8601 string
+  userId: string;
+  userName: string;
+  userEmail: string;
+  userRole: UserRole;
+  action: ActivityActionType;
+  actionTitle: string; // Tiêu đề ngắn gọn: Lập phiếu nhập kho, Phê duyệt xuất kho, Xóa chứng từ...
+  details: string; // Diễn giải chi tiết
+  documentCode?: string; // Mã phiếu PN-..., PX-...
+  proposalNumber?: string; // Số tờ trình
+  targetType?: 'TRANSACTION' | 'PROPOSAL' | 'MATERIAL' | 'SYSTEM' | 'AUTH';
+  amount?: number;
+  ipAddress?: string;
+}
+

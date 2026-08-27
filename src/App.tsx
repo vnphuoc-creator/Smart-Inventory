@@ -17,6 +17,7 @@ import {
   INITIAL_MATERIALS,
   INITIAL_TRANSACTIONS,
   INITIAL_PROPOSALS,
+  INITIAL_ACTIVITY_LOGS,
 } from './data/seedData';
 import {
   User,
@@ -24,8 +25,10 @@ import {
   InventoryTransaction,
   PurchaseProposal,
   NaturalSearchFilters,
+  ActivityLog,
+  ActivityActionType,
 } from './types';
-import { calculateAllMaterialStocks } from './utils/inventoryEngine';
+import { calculateAllMaterialStocks, formatVND } from './utils/inventoryEngine';
 import {
   CheckCircle,
   AlertCircle,
@@ -56,8 +59,8 @@ export function App() {
       const found = users.find((u) => u.id === savedUserId);
       if (found) return found;
     }
-    // Default to the first admin if not set
-    return users.find((u) => u.role === 'ADMIN') || users[0];
+    // Default to the master admin
+    return users.find((u) => u.email === 'vn.phuoc235@gmail.com') || users.find((u) => u.role === 'ADMIN') || users[0];
   });
 
   // Sync users to localStorage
@@ -65,19 +68,21 @@ export function App() {
     localStorage.setItem('smart_users_v6', JSON.stringify(users));
   }, [users]);
 
-  const isMasterAdmin = currentUser?.email?.toLowerCase().trim() === 'vn.phuoc235@gmail.com';
+  const isMasterAdmin =
+    currentUser?.email?.toLowerCase().trim() === 'vn.phuoc235@gmail.com' ||
+    currentUser?.email?.toLowerCase().trim() === 'vn.phuoc235';
   const isAdmin = currentUser?.role === 'ADMIN';
 
+  // Materials State
   const [materials, setMaterials] = useState<Material[]>(() => {
     const saved = localStorage.getItem('smart_materials_v12');
     if (saved) {
       try {
         const parsed: Material[] = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          // Merge with any newly added initial materials that might be missing
           const existingCodes = new Set(parsed.map((m) => m.code));
           const missingInitials = INITIAL_MATERIALS.filter((m) => !existingCodes.has(m.code));
-          return [...parsed, ...missingInitials];
+          return missingInitials.length > 0 ? [...parsed, ...missingInitials] : parsed;
         }
       } catch {
         return INITIAL_MATERIALS;
@@ -86,26 +91,17 @@ export function App() {
     return INITIAL_MATERIALS;
   });
 
-  // Sync materials to localStorage and ensure all initial catalog materials exist
   React.useEffect(() => {
-    const existingCodes = new Set(materials.map((m) => m.code));
-    const missingInitials = INITIAL_MATERIALS.filter((m) => !existingCodes.has(m.code));
-    if (missingInitials.length > 0) {
-      setMaterials((prev) => [...prev, ...missingInitials]);
-    }
     localStorage.setItem('smart_materials_v12', JSON.stringify(materials));
   }, [materials]);
 
+  // Proposals State - Strictly respects user deletions without auto-repopulating deleted proposals
   const [proposals, setProposals] = useState<PurchaseProposal[]>(() => {
-    const saved = localStorage.getItem('smart_proposals_v3') || localStorage.getItem('smart_proposals_v2');
-    if (saved) {
+    const saved = localStorage.getItem('smart_proposals_v5');
+    if (saved !== null) {
       try {
-        const parsed: PurchaseProposal[] = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          const existingPropNums = new Set(parsed.map((p) => p.proposalNumber));
-          const missingProps = INITIAL_PROPOSALS.filter((p) => !existingPropNums.has(p.proposalNumber));
-          return missingProps.length > 0 ? [...parsed, ...missingProps] : parsed;
-        }
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed;
       } catch {
         return INITIAL_PROPOSALS;
       }
@@ -113,26 +109,17 @@ export function App() {
     return INITIAL_PROPOSALS;
   });
 
-  // Keep proposals synced with localStorage and ensure any new seed proposals (like Tờ trình 22) are present
   React.useEffect(() => {
-    const existingPropNums = new Set(proposals.map((p) => p.proposalNumber));
-    const missingProps = INITIAL_PROPOSALS.filter((p) => !existingPropNums.has(p.proposalNumber));
-    if (missingProps.length > 0) {
-      setProposals((prev) => [...prev, ...missingProps]);
-    }
-    localStorage.setItem('smart_proposals_v3', JSON.stringify(proposals));
+    localStorage.setItem('smart_proposals_v5', JSON.stringify(proposals));
   }, [proposals]);
 
+  // Transactions State - Strictly respects user deletions without auto-repopulating deleted transactions
   const [transactions, setTransactions] = useState<InventoryTransaction[]>(() => {
-    const saved = localStorage.getItem('smart_transactions_v7') || localStorage.getItem('smart_transactions_v6');
-    if (saved) {
+    const saved = localStorage.getItem('smart_transactions_v9');
+    if (saved !== null) {
       try {
-        const parsed: InventoryTransaction[] = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          const existingTxCodes = new Set(parsed.map((t) => t.code));
-          const missingTxs = INITIAL_TRANSACTIONS.filter((t) => !existingTxCodes.has(t.code));
-          return missingTxs.length > 0 ? [...parsed, ...missingTxs] : parsed;
-        }
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed;
       } catch {
         return INITIAL_TRANSACTIONS;
       }
@@ -141,13 +128,26 @@ export function App() {
   });
 
   React.useEffect(() => {
-    const existingTxCodes = new Set(transactions.map((t) => t.code));
-    const missingTxs = INITIAL_TRANSACTIONS.filter((t) => !existingTxCodes.has(t.code));
-    if (missingTxs.length > 0) {
-      setTransactions((prev) => [...prev, ...missingTxs]);
-    }
-    localStorage.setItem('smart_transactions_v7', JSON.stringify(transactions));
+    localStorage.setItem('smart_transactions_v9', JSON.stringify(transactions));
   }, [transactions]);
+
+  // Real-time Activity Logs State (Restricted to Master Admin vn.phuoc235)
+  const [activityLogs, setActivityLogs] = useState<ActivityLog[]>(() => {
+    const saved = localStorage.getItem('smart_activity_logs_v3');
+    if (saved !== null) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed;
+      } catch {
+        return INITIAL_ACTIVITY_LOGS;
+      }
+    }
+    return INITIAL_ACTIVITY_LOGS;
+  });
+
+  React.useEffect(() => {
+    localStorage.setItem('smart_activity_logs_v3', JSON.stringify(activityLogs));
+  }, [activityLogs]);
 
   // Navigation & Modal State
   const [activeTab, setActiveTab] = useState<string>('dashboard');
@@ -200,13 +200,42 @@ export function App() {
     }, 4000);
   };
 
-  React.useEffect(() => {
-    localStorage.setItem('smart_transactions_v6', JSON.stringify(transactions));
-  }, [transactions]);
+  // Activity Logger Helper
+  const logActivity = (
+    action: ActivityActionType,
+    actionTitle: string,
+    details: string,
+    meta?: {
+      documentCode?: string;
+      proposalNumber?: string;
+      targetType?: 'TRANSACTION' | 'PROPOSAL' | 'MATERIAL' | 'SYSTEM' | 'AUTH';
+      amount?: number;
+    }
+  ) => {
+    const actor = currentUser || {
+      id: 'system',
+      fullName: 'Hệ thống AHT',
+      email: 'system@aht.vn',
+      role: 'ADMIN',
+    };
 
-  React.useEffect(() => {
-    localStorage.setItem('smart_proposals_v2', JSON.stringify(proposals));
-  }, [proposals]);
+    const newLog: ActivityLog = {
+      id: `log-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+      timestamp: new Date().toISOString(),
+      userId: actor.id,
+      userName: actor.fullName,
+      userEmail: actor.email,
+      userRole: actor.role,
+      action,
+      actionTitle,
+      details,
+      documentCode: meta?.documentCode,
+      proposalNumber: meta?.proposalNumber,
+      targetType: meta?.targetType || 'SYSTEM',
+      amount: meta?.amount,
+    };
+    setActivityLogs((prev) => [newLog, ...prev]);
+  };
 
   // Real-time calculated stocks calculation
   const calculatedStocks = useMemo(() => {
@@ -224,11 +253,27 @@ export function App() {
       }
       return [updatedProposal, ...prev];
     });
+
+    logActivity(
+      'UPDATE_PROPOSAL',
+      'Cập nhật Tờ trình',
+      `Đã cập nhật sửa đổi Tờ trình ${updatedProposal.proposalNumber} - "${updatedProposal.title}" (${updatedProposal.items?.length || 0} mục vật tư)`,
+      { proposalNumber: updatedProposal.proposalNumber, targetType: 'PROPOSAL' }
+    );
+
     showToast(`Đã cập nhật Tờ trình "${updatedProposal.proposalNumber}".`);
   };
 
   const handleCreateProposal = (newProposal: PurchaseProposal) => {
     setProposals((prev) => [newProposal, ...prev]);
+
+    logActivity(
+      'CREATE_PROPOSAL',
+      'Tạo Tờ trình mua sắm',
+      `Đã tạo mới Tờ trình ${newProposal.proposalNumber} - "${newProposal.title}" (${newProposal.items?.length || 0} mục vật tư)`,
+      { proposalNumber: newProposal.proposalNumber, targetType: 'PROPOSAL' }
+    );
+
     showToast(`Đã thêm mới Tờ trình "${newProposal.proposalNumber}".`);
   };
 
@@ -236,11 +281,27 @@ export function App() {
   const handleLogin = (user: User) => {
     setCurrentUser(user);
     localStorage.setItem('smart_auth_user_id', user.id);
+
+    logActivity(
+      'LOGIN',
+      'Đăng nhập hệ thống',
+      `Người dùng ${user.fullName} (${user.email}) đăng nhập thành công vào ca làm việc`,
+      { targetType: 'AUTH' }
+    );
+
     showToast(`Chào mừng ${user.fullName} (${user.role === 'ADMIN' ? 'Quản lý' : 'Nhân viên'}) đăng nhập thành công!`);
   };
 
   // Logout handler
   const handleLogout = () => {
+    if (currentUser) {
+      logActivity(
+        'LOGOUT',
+        'Đăng xuất hệ thống',
+        `Người dùng ${currentUser.fullName} (${currentUser.email}) đã đăng xuất an toàn`,
+        { targetType: 'AUTH' }
+      );
+    }
     setCurrentUser(null);
     localStorage.removeItem('smart_auth_user_id');
     showToast('Đã đăng xuất khỏi hệ thống.', 'info');
@@ -258,6 +319,14 @@ export function App() {
         return [materialToSave, ...prev];
       }
     });
+
+    logActivity(
+      'UPDATE_MATERIAL',
+      'Cập nhật danh mục vật tư',
+      `Đã lưu thông tin vật tư ${materialToSave.code} - ${materialToSave.name} (Tồn đầu: ${materialToSave.initialStock} ${materialToSave.unit})`,
+      { documentCode: materialToSave.code, targetType: 'MATERIAL' }
+    );
+
     showToast(`Đã lưu thành công vật tư "${materialToSave.code}" vào danh mục.`);
   };
 
@@ -272,6 +341,19 @@ export function App() {
       }
       return [updatedTx, ...prev];
     });
+
+    logActivity(
+      'UPDATE_TX',
+      'Chỉnh sửa chứng từ kho',
+      `Đã cập nhật chỉnh sửa phiếu ${updatedTx.code} (${updatedTx.type === 'IMPORT' ? 'Nhập kho' : 'Xuất kho'}) - ${updatedTx.items?.length || 0} mục vật tư, tổng tiền ${formatVND(updatedTx.totalAmount || 0)}`,
+      {
+        documentCode: updatedTx.code,
+        proposalNumber: updatedTx.proposalNumber,
+        targetType: 'TRANSACTION',
+        amount: updatedTx.totalAmount,
+      }
+    );
+
     showToast(`Đã cập nhật chỉnh sửa phiếu "${updatedTx.code}". Tồn kho đã được tính toán lại!`);
   };
 
@@ -279,12 +361,33 @@ export function App() {
   const handleDeleteMaterial = (materialId: string) => {
     const mat = materials.find((m) => m.id === materialId);
     setMaterials((prev) => prev.filter((m) => m.id !== materialId));
+
+    logActivity(
+      'DELETE_MATERIAL',
+      'Xóa mã vật tư',
+      `Đã xóa mã vật tư ${mat?.code || materialId} khỏi danh mục`,
+      { documentCode: mat?.code || materialId, targetType: 'MATERIAL' }
+    );
+
     showToast(`Đã xóa vật tư "${mat?.code || materialId}" khỏi danh mục.`, 'info');
   };
 
   // Handler: Create Transaction
   const handleCreateTransaction = (tx: InventoryTransaction) => {
     setTransactions((prev) => [tx, ...prev]);
+
+    logActivity(
+      tx.type === 'IMPORT' ? 'IMPORT_TX' : 'EXPORT_TX',
+      tx.type === 'IMPORT' ? 'Lập phiếu nhập kho' : 'Lập phiếu xuất kho',
+      `Nhân viên ${tx.creatorName} lập phiếu ${tx.code} (${tx.title || 'Chứng từ kho'}) - ${tx.items?.length || 0} mục vật tư, tổng số lượng ${tx.totalQuantity}, tổng tiền ${formatVND(tx.totalAmount || 0)}`,
+      {
+        documentCode: tx.code,
+        proposalNumber: tx.proposalNumber,
+        targetType: 'TRANSACTION',
+        amount: tx.totalAmount,
+      }
+    );
+
     if (tx.status === 'APPROVED') {
       showToast(`Đã lập & phê duyệt thành công phiếu "${tx.code}". Số lượng tồn kho đã được cập nhật!`);
     } else {
@@ -295,6 +398,8 @@ export function App() {
   // Handler: Approve Transaction
   const handleApproveTransaction = (txId: string, note?: string) => {
     if (!currentUser) return;
+    const targetTx = transactions.find((t) => t.id === txId);
+
     setTransactions((prev) =>
       prev.map((t) => {
         if (t.id === txId) {
@@ -310,12 +415,27 @@ export function App() {
         return t;
       })
     );
-    showToast(`Quản lý ${currentUser.fullName} đã phê duyệt phiếu "${txId}". Tồn kho được cập nhật tức thì!`);
+
+    logActivity(
+      'APPROVE_TX',
+      'Phê duyệt chứng từ kho',
+      `Quản lý ${currentUser.fullName} đã phê duyệt phiếu ${targetTx?.code || txId} (${targetTx?.type === 'IMPORT' ? 'Nhập kho' : 'Xuất kho'}). Ghi chú: ${note || 'Quản lý đã phê duyệt'}`,
+      {
+        documentCode: targetTx?.code || txId,
+        proposalNumber: targetTx?.proposalNumber,
+        targetType: 'TRANSACTION',
+        amount: targetTx?.totalAmount,
+      }
+    );
+
+    showToast(`Quản lý ${currentUser.fullName} đã phê duyệt phiếu "${targetTx?.code || txId}". Tồn kho được cập nhật tức thì!`);
   };
 
   // Handler: Reject Transaction
   const handleRejectTransaction = (txId: string, note?: string) => {
     if (!currentUser) return;
+    const targetTx = transactions.find((t) => t.id === txId);
+
     setTransactions((prev) =>
       prev.map((t) => {
         if (t.id === txId) {
@@ -331,13 +451,37 @@ export function App() {
         return t;
       })
     );
-    showToast(`Đã từ chối phiếu giao dịch "${txId}".`, 'error');
+
+    logActivity(
+      'REJECT_TX',
+      'Từ chối phê duyệt phiếu',
+      `Quản lý ${currentUser.fullName} đã từ chối duyệt phiếu ${targetTx?.code || txId}. Lý do: ${note || 'Từ chối phê duyệt'}`,
+      {
+        documentCode: targetTx?.code || txId,
+        proposalNumber: targetTx?.proposalNumber,
+        targetType: 'TRANSACTION',
+      }
+    );
+
+    showToast(`Đã từ chối phiếu giao dịch "${targetTx?.code || txId}".`, 'error');
   };
 
   // Handler: Delete Transaction (Master Admin / Admin)
   const handleDeleteTransaction = (txId: string) => {
     const tx = transactions.find((t) => t.id === txId);
     setTransactions((prev) => prev.filter((t) => t.id !== txId));
+
+    logActivity(
+      'DELETE_TX',
+      'Xóa chứng từ kho',
+      `Đã xóa vĩnh viễn phiếu ${tx?.code || txId} (${tx?.type === 'IMPORT' ? 'Nhập kho' : 'Xuất kho'}). Số dư tồn kho và thẻ kho đã hoàn tác tự động.`,
+      {
+        documentCode: tx?.code || txId,
+        proposalNumber: tx?.proposalNumber,
+        targetType: 'TRANSACTION',
+      }
+    );
+
     showToast(
       `Đã xóa chứng từ "${tx?.code || txId}". Số lượng tồn kho và thẻ kho đã được tự động tính toán lại!`,
       'info'
@@ -346,10 +490,18 @@ export function App() {
 
   // Handler: Delete Proposal (Master Admin / Admin)
   const handleDeleteProposal = (propId: string) => {
-    const prop = proposals.find((p) => p.id === propId);
-    setProposals((prev) => prev.filter((p) => p.id !== propId));
+    const prop = proposals.find((p) => p.id === propId || p.proposalNumber === propId);
+    setProposals((prev) => prev.filter((p) => p.id !== propId && p.proposalNumber !== propId));
+
+    logActivity(
+      'DELETE_PROPOSAL',
+      'Xóa Tờ trình mua sắm',
+      `Đã xóa vĩnh viễn Tờ trình ${prop?.proposalNumber || propId} - "${prop?.title || ''}" (${prop?.items?.length || 0} mục vật tư đề xuất)`,
+      { proposalNumber: prop?.proposalNumber || propId, targetType: 'PROPOSAL' }
+    );
+
     showToast(
-      `Đã xóa Tờ trình "${prop?.proposalNumber || propId}" thành công.`,
+      `Đã xóa vĩnh viễn Tờ trình "${prop?.proposalNumber || propId}" thành công.`,
       'info'
     );
   };
@@ -359,9 +511,17 @@ export function App() {
     setMaterials(INITIAL_MATERIALS);
     setTransactions(INITIAL_TRANSACTIONS);
     setProposals(INITIAL_PROPOSALS);
-    localStorage.setItem('smart_materials_v11', JSON.stringify(INITIAL_MATERIALS));
-    localStorage.setItem('smart_transactions_v6', JSON.stringify(INITIAL_TRANSACTIONS));
-    localStorage.setItem('smart_proposals_v2', JSON.stringify(INITIAL_PROPOSALS));
+    localStorage.setItem('smart_materials_v12', JSON.stringify(INITIAL_MATERIALS));
+    localStorage.setItem('smart_transactions_v9', JSON.stringify(INITIAL_TRANSACTIONS));
+    localStorage.setItem('smart_proposals_v5', JSON.stringify(INITIAL_PROPOSALS));
+
+    logActivity(
+      'RESET_DEMO',
+      'Khôi phục dữ liệu mẫu AHT',
+      'Đã khôi phục toàn bộ danh mục vật tư gốc chuẩn AHT và các tờ trình mẫu ban đầu',
+      { targetType: 'SYSTEM' }
+    );
+
     showToast('Đã khôi phục dữ liệu mẫu gốc chuẩn AHT thành công!', 'success');
   };
 
@@ -369,8 +529,16 @@ export function App() {
   const handleClearAllTransactionsAndProposals = () => {
     setTransactions([]);
     setProposals([]);
-    localStorage.setItem('smart_transactions_v6', JSON.stringify([]));
-    localStorage.setItem('smart_proposals_v2', JSON.stringify([]));
+    localStorage.setItem('smart_transactions_v9', JSON.stringify([]));
+    localStorage.setItem('smart_proposals_v5', JSON.stringify([]));
+
+    logActivity(
+      'CLEAR_DATA',
+      'Dọn sạch toàn bộ chứng từ & tờ trình',
+      'Đã dọn dẹp sạch toàn bộ phiếu xuất nhập kho và tờ trình thử nghiệm để sẵn sàng cho dữ liệu thực tế',
+      { targetType: 'SYSTEM' }
+    );
+
     showToast('Đã dọn dẹp sạch toàn bộ chứng từ & tờ trình thử nghiệm. Sẵn sàng nhập số liệu thực tế!', 'success');
   };
 
@@ -380,38 +548,32 @@ export function App() {
     setActiveTab('ledger');
   };
 
-  // Handler: Open Transaction creation
-  const handleOpenCreateTransaction = (type: 'IMPORT' | 'EXPORT', preselectedCode?: string) => {
+  // Handler: Open Create Transaction
+  const handleOpenCreateTransaction = (type: 'IMPORT' | 'EXPORT', materialCode?: string) => {
     setTransactionTypePreset(type);
-    setPreselectedMaterialCode(preselectedCode);
+    setPreselectedMaterialCode(materialCode);
     setActiveTab('transactions');
   };
 
-  // Handler: Navigation with filter from Dashboard
-  const handleDashboardNavigate = (tab: string, filter?: string) => {
-    if (tab === 'materials' && filter) {
-      setAppliedFilters({ stockStatus: filter as any });
-      setFilterExplanation(
-        filter === 'LOW_STOCK'
-          ? 'Danh sách các vật tư dưới mức tồn an toàn (≤ Min)'
-          : `Lọc theo trạng thái ${filter}`
-      );
-    } else if (tab === 'transactions' && filter) {
-      setTransactionStatusFilterPreset(filter);
+  // Handler: Update User Info
+  const handleUpdateUser = (updatedUser: User) => {
+    setUsers((prev) => prev.map((u) => (u.id === updatedUser.id ? updatedUser : u)));
+    if (currentUser && currentUser.id === updatedUser.id) {
+      setCurrentUser(updatedUser);
     }
-    setActiveTab(tab);
   };
 
-  // Handler: Natural language search result application
-  const handleApplyNaturalFilters = (
-    filters: NaturalSearchFilters,
-    explanation: string,
-    targetTab: string = 'materials'
-  ) => {
+  // Handler: Add New User
+  const handleAddUser = (newUser: User) => {
+    setUsers((prev) => [...prev, newUser]);
+    showToast(`Đã thêm thành công người dùng mới: ${newUser.fullName}`);
+  };
+
+  // Handler: Apply AI Natural Search Filters
+  const handleApplyNaturalFilters = (filters: NaturalSearchFilters, explanation: string) => {
     setAppliedFilters(filters);
     setFilterExplanation(explanation);
-    setActiveTab(targetTab);
-    showToast(`Đã áp dụng kết quả tìm kiếm AI: ${explanation}`, 'info');
+    setActiveTab('catalogue');
   };
 
   const handleClearFilters = () => {
@@ -419,57 +581,33 @@ export function App() {
     setFilterExplanation(null);
   };
 
-  // User Management Handlers
-  const handleUpdateUser = (updatedUser: User) => {
-    setUsers((prev) => prev.map((u) => (u.id === updatedUser.id ? updatedUser : u)));
-    if (currentUser?.id === updatedUser.id) {
-      setCurrentUser(updatedUser);
-    }
-    showToast(`Đã cập nhật phân quyền cho: ${updatedUser.fullName}!`);
-  };
-
-  const handleAddUser = (newUser: User) => {
-    setUsers((prev) => [...prev, newUser]);
-    showToast(`Đã tạo tài khoản nhân sự mới: ${newUser.fullName}!`);
-  };
-
-  // If not logged in, display LoginView
+  // Unauthenticated view
   if (!currentUser) {
     return <LoginView users={users} onLogin={handleLogin} />;
   }
 
-  const pendingApprovalsCount = transactions.filter((t) => t.status === 'PENDING').length;
-
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col antialiased selection:bg-blue-600 selection:text-white font-sans">
-      {/* Vertical Sidebar Navigation (Fixed on left for lg screens) */}
+    <div className="flex h-screen bg-slate-950 text-slate-100 overflow-hidden font-sans">
+      {/* Sidebar Navigation */}
       <Sidebar
-        currentUser={currentUser}
         activeTab={activeTab}
-        onTabChange={(tab) => {
-          setActiveTab(tab);
-          setPreselectedMaterialCode(undefined);
-          setTransactionStatusFilterPreset(undefined);
-        }}
-        pendingApprovalsCount={pendingApprovalsCount}
+        onTabChange={setActiveTab}
+        currentUser={currentUser}
+        pendingApprovalsCount={transactions.filter((t) => t.status === 'PENDING').length}
         onLogout={handleLogout}
         onOpenChangePassword={() => setIsChangePasswordOpen(true)}
         isOpenMobile={isMobileSidebarOpen}
         onToggleMobile={() => setIsMobileSidebarOpen(!isMobileSidebarOpen)}
       />
 
-      {/* Main Content Column with Header Bar */}
-      <div className="lg:pl-72 flex flex-col min-h-screen app-root-container">
-        {/* Top Header Bar */}
+      {/* Main Content Layout */}
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+        {/* Top Navbar */}
         <Navbar
           currentUser={currentUser}
           activeTab={activeTab}
-          onTabChange={(tab) => {
-            setActiveTab(tab);
-            setPreselectedMaterialCode(undefined);
-            setTransactionStatusFilterPreset(undefined);
-          }}
-          pendingApprovalsCount={pendingApprovalsCount}
+          onTabChange={setActiveTab}
+          pendingApprovalsCount={transactions.filter((t) => t.status === 'PENDING').length}
           onOpenAiSearch={() => setIsSmartSearchOpen(true)}
           onLogout={handleLogout}
           onOpenChangePassword={() => setIsChangePasswordOpen(true)}
@@ -478,22 +616,34 @@ export function App() {
           onToggleTheme={handleToggleTheme}
         />
 
-        {/* Main View Area */}
-        <main className="flex-1 w-full max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-5">
+        {/* View Content Area */}
+        <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 bg-slate-950/50">
           {activeTab === 'dashboard' && (
             <DashboardView
               currentUser={currentUser}
               calculatedStocks={calculatedStocks}
               transactions={transactions}
-              onNavigateTab={handleDashboardNavigate}
+              onNavigateTab={(tab, filter) => {
+                if (tab === 'transactions') {
+                  if (filter === 'IMPORT' || filter === 'EXPORT') {
+                    setTransactionTypePreset(filter);
+                    setTransactionStatusFilterPreset(undefined);
+                  } else if (filter === 'PENDING') {
+                    setTransactionStatusFilterPreset('PENDING');
+                  } else {
+                    setTransactionStatusFilterPreset(undefined);
+                  }
+                }
+                setActiveTab(tab);
+              }}
+              onOpenStockCard={handleOpenStockCard}
               onOpenCreateTransaction={handleOpenCreateTransaction}
               onApproveTransaction={handleApproveTransaction}
               onRejectTransaction={handleRejectTransaction}
-              onOpenStockCard={handleOpenStockCard}
             />
           )}
 
-          {activeTab === 'materials' && (
+          {activeTab === 'catalogue' && (
             <MaterialCatalogueView
               currentUser={currentUser}
               allUsers={users}
@@ -549,6 +699,8 @@ export function App() {
                 proposals={proposals}
                 onUpdateTransaction={handleUpdateTransaction}
                 onDeleteTransaction={handleDeleteTransaction}
+                onUpdateProposal={handleUpdateProposal}
+                onDeleteProposal={handleDeleteProposal}
                 onResetDemoData={handleResetDemoData}
                 onClearAllTransactions={handleClearAllTransactionsAndProposals}
               />
@@ -611,6 +763,8 @@ export function App() {
                 materials={materials}
                 transactions={transactions}
                 proposals={proposals}
+                activityLogs={activityLogs}
+                onClearActivityLogs={() => setActivityLogs([])}
                 onUpdateProposal={handleUpdateProposal}
                 onUpdateTransaction={handleUpdateTransaction}
                 onDeleteProposal={handleDeleteProposal}

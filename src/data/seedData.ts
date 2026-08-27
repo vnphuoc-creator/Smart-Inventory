@@ -1,4 +1,4 @@
-import { User, Material, InventoryTransaction, PurchaseProposal } from '../types';
+import { User, Material, InventoryTransaction, PurchaseProposal, ActivityLog } from '../types';
 import { ALL_MATERIAL_CATEGORIES, RAW_MATERIALS_DATABASE } from './materialsData';
 
 export const INITIAL_USERS: User[] = [
@@ -914,4 +914,81 @@ export const INITIAL_PROPOSALS: PurchaseProposal[] = [
     ],
   },
 ];
+
+export const INITIAL_ACTIVITY_LOGS: ActivityLog[] = [
+  {
+    id: 'log-1',
+    timestamp: '2026-08-25T14:35:10.000Z',
+    userId: 'u-admin-master',
+    userName: 'Vy Ngọc Phước',
+    userEmail: 'vn.phuoc235@gmail.com',
+    userRole: 'ADMIN',
+    action: 'IMPORT_TX',
+    actionTitle: 'Lập phiếu nhập kho',
+    details: 'Nhập kho 23 thiết bị đồng hồ PM5350 & biến dòng KBD theo Tờ trình 22-DNCT/PKT',
+    documentCode: 'PN-260825-397',
+    proposalNumber: '22-DNCT/PKT',
+    targetType: 'TRANSACTION',
+    amount: 55000000,
+  },
+  {
+    id: 'log-2',
+    timestamp: '2026-08-25T11:20:00.000Z',
+    userId: 'u-1',
+    userName: 'Nguyễn Văn Đức',
+    userEmail: 'duc.nguyen@ahtcorp.vn',
+    userRole: 'ADMIN',
+    action: 'APPROVE_TX',
+    actionTitle: 'Phê duyệt phiếu nhập kho',
+    details: 'Đã nghiệm thu và phê duyệt nhập kho 1.568 vật tư theo Tờ trình 27-DNCT/PKT',
+    documentCode: 'PN-260825-500',
+    proposalNumber: '27-DNCT/PKT',
+    targetType: 'TRANSACTION',
+    amount: 794550000,
+  },
+  {
+    id: 'log-3',
+    timestamp: '2026-08-25T09:15:30.000Z',
+    userId: 'u-12',
+    userName: 'Đỗ Hữu Thi',
+    userEmail: 'huuthi.dh@gmail.com',
+    userRole: 'STAFF',
+    action: 'IMPORT_TX',
+    actionTitle: 'Tạo phiếu đề nghị nhập kho',
+    details: 'Lập đề nghị nhập 1.568 vật tư đèn LED, cáp điện theo Tờ trình 27-DNCT/PKT',
+    documentCode: 'PN-260825-500',
+    proposalNumber: '27-DNCT/PKT',
+    targetType: 'TRANSACTION',
+    amount: 794550000,
+  },
+  {
+    id: 'log-4',
+    timestamp: '2026-08-18T16:40:00.000Z',
+    userId: 'u-5',
+    userName: 'Phạm Hà',
+    userEmail: 'hapham281@gmail.com',
+    userRole: 'STAFF',
+    action: 'EXPORT_TX',
+    actionTitle: 'Lập phiếu đề xuất xuất kho',
+    details: 'Xuất 2 bộ vòi rửa cảm ứng TOTO & xi phông thay thế WC tầng 1 theo Tờ trình 26-DNCT/PKT',
+    documentCode: 'PX-2026-0803',
+    proposalNumber: '26-DNCT/PKT',
+    targetType: 'TRANSACTION',
+    amount: 11880000,
+  },
+  {
+    id: 'log-5',
+    timestamp: '2026-08-10T08:30:00.000Z',
+    userId: 'u-1',
+    userName: 'Nguyễn Văn Đức',
+    userEmail: 'duc.nguyen@ahtcorp.vn',
+    userRole: 'ADMIN',
+    action: 'CREATE_PROPOSAL',
+    actionTitle: 'Tạo tờ trình mua sắm mới',
+    details: 'Đã lập Tờ trình 17-DNCT/PKT đề xuất mua sắm dây cáp điện & phụ kiện đấu nối',
+    proposalNumber: '17-DNCT/PKT',
+    targetType: 'PROPOSAL',
+  },
+];
+
 
