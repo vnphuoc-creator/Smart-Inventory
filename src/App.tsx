@@ -573,7 +573,7 @@ export function App() {
   const handleApplyNaturalFilters = (filters: NaturalSearchFilters, explanation: string) => {
     setAppliedFilters(filters);
     setFilterExplanation(explanation);
-    setActiveTab('catalogue');
+    setActiveTab('materials');
   };
 
   const handleClearFilters = () => {
@@ -643,7 +643,7 @@ export function App() {
             />
           )}
 
-          {activeTab === 'catalogue' && (
+          {(activeTab === 'materials' || activeTab === 'catalogue') && (
             <MaterialCatalogueView
               currentUser={currentUser}
               allUsers={users}
