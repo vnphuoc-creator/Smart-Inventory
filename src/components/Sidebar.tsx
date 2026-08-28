@@ -7,7 +7,6 @@ import {
   ShieldCheck,
   Sparkles,
   LogOut,
-  KeyRound,
   X,
   Settings,
   ExternalLink,
@@ -402,26 +401,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
               </div>
             </div>
 
-            <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between gap-1.5">
-              {onOpenChangePassword && (
-                <button
-                  type="button"
-                  onClick={onOpenChangePassword}
-                  className="flex-1 py-1 px-2 rounded-lg bg-slate-800 hover:bg-slate-750 text-slate-300 hover:text-white text-[11px] font-medium flex items-center justify-center gap-1.5 transition-colors border border-slate-700/60"
-                  title="Đổi mật khẩu tài khoản"
-                >
-                  <KeyRound className="w-3 h-3 text-blue-400" />
-                  <span>Đổi MK</span>
-                </button>
-              )}
-
+            <div className="pt-2 border-t border-slate-800/80">
               <button
                 type="button"
                 onClick={onLogout}
-                className="py-1 px-2.5 rounded-lg bg-rose-950/30 hover:bg-rose-900/40 text-rose-400 hover:text-rose-300 text-[11px] font-medium flex items-center justify-center gap-1.5 transition-colors border border-rose-800/40"
+                className="w-full py-1.5 px-3 rounded-lg bg-rose-950/30 hover:bg-rose-900/50 text-rose-400 hover:text-rose-200 text-xs font-medium flex items-center justify-center gap-2 transition-colors border border-rose-800/40 shadow-sm"
                 title="Đăng xuất khỏi hệ thống"
               >
-                <LogOut className="w-3 h-3" />
+                <LogOut className="w-3.5 h-3.5" />
                 <span>Đăng xuất</span>
               </button>
             </div>

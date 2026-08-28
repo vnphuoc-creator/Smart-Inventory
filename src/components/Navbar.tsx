@@ -179,20 +179,6 @@ export const Navbar: React.FC<NavbarProps> = ({
               <Sparkles className="w-4 h-4" />
             </button>
 
-            {/* Quick User Guide Button in Header */}
-            {onOpenUserGuide && (
-              <button
-                type="button"
-                id="btn-navbar-user-guide"
-                onClick={onOpenUserGuide}
-                className="p-2 sm:px-3 sm:py-1.5 rounded-xl bg-blue-650/30 hover:bg-blue-600/40 border border-blue-500/40 text-blue-200 hover:text-white flex items-center gap-1.5 text-xs transition-all shadow-sm group"
-                title="Xem hướng dẫn sử dụng chi tiết cho Nhân viên và Quản lý"
-              >
-                <BookOpen className="w-4 h-4 text-blue-400 group-hover:scale-110 transition-transform" />
-                <span className="hidden sm:inline font-semibold">Hướng Dẫn</span>
-              </button>
-            )}
-
             {/* Theme Toggle Button (Light / Dark Mode) */}
             {onToggleTheme && (
               <button
