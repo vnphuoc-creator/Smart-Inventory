@@ -207,3 +207,22 @@ export interface ActivityLog {
   ipAddress?: string;
 }
 
+export type Transaction = InventoryTransaction;
+
+export interface ReconciledProposalItem extends ProposalItem {
+  totalImported: number;
+  remainingNeeded: number;
+  isComplete: boolean;
+  currentAvailableStock?: number;
+}
+
+export interface ProposalReconciliation {
+  proposal: PurchaseProposal;
+  reconciledItems: ReconciledProposalItem[];
+  missingItems: ReconciledProposalItem[];
+  isFullyImported: boolean;
+  totalRequestedQty: number;
+  totalImportedQty: number;
+  relatedImportTxs: InventoryTransaction[];
+}
+
