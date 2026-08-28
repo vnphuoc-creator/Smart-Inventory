@@ -41,7 +41,7 @@ import {
   User,
   ProposalItem,
 } from '../types';
-import { formatVND, formatNumber, formatDisplayDate } from '../utils/inventoryEngine';
+import { formatVND, formatNumber, formatDisplayDate, isProposalMatch, normalizeProposalNumber } from '../utils/inventoryEngine';
 import { SearchableMaterialSelect } from './SearchableMaterialSelect';
 
 interface ProposalReconciliationViewProps {
@@ -144,16 +144,54 @@ export const ProposalReconciliationView: React.FC<ProposalReconciliationViewProp
     }
   };
 
+  // Effective proposals ensuring any proposal referenced in transactions is available
+  const effectiveProposals = useMemo(() => {
+    const list = [...proposals];
+    
+    // Discover any proposals referenced in transactions that are not in list
+    transactions.forEach((tx) => {
+      if (tx.proposalNumber && tx.proposalNumber.trim()) {
+        const exists = list.some((p) => isProposalMatch(p.proposalNumber, tx.proposalNumber));
+        if (!exists) {
+          list.push({
+            id: `prop-auto-${tx.id}`,
+            proposalNumber: tx.proposalNumber.trim(),
+            title: tx.title || `Tờ trình ${tx.proposalNumber.trim()}`,
+            date: tx.date || new Date().toISOString().split('T')[0],
+            creatorName: tx.creatorName || 'Hệ thống',
+            creatorEmail: tx.creatorEmail || '',
+            department: 'Đội Điện Nước Công Trình',
+            status: 'PARTIALLY_IMPORTED',
+            attachmentName: tx.attachmentName,
+            attachmentUrl: tx.attachmentUrl,
+            attachmentHtml: tx.attachmentHtml,
+            notes: `Tự động liên kết theo phiếu giao dịch ${tx.code}`,
+            createdAt: tx.createdAt || new Date().toISOString(),
+            items: tx.items.map((it) => ({
+              materialCode: it.materialCode,
+              materialName: it.materialName,
+              unit: it.unit,
+              requestedQuantity: it.quantity,
+              unitPrice: it.unitPrice,
+            })),
+          });
+        }
+      }
+    });
+
+    return list;
+  }, [proposals, transactions]);
+
   // Calculate reconciliation for all proposals
   const reconciliationData = useMemo(() => {
-    return proposals.map((proposal) => {
+    return effectiveProposals.map((proposal) => {
       // Find all approved or pending IMPORT transactions matching this proposal number
       const relatedImportTxs = transactions.filter(
         (tx) =>
           tx.type === 'IMPORT' &&
           tx.status !== 'REJECTED' &&
           tx.proposalNumber &&
-          tx.proposalNumber.trim().toLowerCase() === proposal.proposalNumber.trim().toLowerCase()
+          isProposalMatch(tx.proposalNumber, proposal.proposalNumber)
       );
 
       // Aggregate imported quantities by material code
@@ -242,7 +280,7 @@ export const ProposalReconciliationView: React.FC<ProposalReconciliationViewProp
         exportableItems,
       };
     });
-  }, [proposals, transactions, calculatedStocks]);
+  }, [effectiveProposals, transactions, calculatedStocks]);
 
   // Filtered proposals
   const filteredProposals = useMemo(() => {

@@ -26,6 +26,50 @@ export function validateMaterialCode(code: string): { isValid: boolean; error?: 
 }
 
 /**
+ * Normalizes proposal numbers for robust matching across Vietnamese diacritics,
+ * OCR variations, uppercase/lowercase, and separator characters.
+ * E.g., "22-ĐNCT/PKT", "22-DNCT/PKT", "22-BNCT/PKT", "Tờ trình 22", "22/DNCT"
+ */
+export function normalizeProposalNumber(num?: string | null): string {
+  if (!num) return '';
+  return num
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '') // remove diacritics
+    .replace(/[đĐ]/g, 'd')
+    .replace(/[^a-z0-9]/g, ''); // keep only alphanumerics
+}
+
+/**
+ * Checks if two proposal numbers match, using flexible rules:
+ * 1. Exact case-insensitive match
+ * 2. Normalized match (removing accents, dashes, slashes, 'Đ' vs 'D')
+ * 3. Primary numeric prefix match (e.g. number "22" matching if both contain "22" and "pkt" or "dnct")
+ */
+export function isProposalMatch(a?: string | null, b?: string | null): boolean {
+  if (!a || !b) return false;
+  const strA = a.trim().toLowerCase();
+  const strB = b.trim().toLowerCase();
+  if (strA === strB) return true;
+
+  const normA = normalizeProposalNumber(a);
+  const normB = normalizeProposalNumber(b);
+  if (normA && normB) {
+    if (normA === normB) return true;
+    if (normA.includes(normB) || normB.includes(normA)) return true;
+  }
+
+  // Check digit-based match (e.g. "22" in "22-DNCT/PKT")
+  const digitsA = strA.match(/\d+/g)?.join('') || '';
+  const digitsB = strB.match(/\d+/g)?.join('') || '';
+  if (digitsA && digitsB && digitsA === digitsB) {
+    return true;
+  }
+
+  return false;
+}
+
+/**
  * Format currency VNĐ
  */
 export function formatVND(amount: number): string {

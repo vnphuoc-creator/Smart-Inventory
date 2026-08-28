@@ -43,11 +43,12 @@ import {
   User,
   PurchaseProposal,
 } from '../types';
-import { formatVND, formatNumber, formatDisplayDate } from '../utils/inventoryEngine';
+import { formatVND, formatNumber, formatDisplayDate, isProposalMatch, normalizeProposalNumber } from '../utils/inventoryEngine';
 import { parseDocxHtml } from '../utils/docxProposalParser';
 import { AHTLogo } from './AHTLogo';
 import { ProposalReconciliationView } from './ProposalReconciliationView';
 import { SearchableMaterialSelect } from './SearchableMaterialSelect';
+import { ProposalItem } from '../types';
 
 interface TransactionManagementViewProps {
   currentUser: User;
@@ -120,6 +121,7 @@ export const TransactionManagementView: React.FC<TransactionManagementViewProps>
   const [formAttachmentHtml, setFormAttachmentHtml] = useState('');
   const [isScanningProposal, setIsScanningProposal] = useState(false);
   const [scanFeedback, setScanFeedback] = useState<string | null>(null);
+  const [scannedOriginalProposalItems, setScannedOriginalProposalItems] = useState<ProposalItem[]>([]);
   const [formItems, setFormItems] = useState<
     Array<{
       materialCode: string;
@@ -292,7 +294,7 @@ export const TransactionManagementView: React.FC<TransactionManagementViewProps>
   const matchedProposal = useMemo(() => {
     if (!formProposalNumber.trim()) return null;
     return proposals.find(
-      (p) => p.proposalNumber.trim().toLowerCase() === formProposalNumber.trim().toLowerCase()
+      (p) => isProposalMatch(p.proposalNumber, formProposalNumber)
     );
   }, [proposals, formProposalNumber]);
 
@@ -304,7 +306,7 @@ export const TransactionManagementView: React.FC<TransactionManagementViewProps>
         tx.type === 'IMPORT' &&
         tx.status !== 'REJECTED' &&
         tx.proposalNumber &&
-        tx.proposalNumber.trim().toLowerCase() === matchedProposal.proposalNumber.trim().toLowerCase()
+        isProposalMatch(tx.proposalNumber, matchedProposal.proposalNumber)
     );
 
     const importedMap = new Map<string, number>();
@@ -356,7 +358,7 @@ export const TransactionManagementView: React.FC<TransactionManagementViewProps>
         tx.type === 'IMPORT' &&
         tx.status === 'APPROVED' &&
         tx.proposalNumber &&
-        tx.proposalNumber.trim().toLowerCase() === matchedProposal.proposalNumber.trim().toLowerCase()
+        isProposalMatch(tx.proposalNumber, matchedProposal.proposalNumber)
     );
 
     const importedMap = new Map<string, number>();
@@ -586,15 +588,8 @@ export const TransactionManagementView: React.FC<TransactionManagementViewProps>
       // If server or client didn't extract items, or matched a known system proposal:
       const matchedSystemProposal = proposals.find((p) => {
         if (!detectedPropNum && !file.name) return false;
-        const targetNum = (detectedPropNum || '').toLowerCase().trim();
-        const fName = file.name.toLowerCase();
-        const pNum = p.proposalNumber.toLowerCase().trim();
-        const pDigits = pNum.replace(/[^0-9]/g, '');
-        const targetDigits = targetNum.replace(/[^0-9]/g, '');
-
-        if (targetNum && pNum === targetNum) return true;
-        if (targetDigits && targetDigits === pDigits) return true;
-        if (fName.includes(pNum) || (pDigits && fName.includes(pDigits))) return true;
+        if (detectedPropNum && isProposalMatch(p.proposalNumber, detectedPropNum)) return true;
+        if (file.name && isProposalMatch(p.proposalNumber, file.name)) return true;
         return false;
       });
 
@@ -610,6 +605,21 @@ export const TransactionManagementView: React.FC<TransactionManagementViewProps>
             notes: `Nhập theo Tờ trình ${matchedSystemProposal.proposalNumber}`,
           }));
         }
+        setScannedOriginalProposalItems(matchedSystemProposal.items);
+      } else if (detectedItems.length > 0) {
+        // Store the original scanned proposal items (requested quota)
+        setScannedOriginalProposalItems(
+          detectedItems.map((it) => {
+            const matchedMat = materials.find((m) => m.code === it.materialCode);
+            return {
+              materialCode: it.materialCode,
+              materialName: matchedMat ? matchedMat.name : it.materialName || 'Vật tư',
+              unit: matchedMat ? matchedMat.unit : it.unit || 'Cái',
+              requestedQuantity: Number(it.quantity) || 1,
+              unitPrice: Number(it.unitPrice) || (matchedMat ? matchedMat.unitPrice : 0),
+            };
+          })
+        );
       }
 
       // Apply detected fields to form
@@ -782,6 +792,43 @@ export const TransactionManagementView: React.FC<TransactionManagementViewProps>
     };
 
     onCreateTransaction(newTx);
+
+    // Auto-create or ensure Proposal exists in proposals list for tracking and reconciliation
+    if (formType === 'IMPORT' && formProposalNumber.trim() && onCreateProposal) {
+      const existingProp = proposals.find((p) => isProposalMatch(p.proposalNumber, formProposalNumber));
+      if (!existingProp) {
+        const propItems: ProposalItem[] =
+          scannedOriginalProposalItems.length > 0
+            ? scannedOriginalProposalItems
+            : preparedItems.map((pi) => ({
+                materialCode: pi.materialCode,
+                materialName: pi.materialName,
+                unit: pi.unit,
+                requestedQuantity: Math.max(pi.quantity, 1),
+                unitPrice: pi.unitPrice,
+              }));
+
+        const newProposalRecord: PurchaseProposal = {
+          id: `prop-${Date.now()}`,
+          proposalNumber: formProposalNumber.trim(),
+          title: formTitle.trim() || `Tờ trình ${formProposalNumber.trim()}`,
+          date: formDate,
+          creatorName: currentUser.fullName,
+          creatorEmail: currentUser.email,
+          department: 'Đội Điện Nước Công Trình',
+          status: 'PARTIALLY_IMPORTED',
+          attachmentName: formAttachmentName || undefined,
+          attachmentUrl: formAttachmentUrl || undefined,
+          attachmentHtml: formAttachmentHtml || undefined,
+          attachmentType: formAttachmentName.endsWith('.pdf') ? 'pdf' : 'image',
+          notes: formReason || `Tự động khởi tạo và theo dõi đối chiếu theo phiếu ${code}`,
+          items: propItems,
+          createdAt: new Date().toISOString(),
+        };
+        onCreateProposal(newProposalRecord);
+      }
+    }
+
     setIsCreateModalOpen(false);
 
     if (isAutoApprove) {
