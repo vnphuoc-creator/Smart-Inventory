@@ -71,7 +71,11 @@ export interface PurchaseProposal {
   creatorName: string;
   creatorEmail: string;
   department: string;
-  status: 'PENDING_APPROVAL' | 'APPROVED' | 'COMPLETED' | 'PARTIALLY_IMPORTED' | 'DRAFT' | 'SUBMITTED' | 'REJECTED';
+  status: 'PENDING_APPROVAL' | 'APPROVED' | 'COMPLETED' | 'PARTIALLY_IMPORTED' | 'CLOSED_EARLY' | 'DRAFT' | 'SUBMITTED' | 'REJECTED';
+  isClosedEarly?: boolean;
+  closedEarlyReason?: string;
+  closedEarlyDate?: string;
+  closedEarlyBy?: string;
   attachmentUrl?: string; // Data URL or Image/PDF link
   attachmentName?: string;
   attachmentType?: 'image' | 'pdf' | 'document';

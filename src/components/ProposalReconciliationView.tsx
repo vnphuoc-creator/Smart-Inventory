@@ -6,6 +6,7 @@ import {
   AlertTriangle,
   Clock,
   ArrowDownRight,
+  ArrowUpRight,
   FileText,
   Image as ImageIcon,
   Eye,
@@ -25,6 +26,12 @@ import {
   ChevronsLeft,
   ChevronsRight,
   MoveHorizontal,
+  Info,
+  HelpCircle,
+  Sparkles,
+  ShieldCheck,
+  CheckSquare,
+  Lock,
 } from 'lucide-react';
 import {
   PurchaseProposal,
@@ -44,6 +51,7 @@ interface ProposalReconciliationViewProps {
   materials: Material[];
   calculatedStocks: CalculatedMaterialStock[];
   onStartImportForProposal: (proposal: PurchaseProposal, missingItems: Array<{ materialCode: string; missingQty: number; unitPrice: number }>) => void;
+  onStartExportForProposal?: (proposal: PurchaseProposal, availableItems: Array<{ materialCode: string; maxExportQty: number; unitPrice: number; name: string }>) => void;
   onUpdateProposal?: (proposal: PurchaseProposal) => void;
   onCreateProposal?: (proposal: PurchaseProposal) => void;
   onDeleteProposal?: (proposalId: string) => void;
@@ -56,16 +64,20 @@ export const ProposalReconciliationView: React.FC<ProposalReconciliationViewProp
   materials,
   calculatedStocks,
   onStartImportForProposal,
+  onStartExportForProposal,
   onUpdateProposal,
   onCreateProposal,
   onDeleteProposal,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'ALL' | 'COMPLETED' | 'INCOMPLETE' | 'UNTOUCHED'>('ALL');
+  const [statusFilter, setStatusFilter] = useState<'ALL' | 'COMPLETED' | 'INCOMPLETE' | 'UNTOUCHED' | 'CLOSED_EARLY'>('ALL');
   const [expandedProposalId, setExpandedProposalId] = useState<string | null>(proposals[0]?.id || null);
   const [viewingAttachment, setViewingAttachment] = useState<{ url: string; name: string; type?: string } | null>(null);
   const [attachmentZoom, setAttachmentZoom] = useState<number>(100);
   const [proposalToDelete, setProposalToDelete] = useState<PurchaseProposal | null>(null);
+  const [proposalToCloseEarly, setProposalToCloseEarly] = useState<PurchaseProposal | null>(null);
+  const [closeEarlyReason, setCloseEarlyReason] = useState<string>('Nghiệm thu theo số lượng thực nhận, nhà cung cấp không giao tiếp phần còn thiếu.');
+  const [showWorkflowGuide, setShowWorkflowGuide] = useState<boolean>(true);
 
   // New Proposal Modal
   const [isNewProposalModalOpen, setIsNewProposalModalOpen] = useState(false);
@@ -157,13 +169,20 @@ export const ProposalReconciliationView: React.FC<ProposalReconciliationViewProp
       let totalRequestedQty = 0;
       let totalImportedQty = 0;
       let completedItemsCount = 0;
-      const missingItemsList: Array<{ materialCode: string; missingQty: number; unitPrice: number }> = [];
+      const missingItemsList: Array<{ materialCode: string; missingQty: number; unitPrice: number; name: string }> = [];
+      const exportableItems: Array<{ materialCode: string; maxExportQty: number; unitPrice: number; name: string; currentStock: number }> = [];
 
       const reconciledItems = proposal.items.map((pItem) => {
         const imported = importedMap.get(pItem.materialCode) || 0;
         const requested = Number(pItem.requestedQuantity) || 0;
         const missing = Math.max(0, requested - imported);
         const isFulfilled = imported >= requested;
+
+        // Current warehouse stock
+        const matStock = calculatedStocks.find((m) => m.code === pItem.materialCode);
+        const currentStock = matStock ? matStock.currentStock : 0;
+        const canExport = currentStock > 0;
+        const maxExportQty = Math.min(requested, currentStock);
 
         totalRequestedQty += requested;
         totalImportedQty += Math.min(requested, imported);
@@ -175,6 +194,17 @@ export const ProposalReconciliationView: React.FC<ProposalReconciliationViewProp
             materialCode: pItem.materialCode,
             missingQty: missing,
             unitPrice: pItem.unitPrice || 0,
+            name: pItem.materialName,
+          });
+        }
+
+        if (canExport && imported > 0) {
+          exportableItems.push({
+            materialCode: pItem.materialCode,
+            maxExportQty,
+            unitPrice: pItem.unitPrice || 0,
+            name: pItem.materialName,
+            currentStock,
           });
         }
 
@@ -184,12 +214,16 @@ export const ProposalReconciliationView: React.FC<ProposalReconciliationViewProp
           missingQuantity: missing,
           isFulfilled,
           percentFulfilled: requested > 0 ? Math.min(100, Math.round((imported / requested) * 100)) : 100,
+          currentStock,
+          canExport,
+          maxExportQty,
         };
       });
 
+      const isClosedEarly = Boolean(proposal.isClosedEarly || proposal.status === 'CLOSED_EARLY');
       const overallPercent =
         totalRequestedQty > 0 ? Math.min(100, Math.round((totalImportedQty / totalRequestedQty) * 100)) : 100;
-      const isFullyFulfilled = overallPercent >= 100 && missingItemsList.length === 0;
+      const isFullyFulfilled = (overallPercent >= 100 && missingItemsList.length === 0) || isClosedEarly;
       const isUntouched = totalImportedQty === 0;
 
       return {
@@ -201,18 +235,21 @@ export const ProposalReconciliationView: React.FC<ProposalReconciliationViewProp
         overallPercent,
         isFullyFulfilled,
         isUntouched,
+        isClosedEarly,
         completedItemsCount,
         totalItemsCount: proposal.items.length,
         missingItemsList,
+        exportableItems,
       };
     });
-  }, [proposals, transactions]);
+  }, [proposals, transactions, calculatedStocks]);
 
   // Filtered proposals
   const filteredProposals = useMemo(() => {
     return reconciliationData.filter((item) => {
-      if (statusFilter === 'COMPLETED' && !item.isFullyFulfilled) return false;
-      if (statusFilter === 'INCOMPLETE' && (item.isFullyFulfilled || item.isUntouched)) return false;
+      if (statusFilter === 'CLOSED_EARLY' && !item.isClosedEarly) return false;
+      if (statusFilter === 'COMPLETED' && (!item.isFullyFulfilled || item.isClosedEarly)) return false;
+      if (statusFilter === 'INCOMPLETE' && (item.isFullyFulfilled || item.isUntouched || item.isClosedEarly)) return false;
       if (statusFilter === 'UNTOUCHED' && !item.isUntouched) return false;
 
       if (searchQuery.trim()) {
@@ -322,9 +359,25 @@ export const ProposalReconciliationView: React.FC<ProposalReconciliationViewProp
     setNewPropAttachmentUrl('');
   };
 
-  const completedCount = reconciliationData.filter((r) => r.isFullyFulfilled).length;
-  const incompleteCount = reconciliationData.filter((r) => !r.isFullyFulfilled && !r.isUntouched).length;
-  const untouchedCount = reconciliationData.filter((r) => r.isUntouched).length;
+  const handleConfirmCloseEarly = () => {
+    if (!proposalToCloseEarly || !onUpdateProposal) return;
+    const updated: PurchaseProposal = {
+      ...proposalToCloseEarly,
+      status: 'CLOSED_EARLY',
+      isClosedEarly: true,
+      closedEarlyReason: closeEarlyReason.trim() || 'Nghiệm thu theo số lượng thực nhận',
+      closedEarlyDate: new Date().toISOString().split('T')[0],
+      closedEarlyBy: currentUser.fullName,
+      notes: `${proposalToCloseEarly.notes ? proposalToCloseEarly.notes + ' | ' : ''}Đã chốt kết thúc ngày ${formatDisplayDate(new Date().toISOString().split('T')[0])} bởi ${currentUser.fullName}. Lý do: ${closeEarlyReason}`,
+    };
+    onUpdateProposal(updated);
+    setProposalToCloseEarly(null);
+  };
+
+  const completedCount = reconciliationData.filter((r) => r.isFullyFulfilled && !r.isClosedEarly).length;
+  const closedEarlyCount = reconciliationData.filter((r) => r.isClosedEarly).length;
+  const incompleteCount = reconciliationData.filter((r) => !r.isFullyFulfilled && !r.isUntouched && !r.isClosedEarly).length;
+  const untouchedCount = reconciliationData.filter((r) => r.isUntouched && !r.isClosedEarly).length;
 
   return (
     <div className="space-y-6">
@@ -337,27 +390,35 @@ export const ProposalReconciliationView: React.FC<ProposalReconciliationViewProp
                 <FileCheck className="w-5 h-5" />
               </div>
               <h2 className="text-lg font-bold text-white tracking-tight">
-                Đối Chiếu Tờ Trình Nhập Kho & Nhập Bổ Sung
+                Đối Chiếu Tờ Trình Nhập Kho & Tiến Độ Cung Ứng
               </h2>
             </div>
             <p className="text-xs text-slate-300 max-w-3xl leading-relaxed">
-              Theo dõi số lượng đã nhập thực tế so với Tờ trình Quản lý đã ký duyệt. Hệ thống tự động phát hiện số lượng còn thiếu,
-              thông báo khi đã nhập đủ 100%, và cho phép lập phiếu nhập bổ sung đúng vào từng Tờ trình.
+              Quản lý đối chiếu giữa Tờ trình mua sắm và các đợt Nhập - Xuất kho thực tế. Hệ thống hỗ trợ nhập hàng nhiều đợt, cho phép xuất kho thi công ngay các vật tư đã về kho mà không bị tắc nghẽn quy trình.
             </p>
           </div>
 
-          <button
-            id="btn-create-new-proposal"
-            onClick={() => setIsNewProposalModalOpen(true)}
-            className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2.5 rounded-xl text-xs font-semibold flex items-center gap-2 transition-all shadow-md shadow-blue-600/30 shrink-0"
-          >
-            <Plus className="w-4 h-4" />
-            <span>+ Tạo Tờ Trình Mới</span>
-          </button>
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              onClick={() => setShowWorkflowGuide(!showWorkflowGuide)}
+              className="bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 px-3 py-2.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors"
+            >
+              <HelpCircle className="w-4 h-4 text-indigo-400" />
+              <span>{showWorkflowGuide ? 'Ẩn Hướng Dẫn' : 'Xem Hướng Dẫn Nghiệp Vụ'}</span>
+            </button>
+            <button
+              id="btn-create-new-proposal"
+              onClick={() => setIsNewProposalModalOpen(true)}
+              className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2.5 rounded-xl text-xs font-semibold flex items-center gap-2 transition-all shadow-md shadow-blue-600/30 shrink-0"
+            >
+              <Plus className="w-4 h-4" />
+              <span>+ Tạo Tờ Trình Mới</span>
+            </button>
+          </div>
         </div>
 
         {/* Stats Grid */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-5 pt-4 border-t border-slate-800 text-xs">
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mt-5 pt-4 border-t border-slate-800 text-xs">
           <div className="bg-slate-800/60 p-3 rounded-xl border border-slate-700/50">
             <div className="text-slate-400 text-[11px]">Tổng số Tờ trình:</div>
             <div className="text-lg font-bold text-white font-mono mt-0.5">{proposals.length}</div>
@@ -370,9 +431,15 @@ export const ProposalReconciliationView: React.FC<ProposalReconciliationViewProp
           </div>
           <div className="bg-slate-800/60 p-3 rounded-xl border border-amber-500/20">
             <div className="text-amber-400 text-[11px] flex items-center gap-1">
-              <Clock className="w-3.5 h-3.5" /> Đang nhập thiếu (Cần bổ sung):
+              <Clock className="w-3.5 h-3.5" /> Đang nhập thiếu:
             </div>
             <div className="text-lg font-bold text-amber-300 font-mono mt-0.5">{incompleteCount}</div>
+          </div>
+          <div className="bg-slate-800/60 p-3 rounded-xl border border-purple-500/20">
+            <div className="text-purple-400 text-[11px] flex items-center gap-1">
+              <Lock className="w-3.5 h-3.5" /> Đã chốt đóng sớm:
+            </div>
+            <div className="text-lg font-bold text-purple-300 font-mono mt-0.5">{closedEarlyCount}</div>
           </div>
           <div className="bg-slate-800/60 p-3 rounded-xl border border-slate-700/50">
             <div className="text-slate-400 text-[11px]">Chưa nhập kho (0%):</div>
@@ -380,6 +447,91 @@ export const ProposalReconciliationView: React.FC<ProposalReconciliationViewProp
           </div>
         </div>
       </div>
+
+      {/* Workflow Guide Card */}
+      {showWorkflowGuide && (
+        <div className="bg-gradient-to-br from-indigo-950/50 via-slate-900 to-slate-900 border border-indigo-500/30 rounded-2xl p-5 shadow-md relative overflow-hidden">
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex items-center gap-2.5">
+              <div className="p-2 rounded-xl bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+                <HelpCircle className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                  Quy Trình Nghiệp Vụ: Nhập & Xuất Kho Theo Đợt Khi Hàng Chưa Về Đủ
+                  <span className="text-[10px] bg-indigo-500/30 text-indigo-200 border border-indigo-400/30 px-2 py-0.5 rounded-full uppercase tracking-wider font-semibold">
+                    Giải Pháp Thông Suốt
+                  </span>
+                </h3>
+                <p className="text-xs text-slate-300 mt-0.5">
+                  Xử lý trường hợp nhà cung cấp giao thiếu hoặc giao làm nhiều đợt nhưng công trình cần xuất ngay vật tư đợt 1 để thi công.
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={() => setShowWorkflowGuide(false)}
+              className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800"
+              title="Ẩn hướng dẫn"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mt-4 pt-4 border-t border-indigo-900/40 text-xs">
+            <div className="bg-slate-850/80 p-3.5 rounded-xl border border-blue-500/20 flex flex-col justify-between">
+              <div className="space-y-1.5">
+                <div className="flex items-center gap-1.5 text-blue-400 font-bold">
+                  <span className="w-5 h-5 rounded-full bg-blue-500/20 border border-blue-400/40 flex items-center justify-center text-[11px]">1</span>
+                  Lập Nhập Kho Đợt 1
+                </div>
+                <p className="text-[11px] text-slate-300 leading-relaxed">
+                  Nhân viên chọn Tờ trình và lập phiếu nhập kho theo <strong>số lượng thực tế nhận được</strong> (mặt hàng chưa về để 0 hoặc xoá khỏi phiếu).
+                </p>
+              </div>
+              <div className="text-[10px] text-blue-300/80 mt-2 italic font-mono">➡ Không cần chờ đủ 100%</div>
+            </div>
+
+            <div className="bg-slate-850/80 p-3.5 rounded-xl border border-emerald-500/20 flex flex-col justify-between">
+              <div className="space-y-1.5">
+                <div className="flex items-center gap-1.5 text-emerald-400 font-bold">
+                  <span className="w-5 h-5 rounded-full bg-emerald-500/20 border border-emerald-400/40 flex items-center justify-center text-[11px]">2</span>
+                  Duyệt Phiếu Đợt 1
+                </div>
+                <p className="text-[11px] text-slate-300 leading-relaxed">
+                  Quản lý <strong>Duyệt phiếu nhập đợt 1</strong>. Tồn kho các vật tư thực nhận <strong>được cộng ngay lập tức</strong>. Tờ trình vẫn bảo lưu các món còn thiếu.
+                </p>
+              </div>
+              <div className="text-[10px] text-emerald-300/80 mt-2 italic font-mono">➡ Tồn kho tăng tức thì</div>
+            </div>
+
+            <div className="bg-slate-850/80 p-3.5 rounded-xl border border-amber-500/20 flex flex-col justify-between">
+              <div className="space-y-1.5">
+                <div className="flex items-center gap-1.5 text-amber-400 font-bold">
+                  <span className="w-5 h-5 rounded-full bg-amber-500/20 border border-amber-400/40 flex items-center justify-center text-[11px]">3</span>
+                  Xuất Kho Thi Công Ngay
+                </div>
+                <p className="text-[11px] text-slate-300 leading-relaxed">
+                  Nhân viên bấm <strong>"Xuất kho vật tư sẵn có"</strong> để xuất ngay các món đã có trong kho đi phục vụ công trường mà không hề bị chặn.
+                </p>
+              </div>
+              <div className="text-[10px] text-amber-300/80 mt-2 italic font-mono">➡ Không trễ hạn thi công</div>
+            </div>
+
+            <div className="bg-slate-850/80 p-3.5 rounded-xl border border-purple-500/20 flex flex-col justify-between">
+              <div className="space-y-1.5">
+                <div className="flex items-center gap-1.5 text-purple-400 font-bold">
+                  <span className="w-5 h-5 rounded-full bg-purple-500/20 border border-purple-400/40 flex items-center justify-center text-[11px]">4</span>
+                  Nhập Đợt Sau / Chốt Sớm
+                </div>
+                <p className="text-[11px] text-slate-300 leading-relaxed">
+                  Khi NCC giao đợt tiếp: bấm <strong>"Nhập bổ sung số còn thiếu"</strong>. Nếu NCC hết hàng không giao tiếp: Quản lý chọn <strong>"Chốt đóng Tờ trình"</strong>.
+                </p>
+              </div>
+              <div className="text-[10px] text-purple-300/80 mt-2 italic font-mono">➡ Hoàn tất linh hoạt</div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Filter and Search Bar */}
       <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
@@ -409,6 +561,15 @@ export const ProposalReconciliationView: React.FC<ProposalReconciliationViewProp
           >
             <CheckCircle2 className="w-3.5 h-3.5" />
             <span>Đã Đủ 100% ({completedCount})</span>
+          </button>
+          <button
+            onClick={() => setStatusFilter('CLOSED_EARLY')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors flex items-center gap-1 whitespace-nowrap ${
+              statusFilter === 'CLOSED_EARLY' ? 'bg-purple-600 text-white' : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <Lock className="w-3.5 h-3.5" />
+            <span>Đã Chốt Sớm ({closedEarlyCount})</span>
           </button>
           <button
             onClick={() => setStatusFilter('UNTOUCHED')}
@@ -455,7 +616,9 @@ export const ProposalReconciliationView: React.FC<ProposalReconciliationViewProp
               overallPercent,
               isFullyFulfilled,
               isUntouched,
+              isClosedEarly,
               missingItemsList,
+              exportableItems,
               relatedImportTxs,
             } = item;
 
@@ -465,7 +628,9 @@ export const ProposalReconciliationView: React.FC<ProposalReconciliationViewProp
               <div
                 key={proposal.id}
                 className={`bg-slate-900 border rounded-2xl transition-all shadow-sm ${
-                  isFullyFulfilled
+                  isClosedEarly
+                    ? 'border-purple-500/40 hover:border-purple-500/60'
+                    : isFullyFulfilled
                     ? 'border-emerald-500/30 hover:border-emerald-500/50'
                     : isUntouched
                     ? 'border-slate-800 hover:border-slate-700'
@@ -483,7 +648,11 @@ export const ProposalReconciliationView: React.FC<ProposalReconciliationViewProp
                         Số: {proposal.proposalNumber}
                       </span>
 
-                      {isFullyFulfilled ? (
+                      {isClosedEarly ? (
+                        <span className="inline-flex items-center gap-1 text-[11px] bg-purple-500/20 text-purple-300 border border-purple-500/40 px-2.5 py-0.5 rounded-full font-bold">
+                          <Lock className="w-3.5 h-3.5" /> ĐÃ CHỐT ĐÓNG SỚM ({overallPercent}%)
+                        </span>
+                      ) : isFullyFulfilled ? (
                         <span className="inline-flex items-center gap-1 text-[11px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 px-2.5 py-0.5 rounded-full font-bold">
                           <CheckCircle2 className="w-3.5 h-3.5" /> ĐÃ ĐỦ SỐ LƯỢNG (100%)
                         </span>
@@ -494,6 +663,12 @@ export const ProposalReconciliationView: React.FC<ProposalReconciliationViewProp
                       ) : (
                         <span className="inline-flex items-center gap-1 text-[11px] bg-amber-500/20 text-amber-300 border border-amber-500/40 px-2.5 py-0.5 rounded-full font-bold animate-pulse">
                           <AlertTriangle className="w-3.5 h-3.5" /> CÒN THIẾU {missingItemsList.length} MÓN ({overallPercent}%)
+                        </span>
+                      )}
+
+                      {exportableItems.length > 0 && (
+                        <span className="inline-flex items-center gap-1 text-[11px] bg-emerald-950/80 text-emerald-300 border border-emerald-600/50 px-2.5 py-0.5 rounded-full font-medium">
+                          <Check className="w-3.5 h-3.5 text-emerald-400" /> Có {exportableItems.length} vật tư sẵn sàng xuất kho
                         </span>
                       )}
 
@@ -542,22 +717,40 @@ export const ProposalReconciliationView: React.FC<ProposalReconciliationViewProp
                     <div className="w-36 text-right space-y-1">
                       <div className="flex items-center justify-between text-xs">
                         <span className="text-slate-400 text-[11px]">Tiến độ nhập:</span>
-                        <span className={`font-mono font-bold ${isFullyFulfilled ? 'text-emerald-400' : 'text-amber-400'}`}>
+                        <span className={`font-mono font-bold ${isClosedEarly ? 'text-purple-400' : isFullyFulfilled ? 'text-emerald-400' : 'text-amber-400'}`}>
                           {overallPercent}%
                         </span>
                       </div>
                       <div className="w-full h-2 bg-slate-800 rounded-full overflow-hidden">
                         <div
                           className={`h-full rounded-full transition-all ${
-                            isFullyFulfilled ? 'bg-emerald-500' : 'bg-amber-500'
+                            isClosedEarly ? 'bg-purple-500' : isFullyFulfilled ? 'bg-emerald-500' : 'bg-amber-500'
                           }`}
                           style={{ width: `${overallPercent}%` }}
                         />
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-2">
-                      {!isFullyFulfilled && (
+                    <div className="flex flex-wrap items-center gap-2">
+                      {/* Button: Xuất kho vật tư sẵn có (nếu có hàng trong kho) */}
+                      {exportableItems.length > 0 && onStartExportForProposal && (
+                        <button
+                          type="button"
+                          id={`btn-export-proposal-${proposal.id}`}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onStartExportForProposal(proposal, exportableItems);
+                          }}
+                          className="bg-amber-600 hover:bg-amber-500 text-white px-3 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all shadow-sm shadow-amber-600/30"
+                          title="Xuất ngay các vật tư trong tờ trình đã có sẵn trong kho phục vụ công trường"
+                        >
+                          <ArrowUpRight className="w-4 h-4" />
+                          <span>Xuất Kho Sẵn Có ({exportableItems.length})</span>
+                        </button>
+                      )}
+
+                      {/* Button: Nhập kho / Nhập bổ sung */}
+                      {!isFullyFulfilled && !isClosedEarly && (
                         <button
                           type="button"
                           id={`btn-import-proposal-${proposal.id}`}
@@ -572,7 +765,7 @@ export const ProposalReconciliationView: React.FC<ProposalReconciliationViewProp
                         </button>
                       )}
 
-                      {isFullyFulfilled && (
+                      {isFullyFulfilled && !isClosedEarly && (
                         <button
                           type="button"
                           onClick={(e) => {
@@ -583,6 +776,22 @@ export const ProposalReconciliationView: React.FC<ProposalReconciliationViewProp
                         >
                           <Plus className="w-3.5 h-3.5" />
                           <span>Nhập thêm</span>
+                        </button>
+                      )}
+
+                      {/* Button: Chốt đóng tờ trình sớm */}
+                      {!isFullyFulfilled && !isClosedEarly && (currentUser.email === 'vn.phuoc235@gmail.com' || currentUser.role === 'ADMIN') && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setProposalToCloseEarly(proposal);
+                          }}
+                          className="bg-slate-800 hover:bg-purple-900/40 text-slate-300 hover:text-purple-200 border border-slate-700 hover:border-purple-500/40 px-3 py-2 rounded-xl text-xs font-medium flex items-center gap-1.5 transition-colors"
+                          title="Chốt đóng tờ trình theo số lượng thực nhận nếu NCC không giao tiếp"
+                        >
+                          <Lock className="w-3.5 h-3.5 text-purple-400" />
+                          <span>Chốt Đóng Tờ Trình</span>
                         </button>
                       )}
 
@@ -617,13 +826,24 @@ export const ProposalReconciliationView: React.FC<ProposalReconciliationViewProp
                       </div>
                     )}
 
+                    {isClosedEarly && (
+                      <div className="text-xs bg-purple-950/40 p-3.5 rounded-xl border border-purple-600/40 text-purple-200 space-y-1">
+                        <div className="font-bold flex items-center gap-1.5 text-purple-300">
+                          <Lock className="w-4 h-4" /> Tờ trình này đã được chốt kết thúc sớm:
+                        </div>
+                        <p className="text-[11px] text-purple-200/90">
+                          Lý do: {proposal.closedEarlyReason || 'Nghiệm thu theo số thực nhận.'} (Chốt ngày {formatDisplayDate(proposal.closedEarlyDate || '')} bởi {proposal.closedEarlyBy || 'Quản lý'})
+                        </p>
+                      </div>
+                    )}
+
                     <div>
                       <div className="flex items-center justify-between mb-2.5">
                         <h4 className="text-xs font-bold text-slate-200 uppercase tracking-wider">
-                          Chi Tiết Bảng Đối Chiếu Vật Tư (Đề Xuất vs. Thực Nhập Lũy Kế)
+                          Chi Tiết Bảng Đối Chiếu Vật Tư & Tồn Kho Sẵn Có
                         </h4>
                         <span className="text-[11px] text-slate-400">
-                          Đã hoàn thành: <strong className="text-white">{item.completedItemsCount}/{item.totalItemsCount}</strong> vật tư
+                          Đã hoàn thành: <strong className="text-white">{item.completedItemsCount}/{item.totalItemsCount}</strong> vật tư | Sẵn sàng xuất: <strong className="text-emerald-400">{exportableItems.length}</strong> món
                         </span>
                       </div>
 
@@ -638,7 +858,9 @@ export const ProposalReconciliationView: React.FC<ProposalReconciliationViewProp
                               <th className="py-2.5 px-3 text-right">Đề Xuất (Tờ Trình)</th>
                               <th className="py-2.5 px-3 text-right">Đã Nhập Lũy Kế</th>
                               <th className="py-2.5 px-3 text-right">Số Lượng Còn Thiếu</th>
-                              <th className="py-2.5 px-3 text-center">Tiến Độ</th>
+                              <th className="py-2.5 px-3 text-right text-emerald-400">Tồn Kho Hiện Tại</th>
+                              <th className="py-2.5 px-3 text-center">Khả Năng Xuất Kho</th>
+                              <th className="py-2.5 px-3 text-center">Tiến Độ Nhập</th>
                               <th className="py-2.5 px-3 text-center">Trạng Thái</th>
                             </tr>
                           </thead>
@@ -669,6 +891,26 @@ export const ProposalReconciliationView: React.FC<ProposalReconciliationViewProp
                                     </span>
                                   ) : (
                                     <span className="text-emerald-400 font-semibold">0 (Đã đủ)</span>
+                                  )}
+                                </td>
+                                <td className="py-2.5 px-3 text-right font-mono font-bold">
+                                  {pItem.currentStock > 0 ? (
+                                    <span className="text-emerald-400 font-bold bg-emerald-500/10 px-2 py-0.5 rounded">
+                                      {formatNumber(pItem.currentStock)} {pItem.unit}
+                                    </span>
+                                  ) : (
+                                    <span className="text-slate-500">0</span>
+                                  )}
+                                </td>
+                                <td className="py-2.5 px-3 text-center">
+                                  {pItem.currentStock > 0 && pItem.actualImported > 0 ? (
+                                    <span className="inline-flex items-center gap-1 text-[10px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-2 py-0.5 rounded-full font-bold">
+                                      <Check className="w-3 h-3" /> Sẵn sàng xuất ({pItem.maxExportQty})
+                                    </span>
+                                  ) : pItem.actualImported === 0 ? (
+                                    <span className="text-[10px] text-slate-500 font-medium">Chưa nhập kho</span>
+                                  ) : (
+                                    <span className="text-[10px] text-rose-400 font-medium">Đã xuất hết</span>
                                   )}
                                 </td>
                                 <td className="py-2.5 px-3 text-center">
@@ -1124,6 +1366,63 @@ export const ProposalReconciliationView: React.FC<ProposalReconciliationViewProp
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Confirm Close Proposal Early */}
+      {proposalToCloseEarly && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-sm animate-in fade-in duration-150">
+          <div className="w-full max-w-lg bg-slate-900 border border-purple-500/40 rounded-2xl p-6 shadow-2xl space-y-4">
+            <div className="flex items-center gap-3 text-purple-400">
+              <div className="w-10 h-10 rounded-xl bg-purple-500/10 border border-purple-500/30 flex items-center justify-center">
+                <Lock className="w-5 h-5 text-purple-400" />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-white">Chốt Kết Thúc Tờ Trình (Nghiệm Thu Thực Nhận)</h3>
+                <p className="text-xs text-purple-300 font-mono">Tờ trình: {proposalToCloseEarly.proposalNumber}</p>
+              </div>
+            </div>
+
+            <div className="bg-slate-850 p-3.5 rounded-xl border border-slate-800 text-xs text-slate-300 space-y-2">
+              <p>
+                Tiêu đề: <strong className="text-white">{proposalToCloseEarly.title}</strong>
+              </p>
+              <p className="text-[11px] text-amber-300/90 leading-relaxed">
+                💡 Khi chốt đóng, Tờ trình này sẽ được chuyển sang trạng thái <strong>"ĐÃ CHỐT ĐÓNG SỚM"</strong>, giải phóng đối soát và không còn hiện cảnh báo còn thiếu hàng. Các đợt nhập/xuất trước đó vẫn được lưu trữ đầy đủ.
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-300 mb-1">
+                Lý Do Chốt Đóng Sớm <span className="text-rose-400">*</span>:
+              </label>
+              <textarea
+                value={closeEarlyReason}
+                onChange={(e) => setCloseEarlyReason(e.target.value)}
+                rows={3}
+                placeholder="Nhập lý do chốt đóng (VD: NCC hết hàng không thể giao tiếp, chuyển sang phương án mua vật tư tương đương...)"
+                className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-purple-500"
+              />
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-800">
+              <button
+                type="button"
+                onClick={() => setProposalToCloseEarly(null)}
+                className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 transition"
+              >
+                Hủy bỏ
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmCloseEarly}
+                className="px-5 py-2 rounded-xl text-xs font-bold bg-purple-600 hover:bg-purple-500 text-white shadow-md shadow-purple-600/30 transition flex items-center gap-1.5"
+              >
+                <Check className="w-4 h-4" />
+                Xác Nhận Chốt Đóng Tờ Trình
+              </button>
+            </div>
           </div>
         </div>
       )}

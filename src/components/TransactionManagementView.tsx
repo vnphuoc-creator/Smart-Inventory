@@ -347,6 +347,128 @@ export const TransactionManagementView: React.FC<TransactionManagementViewProps>
     };
   }, [matchedProposal, transactions]);
 
+  // Check how much is available in warehouse to export for this matched proposal
+  const matchedProposalExportStock = useMemo(() => {
+    if (!matchedProposal || formType !== 'EXPORT') return null;
+
+    const relatedImportTxs = transactions.filter(
+      (tx) =>
+        tx.type === 'IMPORT' &&
+        tx.status === 'APPROVED' &&
+        tx.proposalNumber &&
+        tx.proposalNumber.trim().toLowerCase() === matchedProposal.proposalNumber.trim().toLowerCase()
+    );
+
+    const importedMap = new Map<string, number>();
+    relatedImportTxs.forEach((tx) => {
+      tx.items.forEach((item) => {
+        const current = importedMap.get(item.materialCode) || 0;
+        importedMap.set(item.materialCode, current + (Number(item.quantity) || 0));
+      });
+    });
+
+    const itemStatusList = matchedProposal.items.map((pItem) => {
+      const matStock = calculatedStocks.find((m) => m.code === pItem.materialCode);
+      const actualImported = importedMap.get(pItem.materialCode) || 0;
+      const currentStock = matStock ? matStock.currentStock : 0;
+      const canExport = currentStock > 0;
+      const maxExport = Math.min(pItem.requestedQuantity, currentStock);
+
+      return {
+        materialCode: pItem.materialCode,
+        materialName: pItem.materialName,
+        unit: pItem.unit,
+        unitPrice: pItem.unitPrice || 0,
+        requestedQuantity: pItem.requestedQuantity,
+        actualImported,
+        currentStock,
+        canExport,
+        maxExport,
+      };
+    });
+
+    const readyItems = itemStatusList.filter((i) => i.canExport);
+    const notReadyItems = itemStatusList.filter((i) => !i.canExport);
+
+    return {
+      itemStatusList,
+      readyItems,
+      notReadyItems,
+      totalRequested: matchedProposal.items.length,
+      readyCount: readyItems.length,
+    };
+  }, [matchedProposal, formType, transactions, calculatedStocks]);
+
+  // Auto-fill available items for EXPORT from matched proposal
+  const handleAutoFillReadyExportItems = () => {
+    if (!matchedProposalExportStock || matchedProposalExportStock.readyItems.length === 0) return;
+    setFormItems(
+      matchedProposalExportStock.readyItems.map((r) => ({
+        materialCode: r.materialCode,
+        quantity: Math.max(1, r.maxExport),
+        unitPrice: r.unitPrice,
+        notes: `Xuất thi công vật tư đã nhập kho theo Tờ trình ${formProposalNumber}`,
+      }))
+    );
+  };
+
+  // Helper: Start export directly from a Proposal
+  const handleStartExportForProposal = (
+    proposal: PurchaseProposal,
+    availableItems: Array<{ materialCode: string; maxExportQty: number; unitPrice: number; name: string }>
+  ) => {
+    setFormType('EXPORT');
+    setFormProposalNumber(proposal.proposalNumber);
+    setFormTitle(`Phiếu xuất kho theo Tờ trình ${proposal.proposalNumber}`);
+    setFormWarehouse('Kho Tổng');
+    setFormReason(`Xuất kho vật tư phục vụ thi công công trình theo Tờ trình ${proposal.proposalNumber}`);
+    setFormDate(new Date().toISOString().split('T')[0]);
+    setFormAttachmentName(proposal.attachmentName || '');
+    setFormAttachmentUrl(proposal.attachmentUrl || '');
+    setFormAttachmentHtml(proposal.attachmentHtml || '');
+
+    if (availableItems && availableItems.length > 0) {
+      setFormItems(
+        availableItems.map((item) => ({
+          materialCode: item.materialCode,
+          quantity: Math.max(1, item.maxExportQty),
+          unitPrice: item.unitPrice,
+          notes: `Xuất thi công vật tư đã có trong kho theo Tờ trình ${proposal.proposalNumber}`,
+        }))
+      );
+    } else {
+      // Find items in proposal with stock > 0
+      const itemsWithStock: typeof formItems = [];
+      proposal.items.forEach((pItem) => {
+        const matStock = calculatedStocks.find((m) => m.code === pItem.materialCode);
+        const currentStock = matStock ? matStock.currentStock : 0;
+        if (currentStock > 0) {
+          itemsWithStock.push({
+            materialCode: pItem.materialCode,
+            quantity: Math.min(pItem.requestedQuantity, currentStock),
+            unitPrice: pItem.unitPrice || 0,
+            notes: `Xuất thi công theo Tờ trình ${proposal.proposalNumber}`,
+          });
+        }
+      });
+
+      if (itemsWithStock.length > 0) {
+        setFormItems(itemsWithStock);
+      } else {
+        const defaultMat = materials[0];
+        setFormItems([
+          {
+            materialCode: defaultMat ? defaultMat.code : '',
+            quantity: 1,
+            unitPrice: defaultMat ? defaultMat.unitPrice : 0,
+            notes: `Xuất thi công theo Tờ trình ${proposal.proposalNumber}`,
+          },
+        ]);
+      }
+    }
+    setIsCreateModalOpen(true);
+  };
+
   // Auto-fill missing items from matched proposal
   const handleAutoFillMissingItems = () => {
     if (!matchedProposalProgress || matchedProposalProgress.missing.length === 0) return;
@@ -930,6 +1052,7 @@ export const TransactionManagementView: React.FC<TransactionManagementViewProps>
           proposals={proposals}
           calculatedStocks={calculatedStocks}
           onStartImportForProposal={handleStartImportForProposal}
+          onStartExportForProposal={handleStartExportForProposal}
           onUpdateProposal={onUpdateProposal}
           onCreateProposal={onCreateProposal}
           onDeleteProposal={onDeleteProposal}
@@ -1373,15 +1496,60 @@ export const TransactionManagementView: React.FC<TransactionManagementViewProps>
                   </div>
                 </div>
               ) : (
-                <div>
-                  <label className="block text-slate-300 font-medium mb-1">Lý Do Xuất Kho</label>
-                  <input
-                    type="text"
-                    value={formReason}
-                    onChange={(e) => setFormReason(e.target.value)}
-                    placeholder="Mục đích xuất vật tư, công trình thi công hoặc kế hoạch bảo dưỡng..."
-                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2 text-white focus:outline-none focus:border-blue-500"
-                  />
+                <div className="space-y-3">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-slate-300 font-medium mb-1">
+                        Căn Cứ Tờ Trình Xuất Vật Tư (Tùy chọn)
+                      </label>
+                      <input
+                        type="text"
+                        value={formProposalNumber}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setFormProposalNumber(val);
+                        }}
+                        onBlur={() => {
+                          const trimmed = formProposalNumber.trim();
+                          if (/^\d{1,4}$/.test(trimmed)) {
+                            setFormProposalNumber(`${trimmed}-DNCT/PKT`);
+                          }
+                        }}
+                        placeholder="Ví dụ: 17, 29, 26 hoặc 17-DNCT/PKT..."
+                        className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2 text-white font-mono focus:outline-none focus:border-amber-500 text-xs"
+                      />
+                      {/* Quick select proposal numbers */}
+                      <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
+                        <span className="text-[10px] text-slate-400">Gợi ý nhanh:</span>
+                        {proposals.slice(0, 5).map((p) => {
+                          return (
+                            <button
+                              key={p.id}
+                              type="button"
+                              onClick={() => setFormProposalNumber(p.proposalNumber)}
+                              className={`text-[10px] font-mono px-2 py-0.5 rounded border transition-colors ${
+                                formProposalNumber === p.proposalNumber
+                                  ? 'bg-amber-600 text-white border-amber-500'
+                                  : 'bg-slate-800 text-slate-300 border-slate-700 hover:border-amber-500 hover:text-white'
+                              }`}
+                            >
+                              {p.proposalNumber}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-slate-300 font-medium mb-1">Lý Do Xuất Kho</label>
+                      <input
+                        type="text"
+                        value={formReason}
+                        onChange={(e) => setFormReason(e.target.value)}
+                        placeholder="Mục đích xuất vật tư, công trình thi công hoặc kế hoạch bảo dưỡng..."
+                        className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2 text-white focus:outline-none focus:border-amber-500"
+                      />
+                    </div>
+                  </div>
                 </div>
               )}
 
@@ -1456,41 +1624,46 @@ export const TransactionManagementView: React.FC<TransactionManagementViewProps>
                 )}
               </div>
 
-              {/* Real-time Proposal Reconciliation Banner */}
+              {/* Real-time Proposal Reconciliation Banner (IMPORT Mode) */}
               {formType === 'IMPORT' && matchedProposal && matchedProposalProgress && (
                 <div
-                  className={`p-3 rounded-xl border text-xs ${
+                  className={`p-3.5 rounded-xl border text-xs ${
                     matchedProposalProgress.isComplete
                       ? 'bg-emerald-950/40 border-emerald-700/60 text-emerald-300'
                       : 'bg-indigo-950/40 border-indigo-700/60 text-indigo-200'
                   }`}
                 >
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                    <div className="flex items-center gap-2">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div className="flex items-start gap-2.5">
                       {matchedProposalProgress.isComplete ? (
-                        <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                        <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" />
                       ) : (
-                        <Clock className="w-4 h-4 text-indigo-400 shrink-0" />
+                        <Clock className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
                       )}
                       <div>
-                        <div className="font-semibold text-white">
-                          Đối chiếu với Tờ trình: {matchedProposal.proposalNumber} - {matchedProposal.title}
+                        <div className="font-semibold text-white text-sm">
+                          Căn cứ Tờ trình: {matchedProposal.proposalNumber} - {matchedProposal.title}
                         </div>
-                        <div className="text-[11px] opacity-90 mt-0.5">
+                        <div className="text-xs opacity-90 mt-1 space-y-0.5">
                           {matchedProposalProgress.isComplete ? (
-                            <span className="text-emerald-300 font-medium">
-                              ✔ Tờ trình này đã nhập đủ 100% số lượng ({matchedProposalProgress.totalImp}/{matchedProposalProgress.totalReq} vật tư qua {matchedProposalProgress.txCount} lần nhập).
-                            </span>
+                            <div className="text-emerald-300 font-medium flex items-center gap-1.5">
+                              <span>✔ Tờ trình này đã nhập đủ 100% số lượng ({matchedProposalProgress.totalImp}/{matchedProposalProgress.totalReq} vật tư qua {matchedProposalProgress.txCount} lần nhập).</span>
+                            </div>
                           ) : (
-                            <span>
-                              Tiến độ: <strong>{matchedProposalProgress.percent}%</strong> ({matchedProposalProgress.totalImp}/{matchedProposalProgress.totalReq} vật tư). Còn thiếu {matchedProposalProgress.missing.length} mặt hàng.
-                            </span>
+                            <div>
+                              <span>
+                                Tiến độ lũy kế: <strong className="text-amber-300">{matchedProposalProgress.percent}%</strong> ({matchedProposalProgress.totalImp}/{matchedProposalProgress.totalReq} vật tư). Còn thiếu <strong className="text-rose-300">{matchedProposalProgress.missing.length} mặt hàng</strong> chưa về kho.
+                              </span>
+                              <p className="text-[11px] text-slate-300/80 mt-1 italic">
+                                💡 Nhập theo đợt: Phiếu nhập này sau khi được Quản lý duyệt sẽ cộng tồn kho ngay cho các vật tư thực nhận. Tờ trình gốc vẫn được bảo lưu tiến độ để tiếp tục theo dõi các đợt giao sau.
+                              </p>
+                            </div>
                           )}
                         </div>
                       </div>
                     </div>
 
-                    <div className="flex flex-wrap items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2 shrink-0">
                       <button
                         type="button"
                         onClick={() => {
@@ -1518,6 +1691,61 @@ export const TransactionManagementView: React.FC<TransactionManagementViewProps>
                           <Clock className="w-3 h-3 text-amber-300" />
                           Nạp {matchedProposalProgress.missing.length} vật tư còn thiếu
                         </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Real-time Proposal Stock Readiness Banner (EXPORT Mode) */}
+              {formType === 'EXPORT' && matchedProposal && matchedProposalExportStock && (
+                <div
+                  className={`p-3.5 rounded-xl border text-xs ${
+                    matchedProposalExportStock.readyCount > 0
+                      ? 'bg-amber-950/30 border-amber-600/50 text-amber-200'
+                      : 'bg-rose-950/30 border-rose-600/50 text-rose-200'
+                  }`}
+                >
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div className="flex items-start gap-2.5">
+                      <ArrowUpRight className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
+                      <div>
+                        <div className="font-semibold text-white text-sm">
+                          Đối chiếu xuất kho theo Tờ trình: {matchedProposal.proposalNumber}
+                        </div>
+                        <div className="text-xs mt-1 space-y-1">
+                          <div>
+                            Trạng thái hàng trong kho:{' '}
+                            <strong className="text-emerald-300">
+                              {matchedProposalExportStock.readyCount}/{matchedProposalExportStock.totalRequested} mặt hàng đã có tồn kho
+                            </strong>
+                            {matchedProposalExportStock.notReadyItems.length > 0 && (
+                              <span className="text-slate-300">
+                                {' '}(còn {matchedProposalExportStock.notReadyItems.length} mặt hàng tồn kho = 0 do chưa nhập kho hoặc đã xuất hết).
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-[11px] text-slate-300/80 italic">
+                            💡 Bạn có thể xuất ngay các vật tư đã về kho đợt 1 để thi công trước mà không cần chờ cả tờ trình giao đủ 100%.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-2 shrink-0">
+                      {matchedProposalExportStock.readyCount > 0 ? (
+                        <button
+                          type="button"
+                          onClick={handleAutoFillReadyExportItems}
+                          className="bg-amber-600 hover:bg-amber-500 text-white font-semibold text-xs px-3.5 py-2 rounded-xl transition-colors flex items-center gap-1.5 shrink-0 shadow-sm shadow-amber-600/30"
+                        >
+                          <Sparkles className="w-3.5 h-3.5 text-amber-200" />
+                          Nạp {matchedProposalExportStock.readyCount} vật tư sẵn có trong kho
+                        </button>
+                      ) : (
+                        <div className="text-[11px] text-rose-300 bg-rose-900/40 border border-rose-700/50 px-2.5 py-1 rounded-lg">
+                          Chưa có vật tư nào trong Tờ trình này nhập vào kho!
+                        </div>
                       )}
                     </div>
                   </div>

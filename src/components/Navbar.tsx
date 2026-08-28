@@ -12,6 +12,7 @@ import {
   Moon,
   CheckCircle2,
   ExternalLink,
+  BookOpen,
 } from 'lucide-react';
 import { User } from '../types';
 import { AHTLogo } from './AHTLogo';
@@ -24,6 +25,7 @@ interface NavbarProps {
   onOpenAiSearch: () => void;
   onLogout?: () => void;
   onOpenChangePassword?: () => void;
+  onOpenUserGuide?: () => void;
   onToggleSidebar?: () => void;
   theme?: 'dark' | 'light';
   onToggleTheme?: () => void;
@@ -37,6 +39,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenAiSearch,
   onLogout,
   onOpenChangePassword,
+  onOpenUserGuide,
   onToggleSidebar,
   theme = 'dark',
   onToggleTheme,
@@ -176,6 +179,20 @@ export const Navbar: React.FC<NavbarProps> = ({
               <Sparkles className="w-4 h-4" />
             </button>
 
+            {/* Quick User Guide Button in Header */}
+            {onOpenUserGuide && (
+              <button
+                type="button"
+                id="btn-navbar-user-guide"
+                onClick={onOpenUserGuide}
+                className="p-2 sm:px-3 sm:py-1.5 rounded-xl bg-blue-650/30 hover:bg-blue-600/40 border border-blue-500/40 text-blue-200 hover:text-white flex items-center gap-1.5 text-xs transition-all shadow-sm group"
+                title="Xem hướng dẫn sử dụng chi tiết cho Nhân viên và Quản lý"
+              >
+                <BookOpen className="w-4 h-4 text-blue-400 group-hover:scale-110 transition-transform" />
+                <span className="hidden sm:inline font-semibold">Hướng Dẫn</span>
+              </button>
+            )}
+
             {/* Theme Toggle Button (Light / Dark Mode) */}
             {onToggleTheme && (
               <button
@@ -261,6 +278,22 @@ export const Navbar: React.FC<NavbarProps> = ({
 
                   {/* Actions list */}
                   <div className="space-y-1">
+                    {/* User Guide Option */}
+                    {onOpenUserGuide && (
+                      <button
+                        type="button"
+                        id="btn-menu-user-guide"
+                        onClick={() => {
+                          setShowUserDropdown(false);
+                          onOpenUserGuide();
+                        }}
+                        className="w-full text-left px-3 py-2.5 rounded-xl text-xs text-blue-300 hover:bg-blue-900/30 hover:text-white flex items-center gap-2.5 transition-colors font-medium border border-blue-500/20"
+                      >
+                        <BookOpen className="w-4 h-4 text-blue-400" />
+                        <span>Hướng dẫn sử dụng chi tiết</span>
+                      </button>
+                    )}
+
                     {/* Change Password Option */}
                     {onOpenChangePassword && (
                       <button

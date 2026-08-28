@@ -12,6 +12,7 @@ import {
   Settings,
   ExternalLink,
   FileX2,
+  BookOpen,
 } from 'lucide-react';
 import { User } from '../types';
 import { AHTLogo } from './AHTLogo';
@@ -23,6 +24,7 @@ interface SidebarProps {
   pendingApprovalsCount: number;
   onLogout: () => void;
   onOpenChangePassword?: () => void;
+  onOpenUserGuide?: () => void;
   isOpenMobile: boolean;
   onToggleMobile: () => void;
 }
@@ -34,6 +36,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   pendingApprovalsCount,
   onLogout,
   onOpenChangePassword,
+  onOpenUserGuide,
   isOpenMobile,
   onToggleMobile,
 }) => {
@@ -344,6 +347,38 @@ export const Sidebar: React.FC<SidebarProps> = ({
               );
             })}
           </div>
+
+          {/* Quick User Guide Button */}
+          {onOpenUserGuide && (
+            <div className="pt-2 border-t border-slate-800/80">
+              <button
+                type="button"
+                id="btn-sidebar-user-guide"
+                onClick={() => {
+                  onOpenUserGuide();
+                  if (isOpenMobile) onToggleMobile();
+                }}
+                className="w-full flex items-center justify-between px-3 py-2 rounded-xl text-left bg-gradient-to-r from-blue-900/30 to-indigo-900/30 hover:from-blue-900/50 hover:to-indigo-900/50 border border-blue-500/30 text-blue-200 hover:text-white transition-all group shadow-sm"
+              >
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className="p-1.5 rounded-lg bg-blue-500/20 text-blue-400 group-hover:text-blue-300">
+                    <BookOpen className="w-4 h-4" />
+                  </div>
+                  <div className="truncate">
+                    <div className="text-xs font-bold tracking-tight text-blue-100 group-hover:text-white">
+                      Hướng Dẫn Sử Dụng
+                    </div>
+                    <div className="text-[10px] text-blue-300/80">
+                      Cẩm nang cho NV &amp; Quản lý
+                    </div>
+                  </div>
+                </div>
+                <span className="text-[10px] bg-blue-500/30 text-blue-200 border border-blue-400/30 px-1.5 py-0.5 rounded font-mono font-bold">
+                  v2.5
+                </span>
+              </button>
+            </div>
+          )}
         </nav>
 
         {/* Bottom User Profile & Actions (Single logged-in user, no dropdown switch list) */}

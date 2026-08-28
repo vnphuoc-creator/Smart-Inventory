@@ -12,6 +12,7 @@ import { AiAssistantView } from './components/AiAssistantView';
 import { SmartSearchBar } from './components/SmartSearchBar';
 import { LoginView } from './components/LoginView';
 import { ChangePasswordModal } from './components/ChangePasswordModal';
+import { UserGuideModal } from './components/UserGuideModal';
 import {
   INITIAL_USERS,
   INITIAL_MATERIALS,
@@ -154,6 +155,7 @@ export function App() {
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [isSmartSearchOpen, setIsSmartSearchOpen] = useState(false);
   const [isChangePasswordOpen, setIsChangePasswordOpen] = useState(false);
+  const [isUserGuideOpen, setIsUserGuideOpen] = useState(false);
   const [appliedFilters, setAppliedFilters] = useState<NaturalSearchFilters | null>(null);
   const [filterExplanation, setFilterExplanation] = useState<string | null>(null);
   const [preselectedMaterialCode, setPreselectedMaterialCode] = useState<string | undefined>(undefined);
@@ -596,6 +598,7 @@ export function App() {
         pendingApprovalsCount={transactions.filter((t) => t.status === 'PENDING').length}
         onLogout={handleLogout}
         onOpenChangePassword={() => setIsChangePasswordOpen(true)}
+        onOpenUserGuide={() => setIsUserGuideOpen(true)}
         isOpenMobile={isMobileSidebarOpen}
         onToggleMobile={() => setIsMobileSidebarOpen(!isMobileSidebarOpen)}
       />
@@ -611,6 +614,7 @@ export function App() {
           onOpenAiSearch={() => setIsSmartSearchOpen(true)}
           onLogout={handleLogout}
           onOpenChangePassword={() => setIsChangePasswordOpen(true)}
+          onOpenUserGuide={() => setIsUserGuideOpen(true)}
           onToggleSidebar={() => setIsMobileSidebarOpen(!isMobileSidebarOpen)}
           theme={theme}
           onToggleTheme={handleToggleTheme}
@@ -830,6 +834,15 @@ export function App() {
         onUpdateUser={handleUpdateUser}
         onSuccessToast={(msg) => showToast(msg, 'success')}
       />
+
+      {/* Comprehensive In-App User Guide Modal */}
+      {currentUser && (
+        <UserGuideModal
+          isOpen={isUserGuideOpen}
+          onClose={() => setIsUserGuideOpen(false)}
+          currentUser={currentUser}
+        />
+      )}
 
       {/* Global Toast Alerts */}
       {toast && (
