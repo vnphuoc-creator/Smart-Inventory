@@ -12,6 +12,7 @@ import {
   ExternalLink,
   FileX2,
   BookOpen,
+  Cloud,
 } from 'lucide-react';
 import { User } from '../types';
 import { AHTLogo } from './AHTLogo';
@@ -414,10 +415,20 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </div>
           </div>
 
+          {/* Cloud Realtime Status Badge in Bottom Left */}
+          <div className="mt-2 flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/25 text-emerald-400">
+            <span className="flex items-center gap-1.5 text-[11px] font-semibold">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+              <Cloud className="w-3.5 h-3.5" />
+              <span>Cloud Realtime</span>
+            </span>
+            <span className="text-[10px] text-emerald-300/80 font-mono">Đồng bộ</span>
+          </div>
+
           {/* System Version Indicator in Bottom Left */}
-          <div className="mt-2.5 px-2 flex items-center justify-between text-[10px] text-slate-400 font-mono">
+          <div className="mt-2 px-2 flex items-center justify-between text-[10px] text-slate-400 font-mono">
             <span className="flex items-center gap-1.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+              <span className="w-1.5 h-1.5 rounded-full bg-blue-400"></span>
               <span>Version 1.0</span>
             </span>
             <span className="text-slate-400">AHT &bull; ĐNCT</span>
