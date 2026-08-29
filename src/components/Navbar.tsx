@@ -13,6 +13,8 @@ import {
   CheckCircle2,
   ExternalLink,
   BookOpen,
+  Cloud,
+  CloudCheck,
 } from 'lucide-react';
 import { User } from '../types';
 import { AHTLogo } from './AHTLogo';
@@ -167,8 +169,18 @@ export const Navbar: React.FC<NavbarProps> = ({
             </button>
           </div>
 
-          {/* Right section: Theme Switcher & User Profile */}
+          {/* Right section: Theme Switcher, Cloud Status & User Profile */}
           <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+            {/* Cloud Real-time Status Badge */}
+            <div
+              className="hidden lg:flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-semibold"
+              title="Đang đồng bộ dữ liệu Real-time với Firebase Cloud Database"
+            >
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+              <Cloud className="w-3.5 h-3.5" />
+              <span>Cloud Realtime</span>
+            </div>
+
             {/* Mobile AI button */}
             <button
               type="button"

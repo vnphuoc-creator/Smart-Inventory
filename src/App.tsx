@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Sidebar } from './components/Sidebar';
 import { Navbar } from './components/Navbar';
 import { DashboardView } from './components/DashboardView';
@@ -31,15 +31,37 @@ import {
 } from './types';
 import { calculateAllMaterialStocks, formatVND } from './utils/inventoryEngine';
 import {
+  subscribeToUsers,
+  subscribeToMaterials,
+  subscribeToProposals,
+  subscribeToTransactions,
+  subscribeToLogs,
+  saveUserToCloud,
+  deleteUserFromCloud,
+  saveMaterialToCloud,
+  deleteMaterialFromCloud,
+  saveProposalToCloud,
+  deleteProposalFromCloud,
+  saveTransactionToCloud,
+  deleteTransactionFromCloud,
+  saveLogToCloud,
+  seedMaterials,
+  seedProposals,
+  seedTransactions,
+  seedUsers,
+} from './services/firebaseSync';
+import {
   CheckCircle,
   AlertCircle,
   X,
   Sparkles,
   ShieldAlert,
+  Cloud,
+  CloudCheck,
 } from 'lucide-react';
 
 export function App() {
-  // Global User State with localStorage persistence
+  // Global User State with Firebase Cloud Real-time synchronization
   const [users, setUsers] = useState<User[]>(() => {
     const saved = localStorage.getItem('smart_users_v6');
     if (saved) {
@@ -64,10 +86,30 @@ export function App() {
     return users.find((u) => u.email === 'vn.phuoc235@gmail.com') || users.find((u) => u.role === 'ADMIN') || users[0];
   });
 
-  // Sync users to localStorage
-  React.useEffect(() => {
+  // Keep currentUser synced if user record is updated in users list (e.g. password changed on another device)
+  useEffect(() => {
+    if (currentUser) {
+      const updatedRecord = users.find((u) => u.id === currentUser.id);
+      if (updatedRecord && (updatedRecord.password !== currentUser.password || updatedRecord.fullName !== currentUser.fullName || updatedRecord.role !== currentUser.role)) {
+        setCurrentUser(updatedRecord);
+      }
+    }
+  }, [users, currentUser]);
+
+  // Sync users to localStorage as offline cache
+  useEffect(() => {
     localStorage.setItem('smart_users_v6', JSON.stringify(users));
   }, [users]);
+
+  // Connect Firebase Realtime Subscription for Users
+  useEffect(() => {
+    const unsubscribe = subscribeToUsers((cloudUsers) => {
+      if (cloudUsers && cloudUsers.length > 0) {
+        setUsers(cloudUsers);
+      }
+    }, INITIAL_USERS);
+    return () => unsubscribe();
+  }, []);
 
   const isMasterAdmin =
     currentUser?.email?.toLowerCase().trim() === 'vn.phuoc235@gmail.com' ||
@@ -92,11 +134,21 @@ export function App() {
     return INITIAL_MATERIALS;
   });
 
-  React.useEffect(() => {
+  useEffect(() => {
     localStorage.setItem('smart_materials_v12', JSON.stringify(materials));
   }, [materials]);
 
-  // Proposals State - Strictly respects user deletions without auto-repopulating deleted proposals
+  // Firebase Realtime Subscription for Materials
+  useEffect(() => {
+    const unsubscribe = subscribeToMaterials((cloudMaterials) => {
+      if (cloudMaterials && cloudMaterials.length > 0) {
+        setMaterials(cloudMaterials);
+      }
+    }, INITIAL_MATERIALS);
+    return () => unsubscribe();
+  }, []);
+
+  // Proposals State
   const [proposals, setProposals] = useState<PurchaseProposal[]>(() => {
     const saved = localStorage.getItem('smart_proposals_v5');
     if (saved !== null) {
@@ -110,11 +162,21 @@ export function App() {
     return INITIAL_PROPOSALS;
   });
 
-  React.useEffect(() => {
+  useEffect(() => {
     localStorage.setItem('smart_proposals_v5', JSON.stringify(proposals));
   }, [proposals]);
 
-  // Transactions State - Strictly respects user deletions without auto-repopulating deleted transactions
+  // Firebase Realtime Subscription for Proposals
+  useEffect(() => {
+    const unsubscribe = subscribeToProposals((cloudProposals) => {
+      if (cloudProposals) {
+        setProposals(cloudProposals);
+      }
+    }, INITIAL_PROPOSALS);
+    return () => unsubscribe();
+  }, []);
+
+  // Transactions State
   const [transactions, setTransactions] = useState<InventoryTransaction[]>(() => {
     const saved = localStorage.getItem('smart_transactions_v9');
     if (saved !== null) {
@@ -128,11 +190,21 @@ export function App() {
     return INITIAL_TRANSACTIONS;
   });
 
-  React.useEffect(() => {
+  useEffect(() => {
     localStorage.setItem('smart_transactions_v9', JSON.stringify(transactions));
   }, [transactions]);
 
-  // Real-time Activity Logs State (Restricted to Master Admin vn.phuoc235)
+  // Firebase Realtime Subscription for Transactions
+  useEffect(() => {
+    const unsubscribe = subscribeToTransactions((cloudTx) => {
+      if (cloudTx) {
+        setTransactions(cloudTx);
+      }
+    }, INITIAL_TRANSACTIONS);
+    return () => unsubscribe();
+  }, []);
+
+  // Real-time Activity Logs State
   const [activityLogs, setActivityLogs] = useState<ActivityLog[]>(() => {
     const saved = localStorage.getItem('smart_activity_logs_v3');
     if (saved !== null) {
@@ -146,9 +218,19 @@ export function App() {
     return INITIAL_ACTIVITY_LOGS;
   });
 
-  React.useEffect(() => {
+  useEffect(() => {
     localStorage.setItem('smart_activity_logs_v3', JSON.stringify(activityLogs));
   }, [activityLogs]);
+
+  // Firebase Realtime Subscription for Activity Logs
+  useEffect(() => {
+    const unsubscribe = subscribeToLogs((cloudLogs) => {
+      if (cloudLogs) {
+        setActivityLogs(cloudLogs);
+      }
+    }, INITIAL_ACTIVITY_LOGS);
+    return () => unsubscribe();
+  }, []);
 
   // Navigation & Modal State
   const [activeTab, setActiveTab] = useState<string>('dashboard');
@@ -168,7 +250,7 @@ export function App() {
     return saved === 'light' ? 'light' : 'dark';
   });
 
-  React.useEffect(() => {
+  useEffect(() => {
     localStorage.setItem('smart_theme_mode', theme);
     if (theme === 'light') {
       document.documentElement.classList.add('light-theme');
@@ -237,6 +319,7 @@ export function App() {
       amount: meta?.amount,
     };
     setActivityLogs((prev) => [newLog, ...prev]);
+    saveLogToCloud(newLog);
   };
 
   // Real-time calculated stocks calculation
@@ -256,6 +339,8 @@ export function App() {
       return [updatedProposal, ...prev];
     });
 
+    saveProposalToCloud(updatedProposal);
+
     logActivity(
       'UPDATE_PROPOSAL',
       'Cập nhật Tờ trình',
@@ -268,6 +353,7 @@ export function App() {
 
   const handleCreateProposal = (newProposal: PurchaseProposal) => {
     setProposals((prev) => [newProposal, ...prev]);
+    saveProposalToCloud(newProposal);
 
     logActivity(
       'CREATE_PROPOSAL',
@@ -322,6 +408,8 @@ export function App() {
       }
     });
 
+    saveMaterialToCloud(materialToSave);
+
     logActivity(
       'UPDATE_MATERIAL',
       'Cập nhật danh mục vật tư',
@@ -344,6 +432,8 @@ export function App() {
       return [updatedTx, ...prev];
     });
 
+    saveTransactionToCloud(updatedTx);
+
     logActivity(
       'UPDATE_TX',
       'Chỉnh sửa chứng từ kho',
@@ -363,6 +453,7 @@ export function App() {
   const handleDeleteMaterial = (materialId: string) => {
     const mat = materials.find((m) => m.id === materialId);
     setMaterials((prev) => prev.filter((m) => m.id !== materialId));
+    deleteMaterialFromCloud(materialId);
 
     logActivity(
       'DELETE_MATERIAL',
@@ -377,6 +468,7 @@ export function App() {
   // Handler: Create Transaction
   const handleCreateTransaction = (tx: InventoryTransaction) => {
     setTransactions((prev) => [tx, ...prev]);
+    saveTransactionToCloud(tx);
 
     logActivity(
       tx.type === 'IMPORT' ? 'IMPORT_TX' : 'EXPORT_TX',
@@ -401,77 +493,72 @@ export function App() {
   const handleApproveTransaction = (txId: string, note?: string) => {
     if (!currentUser) return;
     const targetTx = transactions.find((t) => t.id === txId);
+    if (!targetTx) return;
 
-    setTransactions((prev) =>
-      prev.map((t) => {
-        if (t.id === txId) {
-          return {
-            ...t,
-            status: 'APPROVED',
-            approverEmail: currentUser.email,
-            approverName: currentUser.fullName,
-            approvalDate: new Date().toISOString().split('T')[0],
-            approvalNote: note || 'Quản lý đã phê duyệt',
-          };
-        }
-        return t;
-      })
-    );
+    const approvedTx: InventoryTransaction = {
+      ...targetTx,
+      status: 'APPROVED',
+      approverEmail: currentUser.email,
+      approverName: currentUser.fullName,
+      approvalDate: new Date().toISOString().split('T')[0],
+      approvalNote: note || 'Quản lý đã phê duyệt',
+    };
+
+    setTransactions((prev) => prev.map((t) => (t.id === txId ? approvedTx : t)));
+    saveTransactionToCloud(approvedTx);
 
     logActivity(
       'APPROVE_TX',
       'Phê duyệt chứng từ kho',
-      `Quản lý ${currentUser.fullName} đã phê duyệt phiếu ${targetTx?.code || txId} (${targetTx?.type === 'IMPORT' ? 'Nhập kho' : 'Xuất kho'}). Ghi chú: ${note || 'Quản lý đã phê duyệt'}`,
+      `Quản lý ${currentUser.fullName} đã phê duyệt phiếu ${approvedTx.code} (${approvedTx.type === 'IMPORT' ? 'Nhập kho' : 'Xuất kho'}). Ghi chú: ${note || 'Quản lý đã phê duyệt'}`,
       {
-        documentCode: targetTx?.code || txId,
-        proposalNumber: targetTx?.proposalNumber,
+        documentCode: approvedTx.code,
+        proposalNumber: approvedTx.proposalNumber,
         targetType: 'TRANSACTION',
-        amount: targetTx?.totalAmount,
+        amount: approvedTx.totalAmount,
       }
     );
 
-    showToast(`Quản lý ${currentUser.fullName} đã phê duyệt phiếu "${targetTx?.code || txId}". Tồn kho được cập nhật tức thì!`);
+    showToast(`Quản lý ${currentUser.fullName} đã phê duyệt phiếu "${approvedTx.code}". Tồn kho được cập nhật tức thì!`);
   };
 
   // Handler: Reject Transaction
   const handleRejectTransaction = (txId: string, note?: string) => {
     if (!currentUser) return;
     const targetTx = transactions.find((t) => t.id === txId);
+    if (!targetTx) return;
 
-    setTransactions((prev) =>
-      prev.map((t) => {
-        if (t.id === txId) {
-          return {
-            ...t,
-            status: 'REJECTED',
-            approverEmail: currentUser.email,
-            approverName: currentUser.fullName,
-            approvalDate: new Date().toISOString().split('T')[0],
-            approvalNote: note || 'Từ chối phê duyệt',
-          };
-        }
-        return t;
-      })
-    );
+    const rejectedTx: InventoryTransaction = {
+      ...targetTx,
+      status: 'REJECTED',
+      approverEmail: currentUser.email,
+      approverName: currentUser.fullName,
+      approvalDate: new Date().toISOString().split('T')[0],
+      approvalNote: note || 'Từ chối phê duyệt',
+    };
+
+    setTransactions((prev) => prev.map((t) => (t.id === txId ? rejectedTx : t)));
+    saveTransactionToCloud(rejectedTx);
 
     logActivity(
       'REJECT_TX',
       'Từ chối phê duyệt phiếu',
-      `Quản lý ${currentUser.fullName} đã từ chối duyệt phiếu ${targetTx?.code || txId}. Lý do: ${note || 'Từ chối phê duyệt'}`,
+      `Quản lý ${currentUser.fullName} đã từ chối duyệt phiếu ${rejectedTx.code}. Lý do: ${note || 'Từ chối phê duyệt'}`,
       {
-        documentCode: targetTx?.code || txId,
-        proposalNumber: targetTx?.proposalNumber,
+        documentCode: rejectedTx.code,
+        proposalNumber: rejectedTx.proposalNumber,
         targetType: 'TRANSACTION',
       }
     );
 
-    showToast(`Đã từ chối phiếu giao dịch "${targetTx?.code || txId}".`, 'error');
+    showToast(`Đã từ chối phiếu giao dịch "${rejectedTx.code}".`, 'error');
   };
 
   // Handler: Delete Transaction (Master Admin / Admin)
   const handleDeleteTransaction = (txId: string) => {
     const tx = transactions.find((t) => t.id === txId);
     setTransactions((prev) => prev.filter((t) => t.id !== txId));
+    deleteTransactionFromCloud(txId);
 
     logActivity(
       'DELETE_TX',
@@ -493,7 +580,9 @@ export function App() {
   // Handler: Delete Proposal (Master Admin / Admin)
   const handleDeleteProposal = (propId: string) => {
     const prop = proposals.find((p) => p.id === propId || p.proposalNumber === propId);
+    const targetId = prop?.id || propId;
     setProposals((prev) => prev.filter((p) => p.id !== propId && p.proposalNumber !== propId));
+    deleteProposalFromCloud(targetId);
 
     logActivity(
       'DELETE_PROPOSAL',
@@ -513,9 +602,9 @@ export function App() {
     setMaterials(INITIAL_MATERIALS);
     setTransactions(INITIAL_TRANSACTIONS);
     setProposals(INITIAL_PROPOSALS);
-    localStorage.setItem('smart_materials_v12', JSON.stringify(INITIAL_MATERIALS));
-    localStorage.setItem('smart_transactions_v9', JSON.stringify(INITIAL_TRANSACTIONS));
-    localStorage.setItem('smart_proposals_v5', JSON.stringify(INITIAL_PROPOSALS));
+    seedMaterials(INITIAL_MATERIALS);
+    seedTransactions(INITIAL_TRANSACTIONS);
+    seedProposals(INITIAL_PROPOSALS);
 
     logActivity(
       'RESET_DEMO',
@@ -531,8 +620,8 @@ export function App() {
   const handleClearAllTransactionsAndProposals = () => {
     setTransactions([]);
     setProposals([]);
-    localStorage.setItem('smart_transactions_v9', JSON.stringify([]));
-    localStorage.setItem('smart_proposals_v5', JSON.stringify([]));
+    seedTransactions([]);
+    seedProposals([]);
 
     logActivity(
       'CLEAR_DATA',
@@ -557,17 +646,19 @@ export function App() {
     setActiveTab('transactions');
   };
 
-  // Handler: Update User Info
+  // Handler: Update User Info (Password change, role change, etc. - Synced to Firebase Cloud)
   const handleUpdateUser = (updatedUser: User) => {
     setUsers((prev) => prev.map((u) => (u.id === updatedUser.id ? updatedUser : u)));
     if (currentUser && currentUser.id === updatedUser.id) {
       setCurrentUser(updatedUser);
     }
+    saveUserToCloud(updatedUser);
   };
 
   // Handler: Add New User
   const handleAddUser = (newUser: User) => {
     setUsers((prev) => [...prev, newUser]);
+    saveUserToCloud(newUser);
     showToast(`Đã thêm thành công người dùng mới: ${newUser.fullName}`);
   };
 
