@@ -45,6 +45,10 @@ import {
   saveTransactionToCloud,
   deleteTransactionFromCloud,
   saveLogToCloud,
+  deleteLogFromCloud,
+  clearTransactionsFromCloud,
+  clearProposalsFromCloud,
+  clearLogsFromCloud,
   seedMaterials,
   seedProposals,
   seedTransactions,
@@ -123,9 +127,7 @@ export function App() {
       try {
         const parsed: Material[] = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          const existingCodes = new Set(parsed.map((m) => m.code));
-          const missingInitials = INITIAL_MATERIALS.filter((m) => !existingCodes.has(m.code));
-          return missingInitials.length > 0 ? [...parsed, ...missingInitials] : parsed;
+          return parsed;
         }
       } catch {
         return INITIAL_MATERIALS;
@@ -156,7 +158,7 @@ export function App() {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed)) return parsed;
       } catch {
-        return INITIAL_PROPOSALS;
+        return [];
       }
     }
     return INITIAL_PROPOSALS;
@@ -172,7 +174,7 @@ export function App() {
       if (cloudProposals) {
         setProposals(cloudProposals);
       }
-    }, INITIAL_PROPOSALS);
+    });
     return () => unsubscribe();
   }, []);
 
@@ -184,7 +186,7 @@ export function App() {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed)) return parsed;
       } catch {
-        return INITIAL_TRANSACTIONS;
+        return [];
       }
     }
     return INITIAL_TRANSACTIONS;
@@ -200,7 +202,7 @@ export function App() {
       if (cloudTx) {
         setTransactions(cloudTx);
       }
-    }, INITIAL_TRANSACTIONS);
+    });
     return () => unsubscribe();
   }, []);
 
@@ -212,7 +214,7 @@ export function App() {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed)) return parsed;
       } catch {
-        return INITIAL_ACTIVITY_LOGS;
+        return [];
       }
     }
     return INITIAL_ACTIVITY_LOGS;
@@ -228,7 +230,7 @@ export function App() {
       if (cloudLogs) {
         setActivityLogs(cloudLogs);
       }
-    }, INITIAL_ACTIVITY_LOGS);
+    });
     return () => unsubscribe();
   }, []);
 
@@ -556,9 +558,15 @@ export function App() {
 
   // Handler: Delete Transaction (Master Admin / Admin)
   const handleDeleteTransaction = (txId: string) => {
-    const tx = transactions.find((t) => t.id === txId);
-    setTransactions((prev) => prev.filter((t) => t.id !== txId));
+    const tx = transactions.find((t) => t.id === txId || t.code === txId);
+    const code = tx?.code || txId;
+    const nextList = transactions.filter((t) => t.id !== txId && t.code !== txId);
+    setTransactions(nextList);
+    localStorage.setItem('smart_transactions_v9', JSON.stringify(nextList));
     deleteTransactionFromCloud(txId);
+    if (code && code !== txId) {
+      deleteTransactionFromCloud(code);
+    }
 
     logActivity(
       'DELETE_TX',
@@ -580,9 +588,15 @@ export function App() {
   // Handler: Delete Proposal (Master Admin / Admin)
   const handleDeleteProposal = (propId: string) => {
     const prop = proposals.find((p) => p.id === propId || p.proposalNumber === propId);
+    const propNum = prop?.proposalNumber || propId;
     const targetId = prop?.id || propId;
-    setProposals((prev) => prev.filter((p) => p.id !== propId && p.proposalNumber !== propId));
+    const nextList = proposals.filter((p) => p.id !== propId && p.proposalNumber !== propId && p.id !== targetId);
+    setProposals(nextList);
+    localStorage.setItem('smart_proposals_v5', JSON.stringify(nextList));
     deleteProposalFromCloud(targetId);
+    if (propNum && propNum !== targetId) {
+      deleteProposalFromCloud(propNum);
+    }
 
     logActivity(
       'DELETE_PROPOSAL',
@@ -602,6 +616,9 @@ export function App() {
     setMaterials(INITIAL_MATERIALS);
     setTransactions(INITIAL_TRANSACTIONS);
     setProposals(INITIAL_PROPOSALS);
+    localStorage.setItem('smart_materials_v12', JSON.stringify(INITIAL_MATERIALS));
+    localStorage.setItem('smart_transactions_v9', JSON.stringify(INITIAL_TRANSACTIONS));
+    localStorage.setItem('smart_proposals_v5', JSON.stringify(INITIAL_PROPOSALS));
     seedMaterials(INITIAL_MATERIALS);
     seedTransactions(INITIAL_TRANSACTIONS);
     seedProposals(INITIAL_PROPOSALS);
@@ -617,11 +634,13 @@ export function App() {
   };
 
   // Handler: Clear All Demo Data for Real Data Import
-  const handleClearAllTransactionsAndProposals = () => {
+  const handleClearAllTransactionsAndProposals = async () => {
     setTransactions([]);
     setProposals([]);
-    seedTransactions([]);
-    seedProposals([]);
+    localStorage.setItem('smart_transactions_v9', JSON.stringify([]));
+    localStorage.setItem('smart_proposals_v5', JSON.stringify([]));
+    await clearTransactionsFromCloud();
+    await clearProposalsFromCloud();
 
     logActivity(
       'CLEAR_DATA',
@@ -631,6 +650,14 @@ export function App() {
     );
 
     showToast('Đã dọn dẹp sạch toàn bộ chứng từ & tờ trình thử nghiệm. Sẵn sàng nhập số liệu thực tế!', 'success');
+  };
+
+  // Handler: Clear Activity Logs
+  const handleClearActivityLogs = async () => {
+    setActivityLogs([]);
+    localStorage.setItem('smart_activity_logs_v3', JSON.stringify([]));
+    await clearLogsFromCloud();
+    showToast('Đã xóa sạch toàn bộ lịch sử thao tác real-time!', 'info');
   };
 
   // Handler: Open Stock Card
@@ -859,7 +886,7 @@ export function App() {
                 transactions={transactions}
                 proposals={proposals}
                 activityLogs={activityLogs}
-                onClearActivityLogs={() => setActivityLogs([])}
+                onClearActivityLogs={handleClearActivityLogs}
                 onUpdateProposal={handleUpdateProposal}
                 onUpdateTransaction={handleUpdateTransaction}
                 onDeleteProposal={handleDeleteProposal}
