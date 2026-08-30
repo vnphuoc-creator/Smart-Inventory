@@ -210,6 +210,9 @@ export async function saveProposalToCloud(proposal: PurchaseProposal) {
 
 export async function deleteProposalFromCloud(proposalIdOrNumber: string) {
   try {
+    const target = (proposalIdOrNumber || '').trim().toLowerCase();
+    if (!target) return;
+
     // Delete directly by ID
     try {
       const ref = doc(db, PROPOSALS_COL, proposalIdOrNumber);
@@ -222,11 +225,10 @@ export async function deleteProposalFromCloud(proposalIdOrNumber: string) {
     let found = false;
     snap.forEach((d) => {
       const data = d.data();
-      if (
-        d.id === proposalIdOrNumber ||
-        data.id === proposalIdOrNumber ||
-        data.proposalNumber === proposalIdOrNumber
-      ) {
+      const docId = (d.id || '').trim().toLowerCase();
+      const dId = (data.id || '').trim().toLowerCase();
+      const propNum = (data.proposalNumber || '').trim().toLowerCase();
+      if (docId === target || dId === target || propNum === target) {
         batch.delete(d.ref);
         found = true;
       }
@@ -304,6 +306,9 @@ export async function saveTransactionToCloud(tx: InventoryTransaction) {
 
 export async function deleteTransactionFromCloud(txIdOrCode: string) {
   try {
+    const target = (txIdOrCode || '').trim().toLowerCase();
+    if (!target) return;
+
     // Delete directly by ID
     try {
       const ref = doc(db, TRANSACTIONS_COL, txIdOrCode);
@@ -316,11 +321,10 @@ export async function deleteTransactionFromCloud(txIdOrCode: string) {
     let found = false;
     snap.forEach((d) => {
       const data = d.data();
-      if (
-        d.id === txIdOrCode ||
-        data.id === txIdOrCode ||
-        data.code === txIdOrCode
-      ) {
+      const docId = (d.id || '').trim().toLowerCase();
+      const dId = (data.id || '').trim().toLowerCase();
+      const code = (data.code || '').trim().toLowerCase();
+      if (docId === target || dId === target || code === target) {
         batch.delete(d.ref);
         found = true;
       }
