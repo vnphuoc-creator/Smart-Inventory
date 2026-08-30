@@ -161,7 +161,7 @@ export function App() {
         return [];
       }
     }
-    return INITIAL_PROPOSALS;
+    return [];
   });
 
   useEffect(() => {
@@ -189,7 +189,7 @@ export function App() {
         return [];
       }
     }
-    return INITIAL_TRANSACTIONS;
+    return [];
   });
 
   useEffect(() => {
@@ -557,56 +557,73 @@ export function App() {
   };
 
   // Handler: Delete Transaction (Master Admin / Admin)
-  const handleDeleteTransaction = (txId: string) => {
+  const handleDeleteTransaction = async (txId: string) => {
     const tx = transactions.find((t) => t.id === txId || t.code === txId);
     const code = tx?.code || txId;
-    const nextList = transactions.filter((t) => t.id !== txId && t.code !== txId);
+    const targetId = tx?.id || txId;
+    const nextList = transactions.filter((t) => t.id !== targetId && t.code !== code && t.id !== txId && t.code !== txId);
+    
+    // Update local state immediately
     setTransactions(nextList);
     localStorage.setItem('smart_transactions_v9', JSON.stringify(nextList));
-    deleteTransactionFromCloud(txId);
-    if (code && code !== txId) {
-      deleteTransactionFromCloud(code);
+    
+    // Delete from Firestore Cloud permanently
+    try {
+      await deleteTransactionFromCloud(targetId);
+      if (code && code !== targetId) {
+        await deleteTransactionFromCloud(code);
+      }
+    } catch (err) {
+      console.error('Error deleting transaction from cloud:', err);
     }
 
     logActivity(
       'DELETE_TX',
       'Xóa chứng từ kho',
-      `Đã xóa vĩnh viễn phiếu ${tx?.code || txId} (${tx?.type === 'IMPORT' ? 'Nhập kho' : 'Xuất kho'}). Số dư tồn kho và thẻ kho đã hoàn tác tự động.`,
+      `Đã xóa vĩnh viễn phiếu ${code} (${tx?.type === 'IMPORT' ? 'Nhập kho' : 'Xuất kho'}). Số dư tồn kho và thẻ kho đã hoàn tác tự động.`,
       {
-        documentCode: tx?.code || txId,
+        documentCode: code,
         proposalNumber: tx?.proposalNumber,
         targetType: 'TRANSACTION',
       }
     );
 
     showToast(
-      `Đã xóa chứng từ "${tx?.code || txId}". Số lượng tồn kho và thẻ kho đã được tự động tính toán lại!`,
+      `Đã xóa chứng từ "${code}". Số lượng tồn kho và thẻ kho đã được tự động tính toán lại!`,
       'info'
     );
   };
 
   // Handler: Delete Proposal (Master Admin / Admin)
-  const handleDeleteProposal = (propId: string) => {
+  const handleDeleteProposal = async (propId: string) => {
     const prop = proposals.find((p) => p.id === propId || p.proposalNumber === propId);
     const propNum = prop?.proposalNumber || propId;
     const targetId = prop?.id || propId;
-    const nextList = proposals.filter((p) => p.id !== propId && p.proposalNumber !== propId && p.id !== targetId);
+    const nextList = proposals.filter((p) => p.id !== targetId && p.proposalNumber !== propNum && p.id !== propId && p.proposalNumber !== propId);
+    
+    // Update local state immediately
     setProposals(nextList);
     localStorage.setItem('smart_proposals_v5', JSON.stringify(nextList));
-    deleteProposalFromCloud(targetId);
-    if (propNum && propNum !== targetId) {
-      deleteProposalFromCloud(propNum);
+    
+    // Delete from Firestore Cloud permanently
+    try {
+      await deleteProposalFromCloud(targetId);
+      if (propNum && propNum !== targetId) {
+        await deleteProposalFromCloud(propNum);
+      }
+    } catch (err) {
+      console.error('Error deleting proposal from cloud:', err);
     }
 
     logActivity(
       'DELETE_PROPOSAL',
       'Xóa Tờ trình mua sắm',
-      `Đã xóa vĩnh viễn Tờ trình ${prop?.proposalNumber || propId} - "${prop?.title || ''}" (${prop?.items?.length || 0} mục vật tư đề xuất)`,
-      { proposalNumber: prop?.proposalNumber || propId, targetType: 'PROPOSAL' }
+      `Đã xóa vĩnh viễn Tờ trình ${propNum} - "${prop?.title || ''}" (${prop?.items?.length || 0} mục vật tư đề xuất)`,
+      { proposalNumber: propNum, targetType: 'PROPOSAL' }
     );
 
     showToast(
-      `Đã xóa vĩnh viễn Tờ trình "${prop?.proposalNumber || propId}" thành công.`,
+      `Đã xóa vĩnh viễn Tờ trình "${propNum}" thành công.`,
       'info'
     );
   };
