@@ -82,15 +82,19 @@ export async function seedUsers(users: User[]) {
  */
 export function subscribeToMaterials(
   onUpdate: (materials: Material[]) => void,
-  initialFallback: Material[]
+  initialFallback?: Material[]
 ) {
   const materialsRef = collection(db, MATERIALS_COL);
   return onSnapshot(
     materialsRef,
     (snapshot) => {
       if (snapshot.empty) {
-        seedMaterials(initialFallback);
-        onUpdate(initialFallback);
+        if (initialFallback && initialFallback.length > 0) {
+          seedMaterials(initialFallback);
+          onUpdate(initialFallback);
+        } else {
+          onUpdate([]);
+        }
       } else {
         const list: Material[] = [];
         snapshot.forEach((d) => {
@@ -118,8 +122,34 @@ export async function deleteMaterialFromCloud(materialIdOrCode: string) {
   try {
     const ref = doc(db, MATERIALS_COL, materialIdOrCode);
     await deleteDoc(ref);
+
+    // Also check and delete by code or id if stored differently
+    const snap = await getDocs(collection(db, MATERIALS_COL));
+    const batch = writeBatch(db);
+    let found = false;
+    snap.forEach((d) => {
+      const data = d.data();
+      if (d.id === materialIdOrCode || data.id === materialIdOrCode || data.code === materialIdOrCode) {
+        batch.delete(d.ref);
+        found = true;
+      }
+    });
+    if (found) {
+      await batch.commit();
+    }
   } catch (e) {
     console.error('Error deleting material from Firebase:', e);
+  }
+}
+
+export async function clearMaterialsFromCloud() {
+  try {
+    const snap = await getDocs(collection(db, MATERIALS_COL));
+    const batch = writeBatch(db);
+    snap.forEach((d) => batch.delete(d.ref));
+    await batch.commit();
+  } catch (e) {
+    console.error('Error clearing materials from Firebase:', e);
   }
 }
 
@@ -144,25 +174,20 @@ export async function seedMaterials(materials: Material[]) {
 
 /**
  * 3. REAL-TIME PROPOSALS SYNC
+ * NOTE: When collection is empty, DO NOT auto-reseed demo data! Return [] so user deletions persist permanently.
  */
 export function subscribeToProposals(
-  onUpdate: (proposals: PurchaseProposal[]) => void,
-  initialFallback: PurchaseProposal[]
+  onUpdate: (proposals: PurchaseProposal[]) => void
 ) {
   const proposalsRef = collection(db, PROPOSALS_COL);
   return onSnapshot(
     proposalsRef,
     (snapshot) => {
-      if (snapshot.empty) {
-        seedProposals(initialFallback);
-        onUpdate(initialFallback);
-      } else {
-        const list: PurchaseProposal[] = [];
-        snapshot.forEach((d) => {
-          list.push(d.data() as PurchaseProposal);
-        });
-        onUpdate(list);
-      }
+      const list: PurchaseProposal[] = [];
+      snapshot.forEach((d) => {
+        list.push(d.data() as PurchaseProposal);
+      });
+      onUpdate(list);
     },
     (err) => {
       console.error('Firebase proposals sync error:', err);
@@ -179,12 +204,42 @@ export async function saveProposalToCloud(proposal: PurchaseProposal) {
   }
 }
 
-export async function deleteProposalFromCloud(proposalId: string) {
+export async function deleteProposalFromCloud(proposalIdOrNumber: string) {
   try {
-    const ref = doc(db, PROPOSALS_COL, proposalId);
+    const ref = doc(db, PROPOSALS_COL, proposalIdOrNumber);
     await deleteDoc(ref);
+
+    // Also check and delete by proposalNumber or id
+    const snap = await getDocs(collection(db, PROPOSALS_COL));
+    const batch = writeBatch(db);
+    let found = false;
+    snap.forEach((d) => {
+      const data = d.data();
+      if (
+        d.id === proposalIdOrNumber ||
+        data.id === proposalIdOrNumber ||
+        data.proposalNumber === proposalIdOrNumber
+      ) {
+        batch.delete(d.ref);
+        found = true;
+      }
+    });
+    if (found) {
+      await batch.commit();
+    }
   } catch (e) {
     console.error('Error deleting proposal from Firebase:', e);
+  }
+}
+
+export async function clearProposalsFromCloud() {
+  try {
+    const snap = await getDocs(collection(db, PROPOSALS_COL));
+    const batch = writeBatch(db);
+    snap.forEach((d) => batch.delete(d.ref));
+    await batch.commit();
+  } catch (e) {
+    console.error('Error clearing proposals from Firebase:', e);
   }
 }
 
@@ -203,25 +258,20 @@ export async function seedProposals(proposals: PurchaseProposal[]) {
 
 /**
  * 4. REAL-TIME TRANSACTIONS SYNC
+ * NOTE: When collection is empty, DO NOT auto-reseed demo data! Return [] so user deletions persist permanently.
  */
 export function subscribeToTransactions(
-  onUpdate: (transactions: InventoryTransaction[]) => void,
-  initialFallback: InventoryTransaction[]
+  onUpdate: (transactions: InventoryTransaction[]) => void
 ) {
   const txRef = collection(db, TRANSACTIONS_COL);
   return onSnapshot(
     txRef,
     (snapshot) => {
-      if (snapshot.empty) {
-        seedTransactions(initialFallback);
-        onUpdate(initialFallback);
-      } else {
-        const list: InventoryTransaction[] = [];
-        snapshot.forEach((d) => {
-          list.push(d.data() as InventoryTransaction);
-        });
-        onUpdate(list);
-      }
+      const list: InventoryTransaction[] = [];
+      snapshot.forEach((d) => {
+        list.push(d.data() as InventoryTransaction);
+      });
+      onUpdate(list);
     },
     (err) => {
       console.error('Firebase transactions sync error:', err);
@@ -238,12 +288,42 @@ export async function saveTransactionToCloud(tx: InventoryTransaction) {
   }
 }
 
-export async function deleteTransactionFromCloud(txId: string) {
+export async function deleteTransactionFromCloud(txIdOrCode: string) {
   try {
-    const ref = doc(db, TRANSACTIONS_COL, txId);
+    const ref = doc(db, TRANSACTIONS_COL, txIdOrCode);
     await deleteDoc(ref);
+
+    // Also check and delete by code or id in case it was stored under voucher code
+    const snap = await getDocs(collection(db, TRANSACTIONS_COL));
+    const batch = writeBatch(db);
+    let found = false;
+    snap.forEach((d) => {
+      const data = d.data();
+      if (
+        d.id === txIdOrCode ||
+        data.id === txIdOrCode ||
+        data.code === txIdOrCode
+      ) {
+        batch.delete(d.ref);
+        found = true;
+      }
+    });
+    if (found) {
+      await batch.commit();
+    }
   } catch (e) {
     console.error('Error deleting transaction from Firebase:', e);
+  }
+}
+
+export async function clearTransactionsFromCloud() {
+  try {
+    const snap = await getDocs(collection(db, TRANSACTIONS_COL));
+    const batch = writeBatch(db);
+    snap.forEach((d) => batch.delete(d.ref));
+    await batch.commit();
+  } catch (e) {
+    console.error('Error clearing transactions from Firebase:', e);
   }
 }
 
@@ -264,24 +344,18 @@ export async function seedTransactions(transactions: InventoryTransaction[]) {
  * 5. REAL-TIME ACTIVITY LOGS SYNC
  */
 export function subscribeToLogs(
-  onUpdate: (logs: ActivityLog[]) => void,
-  initialFallback: ActivityLog[]
+  onUpdate: (logs: ActivityLog[]) => void
 ) {
   const logsRef = collection(db, LOGS_COL);
   return onSnapshot(
     logsRef,
     (snapshot) => {
-      if (snapshot.empty) {
-        seedLogs(initialFallback);
-        onUpdate(initialFallback);
-      } else {
-        const list: ActivityLog[] = [];
-        snapshot.forEach((d) => {
-          list.push(d.data() as ActivityLog);
-        });
-        list.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
-        onUpdate(list);
-      }
+      const list: ActivityLog[] = [];
+      snapshot.forEach((d) => {
+        list.push(d.data() as ActivityLog);
+      });
+      list.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+      onUpdate(list);
     },
     (err) => {
       console.error('Firebase logs sync error:', err);
@@ -295,6 +369,26 @@ export async function saveLogToCloud(log: ActivityLog) {
     await setDoc(ref, log, { merge: true });
   } catch (e) {
     console.error('Error saving log to Firebase:', e);
+  }
+}
+
+export async function deleteLogFromCloud(logId: string) {
+  try {
+    const ref = doc(db, LOGS_COL, logId);
+    await deleteDoc(ref);
+  } catch (e) {
+    console.error('Error deleting log from Firebase:', e);
+  }
+}
+
+export async function clearLogsFromCloud() {
+  try {
+    const snap = await getDocs(collection(db, LOGS_COL));
+    const batch = writeBatch(db);
+    snap.forEach((d) => batch.delete(d.ref));
+    await batch.commit();
+  } catch (e) {
+    console.error('Error clearing logs from Firebase:', e);
   }
 }
 
