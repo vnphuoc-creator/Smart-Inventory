@@ -1204,6 +1204,7 @@ export const TransactionManagementView: React.FC<TransactionManagementViewProps>
             <table className="w-full text-left text-xs text-slate-300 min-w-[1100px]">
               <thead className="bg-slate-850 border-b border-slate-800 text-[11px] font-semibold text-slate-400 uppercase tracking-wider sticky top-0 z-10">
                 <tr>
+                  <th className="py-3.5 px-3 text-center w-12 font-semibold text-slate-400 uppercase tracking-wider">STT</th>
                   <th className="py-3.5 px-4">Mã Chứng Từ</th>
                   <th className="py-3.5 px-3">Số Tờ Trình</th>
                   <th className="py-3.5 px-3">Loại Phiếu</th>
@@ -1221,14 +1222,19 @@ export const TransactionManagementView: React.FC<TransactionManagementViewProps>
             <tbody className="divide-y divide-slate-800">
               {filteredTransactions.length === 0 ? (
                 <tr>
-                  <td colSpan={10} className="py-12 text-center text-slate-400">
+                  <td colSpan={11} className="py-12 text-center text-slate-400">
                     <FileText className="w-8 h-8 text-slate-600 mx-auto mb-2 opacity-50" />
                     Không tìm thấy chứng từ nào phù hợp.
                   </td>
                 </tr>
               ) : (
-                filteredTransactions.map((tx) => (
+                filteredTransactions.map((tx, idx) => (
                   <tr key={tx.id} className="hover:bg-slate-800/60 transition-colors">
+                    {/* STT */}
+                    <td className="py-3 px-3 text-center text-slate-500 font-mono font-bold">
+                      {idx + 1}
+                    </td>
+
                     {/* Code */}
                     <td className="py-3 px-4 font-mono font-bold text-white">
                       <span className="bg-slate-800 px-2 py-0.5 rounded text-[11px] border border-slate-700">
@@ -1924,6 +1930,9 @@ export const TransactionManagementView: React.FC<TransactionManagementViewProps>
                   <table className="w-full text-left text-xs text-slate-300 min-w-[760px] border-separate border-spacing-0">
                     <thead className="sticky top-0 z-20 bg-slate-900 shadow-md">
                       <tr>
+                        <th className="sticky top-0 z-20 bg-slate-900 py-2.5 px-2 text-center w-12 font-semibold text-slate-200 uppercase tracking-wider border-b border-slate-800">
+                          STT
+                        </th>
                         <th className="sticky top-0 z-20 bg-slate-900 py-2.5 px-3 min-w-[340px] sm:min-w-[420px] font-semibold text-slate-200 uppercase tracking-wider border-b border-slate-800">
                           Vật Tư & Quy Cách (Mã Chuẩn DN_*)
                         </th>
@@ -1953,6 +1962,11 @@ export const TransactionManagementView: React.FC<TransactionManagementViewProps>
 
                         return (
                           <tr key={idx} className="hover:bg-slate-800/40">
+                            {/* STT */}
+                            <td className="py-2.5 px-2 text-center font-mono font-bold text-slate-400 bg-slate-800/30 border-b border-slate-800/50">
+                              {idx + 1}
+                            </td>
+
                             {/* Material Select */}
                             <td className="py-2.5 px-3 min-w-[340px] sm:min-w-[420px]">
                               <SearchableMaterialSelect
