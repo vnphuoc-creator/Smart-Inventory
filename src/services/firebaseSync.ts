@@ -185,8 +185,11 @@ export function subscribeToProposals(
     (snapshot) => {
       const list: PurchaseProposal[] = [];
       snapshot.forEach((d) => {
-        list.push(d.data() as PurchaseProposal);
+        const data = d.data() as PurchaseProposal;
+        if (!data.id) data.id = d.id;
+        list.push(data);
       });
+      list.sort((a, b) => new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime());
       onUpdate(list);
     },
     (err) => {
@@ -197,7 +200,8 @@ export function subscribeToProposals(
 
 export async function saveProposalToCloud(proposal: PurchaseProposal) {
   try {
-    const ref = doc(db, PROPOSALS_COL, proposal.id);
+    const docId = proposal.id || proposal.proposalNumber;
+    const ref = doc(db, PROPOSALS_COL, docId);
     await setDoc(ref, proposal, { merge: true });
   } catch (e) {
     console.error('Error saving proposal to Firebase:', e);
@@ -206,10 +210,13 @@ export async function saveProposalToCloud(proposal: PurchaseProposal) {
 
 export async function deleteProposalFromCloud(proposalIdOrNumber: string) {
   try {
-    const ref = doc(db, PROPOSALS_COL, proposalIdOrNumber);
-    await deleteDoc(ref);
+    // Delete directly by ID
+    try {
+      const ref = doc(db, PROPOSALS_COL, proposalIdOrNumber);
+      await deleteDoc(ref);
+    } catch {}
 
-    // Also check and delete by proposalNumber or id
+    // Also check and delete by proposalNumber or id across the collection
     const snap = await getDocs(collection(db, PROPOSALS_COL));
     const batch = writeBatch(db);
     let found = false;
@@ -235,9 +242,11 @@ export async function deleteProposalFromCloud(proposalIdOrNumber: string) {
 export async function clearProposalsFromCloud() {
   try {
     const snap = await getDocs(collection(db, PROPOSALS_COL));
-    const batch = writeBatch(db);
-    snap.forEach((d) => batch.delete(d.ref));
-    await batch.commit();
+    if (!snap.empty) {
+      const batch = writeBatch(db);
+      snap.forEach((d) => batch.delete(d.ref));
+      await batch.commit();
+    }
   } catch (e) {
     console.error('Error clearing proposals from Firebase:', e);
   }
@@ -247,7 +256,8 @@ export async function seedProposals(proposals: PurchaseProposal[]) {
   try {
     const batch = writeBatch(db);
     proposals.forEach((p) => {
-      const ref = doc(db, PROPOSALS_COL, p.id);
+      const docId = p.id || p.proposalNumber;
+      const ref = doc(db, PROPOSALS_COL, docId);
       batch.set(ref, p);
     });
     await batch.commit();
@@ -269,8 +279,11 @@ export function subscribeToTransactions(
     (snapshot) => {
       const list: InventoryTransaction[] = [];
       snapshot.forEach((d) => {
-        list.push(d.data() as InventoryTransaction);
+        const data = d.data() as InventoryTransaction;
+        if (!data.id) data.id = d.id;
+        list.push(data);
       });
+      list.sort((a, b) => new Date(b.date || b.createdAt || 0).getTime() - new Date(a.date || a.createdAt || 0).getTime());
       onUpdate(list);
     },
     (err) => {
@@ -281,7 +294,8 @@ export function subscribeToTransactions(
 
 export async function saveTransactionToCloud(tx: InventoryTransaction) {
   try {
-    const ref = doc(db, TRANSACTIONS_COL, tx.id);
+    const docId = tx.id || tx.code;
+    const ref = doc(db, TRANSACTIONS_COL, docId);
     await setDoc(ref, tx, { merge: true });
   } catch (e) {
     console.error('Error saving transaction to Firebase:', e);
@@ -290,10 +304,13 @@ export async function saveTransactionToCloud(tx: InventoryTransaction) {
 
 export async function deleteTransactionFromCloud(txIdOrCode: string) {
   try {
-    const ref = doc(db, TRANSACTIONS_COL, txIdOrCode);
-    await deleteDoc(ref);
+    // Delete directly by ID
+    try {
+      const ref = doc(db, TRANSACTIONS_COL, txIdOrCode);
+      await deleteDoc(ref);
+    } catch {}
 
-    // Also check and delete by code or id in case it was stored under voucher code
+    // Also check and delete by code or id across all docs in the collection
     const snap = await getDocs(collection(db, TRANSACTIONS_COL));
     const batch = writeBatch(db);
     let found = false;
@@ -319,9 +336,11 @@ export async function deleteTransactionFromCloud(txIdOrCode: string) {
 export async function clearTransactionsFromCloud() {
   try {
     const snap = await getDocs(collection(db, TRANSACTIONS_COL));
-    const batch = writeBatch(db);
-    snap.forEach((d) => batch.delete(d.ref));
-    await batch.commit();
+    if (!snap.empty) {
+      const batch = writeBatch(db);
+      snap.forEach((d) => batch.delete(d.ref));
+      await batch.commit();
+    }
   } catch (e) {
     console.error('Error clearing transactions from Firebase:', e);
   }
@@ -331,7 +350,8 @@ export async function seedTransactions(transactions: InventoryTransaction[]) {
   try {
     const batch = writeBatch(db);
     transactions.forEach((t) => {
-      const ref = doc(db, TRANSACTIONS_COL, t.id);
+      const docId = t.id || t.code;
+      const ref = doc(db, TRANSACTIONS_COL, docId);
       batch.set(ref, t);
     });
     await batch.commit();
