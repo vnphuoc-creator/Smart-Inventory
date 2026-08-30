@@ -399,11 +399,16 @@ export const DocumentManagementView: React.FC<DocumentManagementViewProps> = ({
     setEditPropStatus(prop.status);
     setEditPropNotes(prop.notes || '');
     setEditPropItems(
-      prop.items.map((i) => ({
-        ...i,
-        requestedQuantity: i.requestedQuantity || 0,
-        unitPrice: i.unitPrice || 0,
-      }))
+      prop.items.map((i) => {
+        const mat = materials.find((m) => m.code === i.materialCode);
+        return {
+          ...i,
+          materialName: (mat?.name && mat.name.trim() !== 'Vật tư') ? mat.name : i.materialName,
+          unit: mat?.unit || i.unit || 'Cái',
+          requestedQuantity: i.requestedQuantity || 0,
+          unitPrice: i.unitPrice || mat?.unitPrice || 0,
+        };
+      })
     );
   };
 
@@ -526,8 +531,8 @@ export const DocumentManagementView: React.FC<DocumentManagementViewProps> = ({
   };
 
   // Change Material of an item in Edit Proposal
-  const handlePropItemMaterialChange = (idx: number, matCode: string) => {
-    const foundMat = materials.find((m) => m.code === matCode);
+  const handlePropItemMaterialChange = (idx: number, matCode: string, selectedMat?: Material) => {
+    const foundMat = selectedMat || materials.find((m) => m.code === matCode);
     if (!foundMat) return;
     const updated = [...editPropItems];
     updated[idx] = {
@@ -1691,7 +1696,7 @@ export const DocumentManagementView: React.FC<DocumentManagementViewProps> = ({
                               <SearchableMaterialSelect
                                 materials={materials}
                                 value={item.materialCode}
-                                onChange={(matCode) => handlePropItemMaterialChange(idx, matCode)}
+                                onChange={(matCode, selectedMat) => handlePropItemMaterialChange(idx, matCode, selectedMat)}
                               />
                             </td>
                             <td className="py-2.5 px-3 text-center font-medium text-slate-400">

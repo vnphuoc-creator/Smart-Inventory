@@ -156,7 +156,44 @@ export const ProposalReconciliationView: React.FC<ProposalReconciliationViewProp
 
   // Effective proposals ensuring any proposal referenced in transactions is available
   const effectiveProposals = useMemo(() => {
-    const list = [...proposals];
+    const list = proposals.map((p) => {
+      const enrichedItems = (p.items || []).map((it) => {
+        const mat = materials.find((m) => m.code === it.materialCode);
+        let txMatName = '';
+        let txUnit = '';
+        for (const tx of transactions) {
+          const found = tx.items?.find(
+            (i) => i.materialCode === it.materialCode && i.materialName && i.materialName.trim() !== 'Vật tư'
+          );
+          if (found) {
+            txMatName = found.materialName;
+            txUnit = found.unit;
+            break;
+          }
+        }
+        const resolvedName =
+          mat?.name && mat.name.trim() !== 'Vật tư'
+            ? mat.name
+            : it.materialName && it.materialName.trim() !== 'Vật tư'
+            ? it.materialName
+            : txMatName || mat?.name || it.materialName || 'Vật tư';
+        const resolvedUnit = mat?.unit || txUnit || it.unit || 'Cái';
+        const resolvedSpec = mat?.specification || (it as any).specification || it.notes || '';
+
+        return {
+          ...it,
+          materialName: resolvedName,
+          specification: resolvedSpec,
+          unit: resolvedUnit,
+          unitPrice: it.unitPrice || mat?.unitPrice || 0,
+        };
+      });
+
+      return {
+        ...p,
+        items: enrichedItems,
+      };
+    });
     
     // Discover any proposals referenced in transactions that are not in list
     transactions.forEach((tx) => {
@@ -177,20 +214,24 @@ export const ProposalReconciliationView: React.FC<ProposalReconciliationViewProp
             attachmentHtml: tx.attachmentHtml,
             notes: `Tự động liên kết theo phiếu giao dịch ${tx.code}`,
             createdAt: tx.createdAt || new Date().toISOString(),
-            items: tx.items.map((it) => ({
-              materialCode: it.materialCode,
-              materialName: it.materialName,
-              unit: it.unit,
-              requestedQuantity: it.quantity,
-              unitPrice: it.unitPrice,
-            })),
+            items: tx.items.map((it) => {
+              const mat = materials.find((m) => m.code === it.materialCode);
+              return {
+                materialCode: it.materialCode,
+                materialName: (mat?.name && mat.name.trim() !== 'Vật tư') ? mat.name : it.materialName,
+                specification: mat?.specification || '',
+                unit: mat?.unit || it.unit || 'Cái',
+                requestedQuantity: it.quantity,
+                unitPrice: it.unitPrice,
+              };
+            }),
           });
         }
       }
     });
 
     return list;
-  }, [proposals, transactions]);
+  }, [proposals, transactions, materials]);
 
   // Calculate reconciliation for all proposals
   const reconciliationData = useMemo(() => {
@@ -221,6 +262,28 @@ export const ProposalReconciliationView: React.FC<ProposalReconciliationViewProp
       const exportableItems: Array<{ materialCode: string; maxExportQty: number; unitPrice: number; name: string; currentStock: number }> = [];
 
       const reconciledItems = proposal.items.map((pItem) => {
+        const masterMat = materials.find((m) => m.code === pItem.materialCode);
+        let txItemFound: any = null;
+        for (const tx of transactions) {
+          const it = tx.items.find(
+            (i) => i.materialCode === pItem.materialCode && i.materialName && i.materialName.trim() !== 'Vật tư'
+          );
+          if (it) {
+            txItemFound = it;
+            break;
+          }
+        }
+
+        const resolvedName =
+          masterMat?.name && masterMat.name.trim() !== 'Vật tư'
+            ? masterMat.name
+            : pItem.materialName && pItem.materialName.trim() !== 'Vật tư'
+            ? pItem.materialName
+            : txItemFound?.materialName || masterMat?.name || pItem.materialName || 'Vật tư';
+
+        const resolvedSpec = masterMat?.specification || (pItem as any).specification || pItem.notes || '';
+        const resolvedUnit = masterMat?.unit || txItemFound?.unit || pItem.unit || 'Cái';
+
         const imported = importedMap.get(pItem.materialCode) || 0;
         const requested = Number(pItem.requestedQuantity) || 0;
         const missing = Math.max(0, requested - imported);
@@ -242,7 +305,7 @@ export const ProposalReconciliationView: React.FC<ProposalReconciliationViewProp
             materialCode: pItem.materialCode,
             missingQty: missing,
             unitPrice: pItem.unitPrice || 0,
-            name: pItem.materialName,
+            name: resolvedName,
           });
         }
 
@@ -251,13 +314,16 @@ export const ProposalReconciliationView: React.FC<ProposalReconciliationViewProp
             materialCode: pItem.materialCode,
             maxExportQty,
             unitPrice: pItem.unitPrice || 0,
-            name: pItem.materialName,
+            name: resolvedName,
             currentStock,
           });
         }
 
         return {
           ...pItem,
+          materialName: resolvedName,
+          specification: resolvedSpec,
+          unit: resolvedUnit,
           actualImported: imported,
           missingQuantity: missing,
           isFulfilled,
@@ -290,7 +356,7 @@ export const ProposalReconciliationView: React.FC<ProposalReconciliationViewProp
         exportableItems,
       };
     });
-  }, [effectiveProposals, transactions, calculatedStocks]);
+  }, [effectiveProposals, transactions, materials, calculatedStocks]);
 
   // Filtered proposals
   const filteredProposals = useMemo(() => {
@@ -305,8 +371,11 @@ export const ProposalReconciliationView: React.FC<ProposalReconciliationViewProp
         const matchNum = item.proposal.proposalNumber.toLowerCase().includes(q);
         const matchTitle = item.proposal.title.toLowerCase().includes(q);
         const matchCreator = item.proposal.creatorName.toLowerCase().includes(q);
-        const matchItems = item.proposal.items.some(
-          (i) => i.materialCode.toLowerCase().includes(q) || i.materialName.toLowerCase().includes(q)
+        const matchItems = item.reconciledItems.some(
+          (i) =>
+            i.materialCode.toLowerCase().includes(q) ||
+            i.materialName.toLowerCase().includes(q) ||
+            (i.specification && i.specification.toLowerCase().includes(q))
         );
         if (!matchNum && !matchTitle && !matchCreator && !matchItems) return false;
       }
@@ -460,13 +529,16 @@ export const ProposalReconciliationView: React.FC<ProposalReconciliationViewProp
     setEditPropDate(prop.date);
     setEditPropNotes(prop.notes || '');
     setEditPropItems(
-      (prop.items || []).map((it) => ({
-        materialCode: it.materialCode,
-        materialName: it.materialName,
-        unit: it.unit,
-        requestedQuantity: it.requestedQuantity,
-        unitPrice: it.unitPrice || 0,
-      }))
+      (prop.items || []).map((it) => {
+        const mat = materials.find((m) => m.code === it.materialCode);
+        return {
+          materialCode: it.materialCode,
+          materialName: (mat?.name && mat.name.trim() !== 'Vật tư') ? mat.name : it.materialName,
+          unit: mat?.unit || it.unit || 'Cái',
+          requestedQuantity: it.requestedQuantity,
+          unitPrice: it.unitPrice || mat?.unitPrice || 0,
+        };
+      })
     );
   };
 
@@ -1093,7 +1165,16 @@ export const ProposalReconciliationView: React.FC<ProposalReconciliationViewProp
                                 <td className="py-2.5 px-3 font-mono font-bold text-blue-300">
                                   {pItem.materialCode}
                                 </td>
-                                <td className="py-2.5 px-4 font-medium text-white">{pItem.materialName}</td>
+                                <td className="py-2.5 px-4 min-w-[220px]">
+                                  <div className="font-medium text-white text-xs leading-snug">
+                                    {pItem.materialName}
+                                  </div>
+                                  {pItem.specification ? (
+                                    <div className="text-[11px] text-slate-400 mt-0.5 leading-tight font-normal">
+                                      {pItem.specification}
+                                    </div>
+                                  ) : null}
+                                </td>
                                 <td className="py-2.5 px-2 text-center">{pItem.unit}</td>
                                 <td className="py-2.5 px-3 text-right font-mono font-bold text-slate-200">
                                   {formatNumber(pItem.requestedQuantity)}
@@ -1806,7 +1887,18 @@ export const ProposalReconciliationView: React.FC<ProposalReconciliationViewProp
                               materials={materials}
                               calculatedStocks={calculatedStocks}
                               onChange={(newCode, selectedMat) => {
-                                handleEditPropItemChange(idx, 'materialCode', newCode);
+                                const mat = selectedMat || materials.find((m) => m.code === newCode);
+                                setEditPropItems((prev) => {
+                                  const updated = [...prev];
+                                  updated[idx] = {
+                                    ...updated[idx],
+                                    materialCode: newCode,
+                                    materialName: mat?.name || updated[idx].materialName,
+                                    unit: mat?.unit || updated[idx].unit,
+                                    unitPrice: mat?.unitPrice || updated[idx].unitPrice,
+                                  };
+                                  return updated;
+                                });
                               }}
                             />
                           </td>
