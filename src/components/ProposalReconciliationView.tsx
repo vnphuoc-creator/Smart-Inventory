@@ -32,6 +32,7 @@ import {
   ShieldCheck,
   CheckSquare,
   Lock,
+  Edit3,
 } from 'lucide-react';
 import {
   PurchaseProposal,
@@ -96,6 +97,15 @@ export const ProposalReconciliationView: React.FC<ProposalReconciliationViewProp
       unitPrice: materials[0]?.unitPrice || 0,
     },
   ]);
+
+  // Edit Proposal Modal
+  const [editingProposal, setEditingProposal] = useState<PurchaseProposal | null>(null);
+  const [editPropNumber, setEditPropNumber] = useState('');
+  const [editPropTitle, setEditPropTitle] = useState('');
+  const [editPropDept, setEditPropDept] = useState('');
+  const [editPropDate, setEditPropDate] = useState('');
+  const [editPropNotes, setEditPropNotes] = useState('');
+  const [editPropItems, setEditPropItems] = useState<ProposalItem[]>([]);
 
   // Modal Table Horizontal Scroll Synchronization
   const newPropTableRef = useRef<HTMLDivElement>(null);
@@ -395,6 +405,143 @@ export const ProposalReconciliationView: React.FC<ProposalReconciliationViewProp
     setNewPropNotes('');
     setNewPropAttachmentName('');
     setNewPropAttachmentUrl('');
+  };
+
+  // Delete a single item row from Proposal
+  const handleDeleteItemFromProposal = (proposal: PurchaseProposal, materialCode: string) => {
+    if (!onUpdateProposal) return;
+    const itemToRemove = proposal.items.find((i) => i.materialCode === materialCode);
+    const itemName = itemToRemove ? itemToRemove.materialName : materialCode;
+    if (
+      !window.confirm(
+        `Bạn có chắc chắn muốn xóa vật tư "${itemName}" (${materialCode}) khỏi Tờ trình "${proposal.proposalNumber}"?\n\nMục này sẽ không còn xuất hiện trong bảng đối chiếu.`
+      )
+    ) {
+      return;
+    }
+    const updatedItems = proposal.items.filter((it) => it.materialCode !== materialCode);
+    const updatedProp: PurchaseProposal = {
+      ...proposal,
+      items: updatedItems,
+    };
+    onUpdateProposal(updatedProp);
+  };
+
+  // Clean all unimported items (e.g. items deleted during import voucher creation)
+  const handleCleanUnimportedItems = (proposal: PurchaseProposal, reconciledItems: any[]) => {
+    if (!onUpdateProposal) return;
+    const unimported = reconciledItems.filter((i) => i.actualImported === 0);
+    if (unimported.length === 0) {
+      alert(`Tất cả ${reconciledItems.length} vật tư trong Tờ trình "${proposal.proposalNumber}" đều đã có phiếu nhập kho.`);
+      return;
+    }
+    if (
+      !window.confirm(
+        `Tìm thấy ${unimported.length} mục vật tư chưa từng được nhập kho trong Tờ trình "${proposal.proposalNumber}" (bao gồm các mục đã xóa khi lập phiếu nhập kho).\n\nBạn có muốn XÓA BỎ ${unimported.length} mục này để bảng đối chiếu Tờ trình chỉ hiển thị các vật tư thực tế nhập kho?`
+      )
+    ) {
+      return;
+    }
+    const importedCodes = new Set(reconciledItems.filter((i) => i.actualImported > 0).map((i) => i.materialCode));
+    const remainingItems = proposal.items.filter((it) => importedCodes.has(it.materialCode));
+    const updatedProp: PurchaseProposal = {
+      ...proposal,
+      items: remainingItems,
+    };
+    onUpdateProposal(updatedProp);
+  };
+
+  // Open Edit Proposal Modal
+  const handleOpenEditProposal = (prop: PurchaseProposal) => {
+    setEditingProposal(prop);
+    setEditPropNumber(prop.proposalNumber);
+    setEditPropTitle(prop.title);
+    setEditPropDept(prop.department || 'Đội Điện Nước Công Trình');
+    setEditPropDate(prop.date);
+    setEditPropNotes(prop.notes || '');
+    setEditPropItems(
+      (prop.items || []).map((it) => ({
+        materialCode: it.materialCode,
+        materialName: it.materialName,
+        unit: it.unit,
+        requestedQuantity: it.requestedQuantity,
+        unitPrice: it.unitPrice || 0,
+      }))
+    );
+  };
+
+  // Add Item in Edit Proposal
+  const handleAddEditPropItem = () => {
+    const firstMat = materials[0];
+    setEditPropItems((prev) => [
+      ...prev,
+      {
+        materialCode: firstMat?.code || 'DN_CC_00ACB_01',
+        materialName: firstMat?.name || 'Vật tư mới',
+        unit: firstMat?.unit || 'Cái',
+        requestedQuantity: 1,
+        unitPrice: firstMat?.unitPrice || 0,
+      },
+    ]);
+  };
+
+  // Remove Item in Edit Proposal
+  const handleRemoveEditPropItem = (idx: number) => {
+    if (editPropItems.length <= 1) {
+      alert('Tờ trình cần có ít nhất 1 vật tư.');
+      return;
+    }
+    setEditPropItems((prev) => prev.filter((_, i) => i !== idx));
+  };
+
+  // Change Item in Edit Proposal
+  const handleEditPropItemChange = (idx: number, field: keyof ProposalItem, value: any) => {
+    setEditPropItems((prev) => {
+      const updated = [...prev];
+      if (field === 'materialCode') {
+        const mat = materials.find((m) => m.code === value);
+        updated[idx] = {
+          ...updated[idx],
+          materialCode: value,
+          materialName: mat?.name || updated[idx].materialName,
+          unit: mat?.unit || updated[idx].unit,
+          unitPrice: mat?.unitPrice || updated[idx].unitPrice,
+        };
+      } else {
+        updated[idx] = {
+          ...updated[idx],
+          [field]: value,
+        };
+      }
+      return updated;
+    });
+  };
+
+  // Save Edit Proposal
+  const handleSaveEditProposal = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingProposal || !onUpdateProposal) return;
+    if (!editPropNumber.trim() || !editPropTitle.trim()) {
+      alert('Vui lòng điền đầy đủ Số tờ trình và Tiêu đề.');
+      return;
+    }
+    if (editPropItems.length === 0) {
+      alert('Vui lòng thêm ít nhất một vật tư đề xuất.');
+      return;
+    }
+
+    const updated: PurchaseProposal = {
+      ...editingProposal,
+      proposalNumber: editPropNumber.trim(),
+      title: editPropTitle.trim(),
+      department: editPropDept.trim() || 'Đội Điện Nước Công Trình',
+      date: editPropDate || editingProposal.date,
+      notes: editPropNotes.trim() || undefined,
+      items: editPropItems,
+    };
+
+    onUpdateProposal(updated);
+    setEditingProposal(null);
   };
 
   const handleConfirmCloseEarly = () => {
@@ -833,6 +980,37 @@ export const ProposalReconciliationView: React.FC<ProposalReconciliationViewProp
                         </button>
                       )}
 
+                      {/* Button: Bỏ các mục chưa nhập (Xóa các mục đã xóa khi nhập hàng) */}
+                      {reconciledItems.some((ri) => ri.actualImported === 0) && onUpdateProposal && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleCleanUnimportedItems(proposal, reconciledItems);
+                          }}
+                          className="bg-slate-800 hover:bg-amber-900/40 text-amber-300 hover:text-amber-200 border border-slate-700 hover:border-amber-500/40 px-3 py-2 rounded-xl text-xs font-medium flex items-center gap-1.5 transition-colors"
+                          title="Xóa bỏ các vật tư chưa từng nhập kho (ví dụ các mục đã xóa khi lập phiếu nhập kho)"
+                        >
+                          <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                          <span>Bỏ Mục Chưa Nhập</span>
+                        </button>
+                      )}
+
+                      {/* Button: Sửa Tờ Trình */}
+                      {onUpdateProposal && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleOpenEditProposal(proposal);
+                          }}
+                          className="p-2 rounded-xl bg-slate-800 hover:bg-blue-900/50 text-slate-400 hover:text-blue-300 border border-slate-700 hover:border-blue-500/40 transition-colors"
+                          title="Chỉnh sửa thông tin và danh sách vật tư Tờ trình này"
+                        >
+                          <Edit3 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+
                       {(currentUser.email === 'vn.phuoc235@gmail.com' || currentUser.role === 'ADMIN') && onDeleteProposal && (
                         <button
                           type="button"
@@ -900,6 +1078,7 @@ export const ProposalReconciliationView: React.FC<ProposalReconciliationViewProp
                               <th className="py-2.5 px-3 text-center">Khả Năng Xuất Kho</th>
                               <th className="py-2.5 px-3 text-center">Tiến Độ Nhập</th>
                               <th className="py-2.5 px-3 text-center">Trạng Thái</th>
+                              <th className="py-2.5 px-3 text-center w-20">Thao Tác</th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-slate-800">
@@ -975,6 +1154,18 @@ export const ProposalReconciliationView: React.FC<ProposalReconciliationViewProp
                                     <span className="inline-flex items-center gap-1 text-[10px] bg-amber-500/20 text-amber-300 border border-amber-500/30 px-2 py-0.5 rounded-full font-bold">
                                       <AlertTriangle className="w-3 h-3" /> Thiếu
                                     </span>
+                                  )}
+                                </td>
+                                <td className="py-2.5 px-3 text-center">
+                                  {onUpdateProposal && (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleDeleteItemFromProposal(proposal, pItem.materialCode)}
+                                      className="p-1.5 rounded-lg bg-slate-800 hover:bg-rose-900/50 text-slate-400 hover:text-rose-300 border border-slate-700 hover:border-rose-500/40 transition-colors"
+                                      title={`Xóa mục ${pItem.materialCode} (${pItem.materialName}) khỏi Tờ trình này`}
+                                    >
+                                      <Trash2 className="w-3.5 h-3.5" />
+                                    </button>
                                   )}
                                 </td>
                               </tr>
@@ -1504,6 +1695,185 @@ export const ProposalReconciliationView: React.FC<ProposalReconciliationViewProp
                 Xác Nhận Xóa
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Edit Proposal */}
+      {editingProposal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-sm animate-in fade-in overflow-y-auto">
+          <div className="w-full max-w-4xl bg-slate-900 border border-blue-500/30 rounded-2xl p-6 shadow-2xl space-y-5 my-8">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-blue-500/10 border border-blue-500/30 flex items-center justify-center text-blue-400">
+                  <Edit3 className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-white">Chỉnh Sửa Tờ Trình Mua Sắm</h3>
+                  <p className="text-xs text-blue-300 font-mono">Mã: {editingProposal.proposalNumber}</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEditingProposal(null)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveEditProposal} className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1">
+                    Số Tờ Trình <span className="text-rose-400">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={editPropNumber}
+                    onChange={(e) => setEditPropNumber(e.target.value)}
+                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white font-mono focus:outline-none focus:border-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1">
+                    Tiêu Đề Tờ Trình <span className="text-rose-400">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={editPropTitle}
+                    onChange={(e) => setEditPropTitle(e.target.value)}
+                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1">Bộ Phận Đề Xuất</label>
+                  <input
+                    type="text"
+                    value={editPropDept}
+                    onChange={(e) => setEditPropDept(e.target.value)}
+                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-500"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">Ghi Chú Phê Duyệt</label>
+                <input
+                  type="text"
+                  value={editPropNotes}
+                  onChange={(e) => setEditPropNotes(e.target.value)}
+                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-500"
+                  placeholder="Ghi chú thêm..."
+                />
+              </div>
+
+              {/* Items Table */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold text-slate-200 uppercase tracking-wider">
+                    Danh Sách Vật Tư Đề Xuất ({editPropItems.length} mục)
+                  </label>
+                  <button
+                    type="button"
+                    onClick={handleAddEditPropItem}
+                    className="px-3 py-1.5 rounded-lg bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 border border-blue-500/30 text-xs font-semibold flex items-center gap-1 transition"
+                  >
+                    <Plus className="w-3.5 h-3.5" /> Thêm Dòng Vật Tư
+                  </button>
+                </div>
+
+                <div className="bg-slate-850 border border-slate-800 rounded-xl overflow-x-auto max-h-[300px] overflow-y-auto">
+                  <table className="w-full text-left text-xs text-slate-300">
+                    <thead className="bg-slate-900 text-slate-400 font-semibold sticky top-0 z-10 border-b border-slate-800">
+                      <tr>
+                        <th className="py-2 px-3 w-12 text-center">STT</th>
+                        <th className="py-2 px-3 min-w-[280px]">Vật Tư (Mã Chuẩn DN_*)</th>
+                        <th className="py-2 px-3 text-right w-28">SL Đề Xuất</th>
+                        <th className="py-2 px-3 text-right w-32">Đơn Giá (VNĐ)</th>
+                        <th className="py-2 px-3 text-center w-14">Xóa</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-800">
+                      {editPropItems.map((item, idx) => (
+                        <tr key={idx} className="hover:bg-slate-800/40">
+                          <td className="py-2 px-3 text-center font-mono text-slate-500">{idx + 1}</td>
+                          <td className="py-2 px-3 min-w-[280px]">
+                            <SearchableMaterialSelect
+                              value={item.materialCode}
+                              materials={materials}
+                              calculatedStocks={calculatedStocks}
+                              onChange={(newCode, selectedMat) => {
+                                handleEditPropItemChange(idx, 'materialCode', newCode);
+                              }}
+                            />
+                          </td>
+                          <td className="py-2 px-3 text-right">
+                            <input
+                              type="number"
+                              min="1"
+                              value={item.requestedQuantity}
+                              onChange={(e) =>
+                                handleEditPropItemChange(
+                                  idx,
+                                  'requestedQuantity',
+                                  Math.max(1, parseInt(e.target.value) || 1)
+                                )
+                              }
+                              className="w-24 bg-slate-800 border border-slate-700 rounded-lg px-2 py-1 text-right font-mono text-white focus:outline-none focus:border-blue-500"
+                            />
+                          </td>
+                          <td className="py-2 px-3 text-right">
+                            <input
+                              type="number"
+                              min="0"
+                              value={item.unitPrice || 0}
+                              onChange={(e) =>
+                                handleEditPropItemChange(
+                                  idx,
+                                  'unitPrice',
+                                  Math.max(0, parseInt(e.target.value) || 0)
+                                )
+                              }
+                              className="w-28 bg-slate-800 border border-slate-700 rounded-lg px-2 py-1 text-right font-mono text-white focus:outline-none focus:border-blue-500"
+                            />
+                          </td>
+                          <td className="py-2 px-3 text-center">
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveEditPropItem(idx)}
+                              className="p-1.5 rounded text-slate-400 hover:text-rose-400 hover:bg-slate-800 transition"
+                              title="Xóa dòng này"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setEditingProposal(null)}
+                  className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 transition"
+                >
+                  Hủy Bỏ
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 rounded-xl text-xs font-bold bg-blue-600 hover:bg-blue-500 text-white shadow-md shadow-blue-600/30 transition flex items-center gap-1.5"
+                >
+                  <Check className="w-4 h-4" />
+                  Lưu Thay Đổi Tờ Trình
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
