@@ -356,9 +356,32 @@ export function parseDocxHtml(
               qtyCol === -1
             ) {
               qtyCol = cIdx;
-            } else if (text.includes('đơn giá') || text === 'giá' || text.includes('đơn giá (vnđ)')) {
+            } else if (
+              text.includes('đơn giá') ||
+              text.includes('don gia') ||
+              text.includes('đơn giá (vnđ)') ||
+              text.includes('đơn giá dự toán') ||
+              text.includes('đơn giá chào') ||
+              text.includes('đơn giá mua') ||
+              text.includes('đơn giá vat') ||
+              text.includes('đơn giá (đ)') ||
+              text.includes('đơn giá (đồng)') ||
+              text.includes('unit price') ||
+              text === 'giá' ||
+              text === 'gia' ||
+              text === 'giá tiền' ||
+              text === 'price'
+            ) {
               priceCol = cIdx;
-            } else if (text.includes('thành tiền') || text.includes('tổng tiền')) {
+            } else if (
+              text.includes('thành tiền') ||
+              text.includes('thanh tien') ||
+              text.includes('tổng tiền') ||
+              text.includes('tong tien') ||
+              text.includes('thành tiền (vnđ)') ||
+              text.includes('total amount') ||
+              text.includes('tổng cộng (vnđ)')
+            ) {
               totalCol = cIdx;
             } else if (text.includes('ghi chú') || text.includes('note') || text.includes('phạm vi')) {
               noteCol = cIdx;
@@ -385,6 +408,7 @@ export function parseDocxHtml(
           let rawUnit = unitCol !== -1 && cells[unitCol] ? cells[unitCol] : '';
           let rawQtyStr = qtyCol !== -1 && cells[qtyCol] ? cells[qtyCol] : '';
           let rawPriceStr = priceCol !== -1 && cells[priceCol] ? cells[priceCol] : '';
+          let rawTotalStr = totalCol !== -1 && cells[totalCol] ? cells[totalCol] : '';
           let rawNote = noteCol !== -1 && cells[noteCol] ? cells[noteCol] : '';
 
           // Deduce name if header index was missed
@@ -423,7 +447,7 @@ export function parseDocxHtml(
           // Deduce unit
           if (!rawUnit) {
             const unitCell = cells.find((c) =>
-              /^(cái|bộ|mét|m|cuộn|cây|thùng|hộp|kg|lít|lit|bình|quả|viên|chiếc|ống|thanh|khung|sợi|tấm|đôi|cặp|túi|can|bao)$/i.test(
+              /^(cái|bộ|mét|m|cuộn|cây|thùng|hộp|kg|lít|lit|bình|quả|viên|chiếc|ống|thanh|khung|sợi|tấm|đôi|cặp|túi|can|bao|bịch|met)$/i.test(
                 c.trim()
               )
             );
@@ -455,12 +479,25 @@ export function parseDocxHtml(
             }
           }
 
-          // Parse price
-          let price = 0;
-          if (rawPriceStr) {
-            const cleanedPrice = rawPriceStr.replace(/[^0-9]/g, '');
-            const parsedP = parseFloat(cleanedPrice);
-            if (!isNaN(parsedP)) price = parsedP;
+          // Helper to parse currency amount in Vietnamese formats (e.g. 4.850.000, 180,000 đ, 6.500)
+          const parseCurrency = (str: string): number => {
+            if (!str) return 0;
+            let clean = str.trim().replace(/(?:vnđ|vnd|đồng|đ|d)/gi, '').trim();
+            clean = clean.replace(/[,.]00$/, ''); // strip decimal cents
+            clean = clean.replace(/[\s\.]/g, '').replace(/,/g, '');
+            const parsed = parseFloat(clean);
+            return !isNaN(parsed) && parsed > 0 ? parsed : 0;
+          };
+
+          // Parse unit price
+          let price = parseCurrency(rawPriceStr);
+
+          // If unit price not in unit price column, check total amount / qty
+          if (price === 0 && rawTotalStr) {
+            const totalAmt = parseCurrency(rawTotalStr);
+            if (totalAmt > 0 && qty > 0) {
+              price = Math.round(totalAmt / qty);
+            }
           }
 
           if (rawName && rawName.length >= 2) {
@@ -473,7 +510,8 @@ export function parseDocxHtml(
               : generateSuggestedCode(rawName, detectedItems.length);
             const assignedName = matchedMat ? matchedMat.name : rawName;
             const assignedUnit = rawUnit || (matchedMat ? matchedMat.unit : 'Cái');
-            const assignedPrice = price || (matchedMat ? matchedMat.unitPrice : 0);
+            // Prioritize the actual extracted price from the proposal; fallback to catalog standard price
+            const assignedPrice = price > 0 ? price : (matchedMat ? matchedMat.unitPrice : 0);
 
             detectedItems.push({
               materialCode: assignedCode,

@@ -239,10 +239,10 @@ export const MaterialCatalogueView: React.FC<MaterialCatalogueViewProps> = ({
       unit: 'Cái',
       specification: '',
       location: 'Kho Tổng (Kệ A1)',
-      initialStock: 10,
+      initialStock: 0,
       minStock: 5,
       maxStock: 50,
-      unitPrice: 500000,
+      unitPrice: 0,
       allocatedStaffEmails: [],
       notes: '',
     });

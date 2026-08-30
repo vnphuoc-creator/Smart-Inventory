@@ -668,13 +668,31 @@ export const TransactionManagementView: React.FC<TransactionManagementViewProps>
   };
 
   const handleAddItemRow = () => {
-    const defaultMat = materials[0];
+    // If there is a matched proposal, find an item from the proposal that is not yet added
+    let defaultCode = '';
+    let defaultPrice = 0;
+
+    if (matchedProposal && matchedProposal.items.length > 0) {
+      const alreadyAddedCodes = new Set(formItems.map((i) => i.materialCode));
+      const nextPropItem = matchedProposal.items.find((pi) => !alreadyAddedCodes.has(pi.materialCode));
+      if (nextPropItem) {
+        defaultCode = nextPropItem.materialCode;
+        defaultPrice = nextPropItem.unitPrice || 0;
+      }
+    }
+
+    if (!defaultCode) {
+      const defaultMat = materials[0];
+      defaultCode = defaultMat ? defaultMat.code : '';
+      defaultPrice = defaultMat ? defaultMat.unitPrice : 0;
+    }
+
     setFormItems([
       ...formItems,
       {
-        materialCode: defaultMat ? defaultMat.code : '',
+        materialCode: defaultCode,
         quantity: 1,
-        unitPrice: defaultMat ? defaultMat.unitPrice : 0,
+        unitPrice: defaultPrice,
         notes: '',
       },
     ]);
@@ -692,10 +710,19 @@ export const TransactionManagementView: React.FC<TransactionManagementViewProps>
     const updated = [...formItems];
     if (field === 'materialCode') {
       const mat = materials.find((m) => m.code === value);
+      // Check if this material is in the matched proposal first
+      const propItem = matchedProposal?.items.find((pi) => pi.materialCode === value);
+      const resolvedPrice =
+        propItem && propItem.unitPrice > 0
+          ? propItem.unitPrice
+          : mat
+          ? mat.unitPrice
+          : updated[index].unitPrice;
+
       updated[index] = {
         ...updated[index],
         materialCode: value,
-        unitPrice: mat ? mat.unitPrice : updated[index].unitPrice,
+        unitPrice: resolvedPrice,
       };
     } else {
       updated[index] = {
@@ -1934,10 +1961,18 @@ export const TransactionManagementView: React.FC<TransactionManagementViewProps>
                                 calculatedStocks={calculatedStocks}
                                 onChange={(newCode, selectedMat) => {
                                   const updated = [...formItems];
+                                  const propItem = matchedProposal?.items.find((pi) => pi.materialCode === newCode);
+                                  const resolvedPrice =
+                                    propItem && propItem.unitPrice > 0
+                                      ? propItem.unitPrice
+                                      : selectedMat
+                                      ? selectedMat.unitPrice
+                                      : updated[idx].unitPrice;
+
                                   updated[idx] = {
                                     ...updated[idx],
                                     materialCode: newCode,
-                                    unitPrice: selectedMat ? selectedMat.unitPrice : updated[idx].unitPrice,
+                                    unitPrice: resolvedPrice,
                                   };
                                   setFormItems(updated);
                                 }}
