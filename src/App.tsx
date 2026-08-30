@@ -558,15 +558,32 @@ export function App() {
 
   // Handler: Delete Transaction (Master Admin / Admin)
   const handleDeleteTransaction = async (txId: string) => {
-    const tx = transactions.find((t) => t.id === txId || t.code === txId);
-    const code = tx?.code || txId;
-    const targetId = tx?.id || txId;
-    const nextList = transactions.filter((t) => t.id !== targetId && t.code !== code && t.id !== txId && t.code !== txId);
-    
-    // Update local state immediately
-    setTransactions(nextList);
-    localStorage.setItem('smart_transactions_v9', JSON.stringify(nextList));
-    
+    let code = txId;
+    let targetId = txId;
+    let txType: string | undefined;
+    let propNum: string | undefined;
+
+    setTransactions((prev) => {
+      const tx = prev.find((t) => t.id === txId || t.code === txId);
+      if (tx) {
+        code = tx.code;
+        targetId = tx.id;
+        txType = tx.type;
+        propNum = tx.proposalNumber;
+      }
+      const nextList = prev.filter(
+        (t) =>
+          t.id !== targetId &&
+          t.code !== code &&
+          t.id !== txId &&
+          t.code !== txId &&
+          t.id?.toLowerCase() !== targetId.toLowerCase() &&
+          t.code?.toLowerCase() !== code.toLowerCase()
+      );
+      localStorage.setItem('smart_transactions_v9', JSON.stringify(nextList));
+      return nextList;
+    });
+
     // Delete from Firestore Cloud permanently
     try {
       await deleteTransactionFromCloud(targetId);
@@ -580,10 +597,10 @@ export function App() {
     logActivity(
       'DELETE_TX',
       'Xóa chứng từ kho',
-      `Đã xóa vĩnh viễn phiếu ${code} (${tx?.type === 'IMPORT' ? 'Nhập kho' : 'Xuất kho'}). Số dư tồn kho và thẻ kho đã hoàn tác tự động.`,
+      `Đã xóa vĩnh viễn phiếu ${code} (${txType === 'IMPORT' ? 'Nhập kho' : 'Xuất kho'}). Số dư tồn kho và thẻ kho đã hoàn tác tự động.`,
       {
         documentCode: code,
-        proposalNumber: tx?.proposalNumber,
+        proposalNumber: propNum,
         targetType: 'TRANSACTION',
       }
     );
@@ -596,15 +613,32 @@ export function App() {
 
   // Handler: Delete Proposal (Master Admin / Admin)
   const handleDeleteProposal = async (propId: string) => {
-    const prop = proposals.find((p) => p.id === propId || p.proposalNumber === propId);
-    const propNum = prop?.proposalNumber || propId;
-    const targetId = prop?.id || propId;
-    const nextList = proposals.filter((p) => p.id !== targetId && p.proposalNumber !== propNum && p.id !== propId && p.proposalNumber !== propId);
-    
-    // Update local state immediately
-    setProposals(nextList);
-    localStorage.setItem('smart_proposals_v5', JSON.stringify(nextList));
-    
+    let propNum = propId;
+    let targetId = propId;
+    let propTitle = '';
+    let itemsCount = 0;
+
+    setProposals((prev) => {
+      const prop = prev.find((p) => p.id === propId || p.proposalNumber === propId);
+      if (prop) {
+        propNum = prop.proposalNumber;
+        targetId = prop.id;
+        propTitle = prop.title || '';
+        itemsCount = prop.items?.length || 0;
+      }
+      const nextList = prev.filter(
+        (p) =>
+          p.id !== targetId &&
+          p.proposalNumber !== propNum &&
+          p.id !== propId &&
+          p.proposalNumber !== propId &&
+          p.id?.toLowerCase() !== targetId.toLowerCase() &&
+          p.proposalNumber?.toLowerCase() !== propNum.toLowerCase()
+      );
+      localStorage.setItem('smart_proposals_v5', JSON.stringify(nextList));
+      return nextList;
+    });
+
     // Delete from Firestore Cloud permanently
     try {
       await deleteProposalFromCloud(targetId);
@@ -618,7 +652,7 @@ export function App() {
     logActivity(
       'DELETE_PROPOSAL',
       'Xóa Tờ trình mua sắm',
-      `Đã xóa vĩnh viễn Tờ trình ${propNum} - "${prop?.title || ''}" (${prop?.items?.length || 0} mục vật tư đề xuất)`,
+      `Đã xóa vĩnh viễn Tờ trình ${propNum} - "${propTitle}" (${itemsCount} mục vật tư đề xuất)`,
       { proposalNumber: propNum, targetType: 'PROPOSAL' }
     );
 
