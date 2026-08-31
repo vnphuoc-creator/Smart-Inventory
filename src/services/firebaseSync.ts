@@ -18,6 +18,27 @@ const TRANSACTIONS_COL = 'transactions';
 const LOGS_COL = 'activity_logs';
 
 /**
+ * Utility to recursively remove undefined properties before saving to Firestore.
+ * Prevents "Function setDoc() called with invalid data. Unsupported field value: undefined" errors.
+ */
+export function cleanForFirestore<T>(obj: T): T {
+  if (obj === null || obj === undefined) return obj;
+  if (Array.isArray(obj)) {
+    return obj.map((item) => cleanForFirestore(item)) as unknown as T;
+  }
+  if (typeof obj === 'object' && !(obj instanceof Date)) {
+    const cleaned: Record<string, any> = {};
+    for (const [key, value] of Object.entries(obj)) {
+      if (value !== undefined) {
+        cleaned[key] = cleanForFirestore(value);
+      }
+    }
+    return cleaned as T;
+  }
+  return obj;
+}
+
+/**
  * 1. REAL-TIME USERS SYNC
  */
 export function subscribeToUsers(
@@ -35,8 +56,11 @@ export function subscribeToUsers(
       } else {
         const usersList: User[] = [];
         snapshot.forEach((d) => {
-          usersList.push(d.data() as User);
+          const u = d.data() as User;
+          if (!u.id) u.id = d.id;
+          usersList.push(u);
         });
+        usersList.sort((a, b) => (a.stt || 0) - (b.stt || 0));
         onUpdate(usersList);
       }
     },
@@ -49,7 +73,7 @@ export function subscribeToUsers(
 export async function saveUserToCloud(user: User) {
   try {
     const userRef = doc(db, USERS_COL, user.id);
-    await setDoc(userRef, user, { merge: true });
+    await setDoc(userRef, cleanForFirestore(user), { merge: true });
   } catch (e) {
     console.error('Error saving user to Firebase:', e);
   }
@@ -69,7 +93,7 @@ export async function seedUsers(users: User[]) {
     const batch = writeBatch(db);
     users.forEach((u) => {
       const ref = doc(db, USERS_COL, u.id);
-      batch.set(ref, u);
+      batch.set(ref, cleanForFirestore(u));
     });
     await batch.commit();
   } catch (e) {
@@ -98,7 +122,9 @@ export function subscribeToMaterials(
       } else {
         const list: Material[] = [];
         snapshot.forEach((d) => {
-          list.push(d.data() as Material);
+          const m = d.data() as Material;
+          if (!m.id) m.id = d.id;
+          list.push(m);
         });
         onUpdate(list);
       }
@@ -112,7 +138,7 @@ export function subscribeToMaterials(
 export async function saveMaterialToCloud(material: Material) {
   try {
     const ref = doc(db, MATERIALS_COL, material.id || material.code);
-    await setDoc(ref, material, { merge: true });
+    await setDoc(ref, cleanForFirestore(material), { merge: true });
   } catch (e) {
     console.error('Error saving material to Firebase:', e);
   }
@@ -163,7 +189,7 @@ export async function seedMaterials(materials: Material[]) {
       const batch = writeBatch(db);
       chunk.forEach((m) => {
         const ref = doc(db, MATERIALS_COL, m.id || m.code);
-        batch.set(ref, m);
+        batch.set(ref, cleanForFirestore(m));
       });
       await batch.commit();
     }
@@ -202,7 +228,7 @@ export async function saveProposalToCloud(proposal: PurchaseProposal) {
   try {
     const docId = proposal.id || proposal.proposalNumber;
     const ref = doc(db, PROPOSALS_COL, docId);
-    await setDoc(ref, proposal, { merge: true });
+    await setDoc(ref, cleanForFirestore(proposal), { merge: true });
   } catch (e) {
     console.error('Error saving proposal to Firebase:', e);
   }
@@ -260,7 +286,7 @@ export async function seedProposals(proposals: PurchaseProposal[]) {
     proposals.forEach((p) => {
       const docId = p.id || p.proposalNumber;
       const ref = doc(db, PROPOSALS_COL, docId);
-      batch.set(ref, p);
+      batch.set(ref, cleanForFirestore(p));
     });
     await batch.commit();
   } catch (e) {
@@ -298,7 +324,7 @@ export async function saveTransactionToCloud(tx: InventoryTransaction) {
   try {
     const docId = tx.id || tx.code;
     const ref = doc(db, TRANSACTIONS_COL, docId);
-    await setDoc(ref, tx, { merge: true });
+    await setDoc(ref, cleanForFirestore(tx), { merge: true });
   } catch (e) {
     console.error('Error saving transaction to Firebase:', e);
   }
@@ -356,7 +382,7 @@ export async function seedTransactions(transactions: InventoryTransaction[]) {
     transactions.forEach((t) => {
       const docId = t.id || t.code;
       const ref = doc(db, TRANSACTIONS_COL, docId);
-      batch.set(ref, t);
+      batch.set(ref, cleanForFirestore(t));
     });
     await batch.commit();
   } catch (e) {
@@ -368,18 +394,30 @@ export async function seedTransactions(transactions: InventoryTransaction[]) {
  * 5. REAL-TIME ACTIVITY LOGS SYNC
  */
 export function subscribeToLogs(
-  onUpdate: (logs: ActivityLog[]) => void
+  onUpdate: (logs: ActivityLog[]) => void,
+  initialFallback?: ActivityLog[]
 ) {
   const logsRef = collection(db, LOGS_COL);
   return onSnapshot(
     logsRef,
     (snapshot) => {
-      const list: ActivityLog[] = [];
-      snapshot.forEach((d) => {
-        list.push(d.data() as ActivityLog);
-      });
-      list.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
-      onUpdate(list);
+      if (snapshot.empty) {
+        if (initialFallback && initialFallback.length > 0) {
+          seedLogs(initialFallback);
+          onUpdate(initialFallback);
+        } else {
+          onUpdate([]);
+        }
+      } else {
+        const list: ActivityLog[] = [];
+        snapshot.forEach((d) => {
+          const l = d.data() as ActivityLog;
+          if (!l.id) l.id = d.id;
+          list.push(l);
+        });
+        list.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+        onUpdate(list);
+      }
     },
     (err) => {
       console.error('Firebase logs sync error:', err);
@@ -390,7 +428,7 @@ export function subscribeToLogs(
 export async function saveLogToCloud(log: ActivityLog) {
   try {
     const ref = doc(db, LOGS_COL, log.id);
-    await setDoc(ref, log, { merge: true });
+    await setDoc(ref, cleanForFirestore(log), { merge: true });
   } catch (e) {
     console.error('Error saving log to Firebase:', e);
   }
@@ -421,10 +459,11 @@ export async function seedLogs(logs: ActivityLog[]) {
     const batch = writeBatch(db);
     logs.forEach((l) => {
       const ref = doc(db, LOGS_COL, l.id);
-      batch.set(ref, l);
+      batch.set(ref, cleanForFirestore(l));
     });
     await batch.commit();
   } catch (e) {
     console.error('Error seeding logs:', e);
   }
 }
+

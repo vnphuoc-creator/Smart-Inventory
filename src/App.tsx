@@ -212,9 +212,9 @@ export function App() {
     if (saved !== null) {
       try {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) return parsed;
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
       } catch {
-        return [];
+        return INITIAL_ACTIVITY_LOGS;
       }
     }
     return INITIAL_ACTIVITY_LOGS;
@@ -227,10 +227,10 @@ export function App() {
   // Firebase Realtime Subscription for Activity Logs
   useEffect(() => {
     const unsubscribe = subscribeToLogs((cloudLogs) => {
-      if (cloudLogs) {
+      if (cloudLogs && cloudLogs.length > 0) {
         setActivityLogs(cloudLogs);
       }
-    });
+    }, INITIAL_ACTIVITY_LOGS);
     return () => unsubscribe();
   }, []);
 
@@ -731,12 +731,24 @@ export function App() {
       setCurrentUser(updatedUser);
     }
     saveUserToCloud(updatedUser);
+    logActivity(
+      'PASSWORD_CHANGE',
+      'Cập nhật thông tin / mật khẩu tài khoản',
+      `Tài khoản ${updatedUser.fullName} (${updatedUser.email}) đã được cập nhật thành công và đồng bộ lên Cloud`,
+      { targetType: 'AUTH' }
+    );
   };
 
   // Handler: Add New User
   const handleAddUser = (newUser: User) => {
     setUsers((prev) => [...prev, newUser]);
     saveUserToCloud(newUser);
+    logActivity(
+      'PASSWORD_CHANGE',
+      'Tạo tài khoản mới',
+      `Đã tạo tài khoản mới cho ${newUser.fullName} (${newUser.email}, vai trò ${newUser.roleName})`,
+      { targetType: 'AUTH' }
+    );
     showToast(`Đã thêm thành công người dùng mới: ${newUser.fullName}`);
   };
 
@@ -946,11 +958,13 @@ export function App() {
                 onClearAllTransactionsAndProposals={handleClearAllTransactionsAndProposals}
                 onUpdateMaterials={(newMats) => {
                   setMaterials(newMats);
+                  newMats.forEach((m) => saveMaterialToCloud(m));
                   showToast(`Đã cập nhật danh mục gồm ${newMats.length} vật tư.`);
                 }}
                 onUpdateUsers={(newUsers) => {
                   setUsers(newUsers);
-                  showToast(`Đã cập nhật danh sách người dùng.`);
+                  newUsers.forEach((u) => saveUserToCloud(u));
+                  showToast(`Đã cập nhật danh sách người dùng và đồng bộ lên Cloud.`);
                 }}
               />
             ) : (

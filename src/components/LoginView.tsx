@@ -63,15 +63,23 @@ export const LoginView: React.FC<LoginViewProps> = ({ users, onLogin }) => {
       return;
     }
 
-    // Verify password: check user.password or user.defaultPassword or custom aliases
-    const validPasswords = [
-      foundUser.password,
-      foundUser.defaultPassword,
-      `${foundUser.username}12345`,
-      `${foundUser.email.split('@')[0]}12345`,
+    // Verify password: check user.password (primary), defaultPassword, or fallback alias
+    const currentPass = (foundUser.password || '').trim();
+    const defaultPass = (foundUser.defaultPassword || '').trim();
+    const usernamePass = `${foundUser.username.trim()}12345`;
+    const emailPrefixPass = `${foundUser.email.split('@')[0].trim()}12345`;
+
+    const candidatePasswords = [
+      currentPass,
+      defaultPass,
+      usernamePass,
+      emailPrefixPass,
     ].filter(Boolean);
 
-    const isMatch = validPasswords.some((p) => p?.toLowerCase() === cleanPass.toLowerCase());
+    // Exact or case-insensitive match against all valid candidate passwords
+    const isMatch = candidatePasswords.some(
+      (p) => p === cleanPass || p.toLowerCase() === cleanPass.toLowerCase()
+    );
 
     if (!isMatch) {
       setErrorMsg('Mật khẩu không chính xác! Vui lòng kiểm tra lại hoặc liên hệ Quản lý để được hỗ trợ.');
