@@ -57,6 +57,7 @@ export interface TransactionItem {
 export interface ProposalItem {
   materialCode: string;
   materialName: string;
+  specification?: string;
   unit: string;
   requestedQuantity: number;
   unitPrice?: number;

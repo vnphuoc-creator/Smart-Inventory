@@ -1,4 +1,5 @@
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
+import mammoth from 'mammoth';
 import {
   FileCheck,
   Plus,
@@ -33,6 +34,14 @@ import {
   CheckSquare,
   Lock,
   Edit3,
+  Download,
+  Printer,
+  ZoomIn,
+  ZoomOut,
+  RotateCcw,
+  FileSpreadsheet,
+  Layers,
+  FileCode,
 } from 'lucide-react';
 import {
   PurchaseProposal,
@@ -73,8 +82,18 @@ export const ProposalReconciliationView: React.FC<ProposalReconciliationViewProp
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'COMPLETED' | 'INCOMPLETE' | 'UNTOUCHED' | 'CLOSED_EARLY'>('ALL');
   const [expandedProposalId, setExpandedProposalId] = useState<string | null>(proposals[0]?.id || null);
-  const [viewingAttachment, setViewingAttachment] = useState<{ url: string; name: string; type?: string } | null>(null);
+  const [viewingAttachment, setViewingAttachment] = useState<{
+    url?: string;
+    name: string;
+    type?: string;
+    html?: string;
+    proposal?: PurchaseProposal;
+    reconciledItems?: any[];
+  } | null>(null);
+  const [attachmentTab, setAttachmentTab] = useState<'document' | 'items'>('document');
   const [attachmentZoom, setAttachmentZoom] = useState<number>(100);
+  const [parsedDocxHtml, setParsedDocxHtml] = useState<string>('');
+  const [isDocxParsing, setIsDocxParsing] = useState<boolean>(false);
   const [proposalToDelete, setProposalToDelete] = useState<PurchaseProposal | null>(null);
   const [proposalToCloseEarly, setProposalToCloseEarly] = useState<PurchaseProposal | null>(null);
   const [closeEarlyReason, setCloseEarlyReason] = useState<string>('Nghiệm thu theo số lượng thực nhận, nhà cung cấp không giao tiếp phần còn thiếu.');
@@ -88,6 +107,65 @@ export const ProposalReconciliationView: React.FC<ProposalReconciliationViewProp
   const [newPropNotes, setNewPropNotes] = useState('');
   const [newPropAttachmentName, setNewPropAttachmentName] = useState('');
   const [newPropAttachmentUrl, setNewPropAttachmentUrl] = useState('');
+  const [newPropAttachmentHtml, setNewPropAttachmentHtml] = useState('');
+
+  // On-the-fly Mammoth docx parser when viewing attachment
+  useEffect(() => {
+    if (!viewingAttachment) {
+      setParsedDocxHtml('');
+      setIsDocxParsing(false);
+      return;
+    }
+
+    const isDocx =
+      viewingAttachment.name.endsWith('.docx') ||
+      viewingAttachment.name.endsWith('.doc') ||
+      viewingAttachment.type === 'document';
+
+    if (viewingAttachment.html && viewingAttachment.html.trim()) {
+      setParsedDocxHtml(viewingAttachment.html);
+      setIsDocxParsing(false);
+      return;
+    }
+
+    if (isDocx && viewingAttachment.url && viewingAttachment.url.startsWith('data:')) {
+      setIsDocxParsing(true);
+      try {
+        const base64Data = viewingAttachment.url.split(',')[1];
+        if (base64Data) {
+          const binaryString = atob(base64Data);
+          const len = binaryString.length;
+          const bytes = new Uint8Array(len);
+          for (let i = 0; i < len; i++) {
+            bytes[i] = binaryString.charCodeAt(i);
+          }
+          mammoth
+            .convertToHtml({ arrayBuffer: bytes.buffer })
+            .then((result) => {
+              if (result && result.value) {
+                setParsedDocxHtml(result.value);
+              } else {
+                setParsedDocxHtml('');
+              }
+            })
+            .catch((err) => {
+              console.warn('Docx on-the-fly parse error:', err);
+              setParsedDocxHtml('');
+            })
+            .finally(() => {
+              setIsDocxParsing(false);
+            });
+          return;
+        }
+      } catch (e) {
+        console.warn('Failed decoding base64 docx:', e);
+      }
+      setIsDocxParsing(false);
+    } else {
+      setParsedDocxHtml('');
+      setIsDocxParsing(false);
+    }
+  }, [viewingAttachment]);
   const [newPropItems, setNewPropItems] = useState<ProposalItem[]>([
     {
       materialCode: materials[0]?.code || 'DN_CC_00ACB_01',
@@ -157,6 +235,24 @@ export const ProposalReconciliationView: React.FC<ProposalReconciliationViewProp
   // Effective proposals ensuring any proposal referenced in transactions is available
   const effectiveProposals = useMemo(() => {
     const list = proposals.map((p) => {
+      const relTxs = transactions.filter((tx) => isProposalMatch(tx.proposalNumber, p.proposalNumber));
+      const foundHtml =
+        p.attachmentHtml ||
+        relTxs.find((t) => t.proposalAttachmentHtml || t.attachmentHtml)?.proposalAttachmentHtml ||
+        relTxs.find((t) => t.proposalAttachmentHtml || t.attachmentHtml)?.attachmentHtml;
+      const foundUrl =
+        p.attachmentUrl ||
+        relTxs.find((t) => t.proposalAttachmentUrl || t.attachmentUrl)?.proposalAttachmentUrl ||
+        relTxs.find((t) => t.proposalAttachmentUrl || t.attachmentUrl)?.attachmentUrl;
+      const foundName =
+        p.attachmentName ||
+        relTxs.find((t) => t.proposalAttachmentName || t.attachmentName)?.proposalAttachmentName ||
+        relTxs.find((t) => t.proposalAttachmentName || t.attachmentName)?.attachmentName;
+      const foundType =
+        p.attachmentType ||
+        relTxs.find((t) => t.proposalAttachmentType || t.attachmentType)?.proposalAttachmentType ||
+        relTxs.find((t) => t.proposalAttachmentType || t.attachmentType)?.attachmentType;
+
       const enrichedItems = (p.items || []).map((it) => {
         const mat = materials.find((m) => m.code === it.materialCode);
         let txMatName = '';
@@ -191,6 +287,10 @@ export const ProposalReconciliationView: React.FC<ProposalReconciliationViewProp
 
       return {
         ...p,
+        attachmentHtml: foundHtml,
+        attachmentUrl: foundUrl,
+        attachmentName: foundName,
+        attachmentType: foundType,
         items: enrichedItems,
       };
     });
@@ -209,9 +309,10 @@ export const ProposalReconciliationView: React.FC<ProposalReconciliationViewProp
             creatorEmail: tx.creatorEmail || '',
             department: 'Đội Điện Nước Công Trình',
             status: 'PARTIALLY_IMPORTED',
-            attachmentName: tx.attachmentName,
-            attachmentUrl: tx.attachmentUrl,
-            attachmentHtml: tx.attachmentHtml,
+            attachmentName: tx.proposalAttachmentName || tx.attachmentName,
+            attachmentUrl: tx.proposalAttachmentUrl || tx.attachmentUrl,
+            attachmentHtml: tx.proposalAttachmentHtml || tx.attachmentHtml,
+            attachmentType: tx.proposalAttachmentType || tx.attachmentType || 'document',
             notes: `Tự động liên kết theo phiếu giao dịch ${tx.code}`,
             createdAt: tx.createdAt || new Date().toISOString(),
             items: tx.items.map((it) => {
@@ -385,10 +486,32 @@ export const ProposalReconciliationView: React.FC<ProposalReconciliationViewProp
   }, [reconciliationData, statusFilter, searchQuery]);
 
   // Handle file upload for new proposal
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       setNewPropAttachmentName(file.name);
+      let docHtml = '';
+      if (file.name.endsWith('.docx') || file.name.endsWith('.doc')) {
+        try {
+          const arrayBuffer = await file.arrayBuffer();
+          const resMammothHtml = await mammoth.convertToHtml({ arrayBuffer });
+          docHtml = resMammothHtml.value || '';
+          setNewPropAttachmentHtml(docHtml);
+        } catch (err) {
+          console.warn('Mammoth parse error:', err);
+        }
+      } else if (file.name.endsWith('.txt')) {
+        try {
+          const text = await file.text();
+          docHtml = `<pre style="white-space: pre-wrap;">${text}</pre>`;
+          setNewPropAttachmentHtml(docHtml);
+        } catch (err) {
+          console.warn('Text file read error:', err);
+        }
+      } else {
+        setNewPropAttachmentHtml('');
+      }
+
       const reader = new FileReader();
       reader.onload = (event) => {
         setNewPropAttachmentUrl(event.target?.result as string);
@@ -448,6 +571,9 @@ export const ProposalReconciliationView: React.FC<ProposalReconciliationViewProp
       return;
     }
 
+    const isPdf = newPropAttachmentName.endsWith('.pdf');
+    const isDoc = newPropAttachmentName.endsWith('.docx') || newPropAttachmentName.endsWith('.doc');
+
     const created: PurchaseProposal = {
       id: `prop-${Date.now()}`,
       proposalNumber: newPropNumber.trim(),
@@ -459,7 +585,8 @@ export const ProposalReconciliationView: React.FC<ProposalReconciliationViewProp
       status: 'APPROVED',
       attachmentName: newPropAttachmentName || undefined,
       attachmentUrl: newPropAttachmentUrl || undefined,
-      attachmentType: newPropAttachmentName.endsWith('.pdf') ? 'pdf' : 'image',
+      attachmentHtml: newPropAttachmentHtml || undefined,
+      attachmentType: isPdf ? 'pdf' : isDoc ? 'document' : 'image',
       notes: newPropNotes.trim() || undefined,
       items: newPropItems,
       createdAt: new Date().toISOString(),
@@ -474,6 +601,7 @@ export const ProposalReconciliationView: React.FC<ProposalReconciliationViewProp
     setNewPropNotes('');
     setNewPropAttachmentName('');
     setNewPropAttachmentUrl('');
+    setNewPropAttachmentHtml('');
   };
 
   // Delete a single item row from Proposal
@@ -929,22 +1057,28 @@ export const ProposalReconciliationView: React.FC<ProposalReconciliationViewProp
                         </span>
                       )}
 
-                      {proposal.attachmentName && (
+                      {(proposal.attachmentName || proposal.attachmentUrl || proposal.attachmentHtml) && (
                         <button
                           type="button"
                           onClick={(e) => {
                             e.stopPropagation();
                             setViewingAttachment({
-                              url: proposal.attachmentUrl || 'https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?auto=format&fit=crop&w=1200&q=80',
-                              name: proposal.attachmentName || 'Tờ trình phê duyệt',
-                              type: proposal.attachmentType,
+                              url: proposal.attachmentUrl || '',
+                              name: proposal.attachmentName || `Tờ trình ${proposal.proposalNumber}.docx`,
+                              type: proposal.attachmentType || (proposal.attachmentName?.endsWith('.pdf') ? 'pdf' : proposal.attachmentName?.endsWith('.docx') ? 'document' : 'image'),
+                              html: proposal.attachmentHtml || '',
+                              proposal: proposal,
+                              reconciledItems: reconciledItems,
                             });
+                            setAttachmentTab('document');
+                            setAttachmentZoom(100);
                           }}
-                          className="inline-flex items-center gap-1 text-[11px] bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-300 border border-indigo-500/30 px-2 py-0.5 rounded-full transition-colors"
+                          className="inline-flex items-center gap-1.5 text-[11px] bg-blue-500/20 hover:bg-blue-500/30 text-blue-300 border border-blue-500/40 px-2.5 py-0.5 rounded-full transition-colors font-medium shadow-sm cursor-pointer"
+                          title="Bấm để xem và in nội dung Tờ trình đính kèm"
                         >
-                          <ImageIcon className="w-3 h-3" />
-                          <span>Đính kèm: {proposal.attachmentName}</span>
-                          <Eye className="w-3 h-3 ml-0.5" />
+                          <FileText className="w-3.5 h-3.5 text-blue-400" />
+                          <span>Đính kèm: {proposal.attachmentName || `Tờ trình ${proposal.proposalNumber}`}</span>
+                          <Eye className="w-3.5 h-3.5 ml-0.5 text-blue-300" />
                         </button>
                       )}
                     </div>
@@ -1294,54 +1428,571 @@ export const ProposalReconciliationView: React.FC<ProposalReconciliationViewProp
         )}
       </div>
 
-      {/* Lightbox / View Attachment Modal */}
+      {/* Lightbox / View Attachment & Word Document Modal */}
       {viewingAttachment && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-sm animate-in fade-in duration-150">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-950/85 backdrop-blur-sm animate-in fade-in duration-150">
           <div
-            className="w-full max-w-4xl bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
+            className="w-full max-w-5xl bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[94vh]"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="p-4 border-b border-slate-800 flex items-center justify-between bg-slate-850">
-              <div className="flex items-center gap-2">
-                <FileText className="w-5 h-5 text-blue-400" />
-                <h3 className="text-sm font-bold text-white">Xem File / Ảnh Tờ Trình Đính Kèm</h3>
-                <span className="text-xs text-slate-400 font-mono">({viewingAttachment.name})</span>
+            {/* Modal Header */}
+            <div className="p-3.5 sm:p-4 border-b border-slate-800 flex items-center justify-between bg-slate-850 flex-wrap gap-2">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="w-8 h-8 rounded-lg bg-blue-600/20 text-blue-400 flex items-center justify-center shrink-0">
+                  {viewingAttachment.name.endsWith('.docx') || viewingAttachment.name.endsWith('.doc') ? (
+                    <FileText className="w-4 h-4 text-blue-400" />
+                  ) : viewingAttachment.name.endsWith('.pdf') ? (
+                    <FileText className="w-4 h-4 text-rose-400" />
+                  ) : (
+                    <ImageIcon className="w-4 h-4 text-emerald-400" />
+                  )}
+                </div>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h3 className="text-sm font-bold text-white truncate max-w-[280px] sm:max-w-md">
+                      {viewingAttachment.name}
+                    </h3>
+                    <span className="text-[10px] px-2 py-0.5 rounded-full font-mono font-medium bg-slate-800 text-blue-300 border border-slate-700">
+                      {viewingAttachment.name.endsWith('.docx') || viewingAttachment.name.endsWith('.doc')
+                        ? 'Word Document (.docx)'
+                        : viewingAttachment.name.endsWith('.pdf')
+                        ? 'PDF Document'
+                        : 'Ảnh đính kèm'}
+                    </span>
+                  </div>
+                  {viewingAttachment.proposal && (
+                    <p className="text-[11px] text-slate-400 truncate">
+                      Tờ trình: <strong className="text-slate-300 font-mono">{viewingAttachment.proposal.proposalNumber}</strong> - {viewingAttachment.proposal.title}
+                    </p>
+                  )}
+                </div>
               </div>
-              <button
-                onClick={() => setViewingAttachment(null)}
-                className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800"
-              >
-                <X className="w-5 h-5" />
-              </button>
+
+              {/* Action Buttons */}
+              <div className="flex items-center gap-2 ml-auto">
+                {/* Tabs */}
+                <div className="bg-slate-800 p-0.5 rounded-xl flex items-center border border-slate-700">
+                  <button
+                    type="button"
+                    onClick={() => setAttachmentTab('document')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors flex items-center gap-1.5 ${
+                      attachmentTab === 'document'
+                        ? 'bg-blue-600 text-white shadow'
+                        : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    <FileText className="w-3.5 h-3.5" />
+                    <span className="hidden sm:inline">Văn Bản Tờ Trình</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setAttachmentTab('items')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors flex items-center gap-1.5 ${
+                      attachmentTab === 'items'
+                        ? 'bg-blue-600 text-white shadow'
+                        : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    <Layers className="w-3.5 h-3.5" />
+                    <span className="hidden sm:inline">Bảng Vật Tư & Đối Soát</span>
+                    {viewingAttachment.proposal && (
+                      <span className="text-[10px] bg-slate-700/80 px-1.5 py-0.2 rounded-full">
+                        {viewingAttachment.proposal.items?.length || 0}
+                      </span>
+                    )}
+                  </button>
+                </div>
+
+                {/* Zoom Controls */}
+                {attachmentTab === 'document' && (
+                  <div className="hidden md:flex items-center gap-1 bg-slate-800 px-2 py-1 rounded-xl border border-slate-700 text-xs text-slate-300">
+                    <button
+                      type="button"
+                      onClick={() => setAttachmentZoom((prev) => Math.max(60, prev - 15))}
+                      className="p-1 hover:text-white rounded hover:bg-slate-700"
+                      title="Thu nhỏ"
+                    >
+                      <ZoomOut className="w-3.5 h-3.5" />
+                    </button>
+                    <span className="font-mono text-[11px] px-1">{attachmentZoom}%</span>
+                    <button
+                      type="button"
+                      onClick={() => setAttachmentZoom((prev) => Math.min(160, prev + 15))}
+                      className="p-1 hover:text-white rounded hover:bg-slate-700"
+                      title="Phóng to"
+                    >
+                      <ZoomIn className="w-3.5 h-3.5" />
+                    </button>
+                    {attachmentZoom !== 100 && (
+                      <button
+                        type="button"
+                        onClick={() => setAttachmentZoom(100)}
+                        className="p-1 text-blue-400 hover:text-blue-300 rounded hover:bg-slate-700"
+                        title="Đặt lại 100%"
+                      >
+                        <RotateCcw className="w-3 h-3" />
+                      </button>
+                    )}
+                  </div>
+                )}
+
+                {/* Download Button */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (viewingAttachment.url && viewingAttachment.url.startsWith('data:')) {
+                      const a = document.createElement('a');
+                      a.href = viewingAttachment.url;
+                      a.download = viewingAttachment.name || 'to-trinh-dinh-kem.docx';
+                      document.body.appendChild(a);
+                      a.click();
+                      document.body.removeChild(a);
+                    } else if (viewingAttachment.url && viewingAttachment.url.startsWith('http')) {
+                      window.open(viewingAttachment.url, '_blank');
+                    } else {
+                      window.print();
+                    }
+                  }}
+                  className="bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 px-2.5 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors"
+                  title="Tải tệp hoặc xuất file"
+                >
+                  <Download className="w-3.5 h-3.5 text-emerald-400" />
+                  <span className="hidden sm:inline">Tải Về</span>
+                </button>
+
+                {/* Print Button */}
+                <button
+                  type="button"
+                  onClick={() => window.print()}
+                  className="bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 px-2.5 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors"
+                  title="In Tờ Trình"
+                >
+                  <Printer className="w-3.5 h-3.5 text-blue-400" />
+                  <span className="hidden sm:inline">In</span>
+                </button>
+
+                {/* Close Button */}
+                <button
+                  type="button"
+                  onClick={() => setViewingAttachment(null)}
+                  className="text-slate-400 hover:text-white p-1.5 rounded-xl hover:bg-slate-800 transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
             </div>
 
-            <div className="p-6 overflow-y-auto flex items-center justify-center bg-slate-950/60 min-h-[400px]">
-              {viewingAttachment.type === 'pdf' || viewingAttachment.name.endsWith('.pdf') ? (
-                <div className="text-center space-y-4 max-w-md p-8 bg-slate-900 rounded-2xl border border-slate-800">
-                  <div className="w-16 h-16 rounded-2xl bg-rose-600/20 text-rose-400 flex items-center justify-center mx-auto">
-                    <FileText className="w-8 h-8" />
-                  </div>
-                  <h4 className="font-bold text-white text-base">{viewingAttachment.name}</h4>
-                  <p className="text-xs text-slate-400">
-                    Tài liệu Tờ trình định dạng PDF đã được ký duyệt chính thức bởi Ban Giám đốc và Phòng Kỹ thuật.
-                  </p>
-                  <div className="pt-2">
-                    <button
-                      onClick={() => alert(`Đang mở tài liệu: ${viewingAttachment.name}`)}
-                      className="bg-blue-600 hover:bg-blue-500 text-white px-5 py-2.5 rounded-xl text-xs font-semibold inline-flex items-center gap-2"
+            {/* Modal Body */}
+            <div className="overflow-y-auto flex-1 bg-slate-950/80 p-3 sm:p-6 min-h-[450px] max-h-[calc(94vh-80px)]">
+              {attachmentTab === 'document' ? (
+                <div className="w-full flex justify-center py-2">
+                  {/* PDF Document */}
+                  {viewingAttachment.type === 'pdf' || viewingAttachment.name.endsWith('.pdf') ? (
+                    viewingAttachment.url && (viewingAttachment.url.startsWith('data:application/pdf') || viewingAttachment.url.startsWith('http')) ? (
+                      <div className="w-full max-w-4xl h-[72vh] rounded-xl overflow-hidden border border-slate-700 shadow-2xl bg-white">
+                        <iframe
+                          src={viewingAttachment.url}
+                          className="w-full h-full border-0"
+                          title={viewingAttachment.name}
+                        />
+                      </div>
+                    ) : (
+                      <div className="text-center space-y-4 max-w-md p-8 bg-slate-900 rounded-2xl border border-slate-800 mx-auto my-auto">
+                        <div className="w-16 h-16 rounded-2xl bg-rose-600/20 text-rose-400 flex items-center justify-center mx-auto">
+                          <FileText className="w-8 h-8" />
+                        </div>
+                        <h4 className="font-bold text-white text-base">{viewingAttachment.name}</h4>
+                        <p className="text-xs text-slate-400">
+                          Tài liệu Tờ trình định dạng PDF đã được lưu trữ và liên kết với tờ trình {viewingAttachment.proposal?.proposalNumber}.
+                        </p>
+                        <div className="pt-2 flex justify-center gap-3">
+                          <button
+                            type="button"
+                            onClick={() => window.print()}
+                            className="bg-blue-600 hover:bg-blue-500 text-white px-5 py-2.5 rounded-xl text-xs font-semibold inline-flex items-center gap-2"
+                          >
+                            <Printer className="w-4 h-4" /> In Tờ Trình Số Hóa
+                          </button>
+                        </div>
+                      </div>
+                    )
+                  ) : viewingAttachment.type === 'image' || viewingAttachment.name.match(/\.(png|jpe?g|webp|gif|svg)$/i) ? (
+                    /* Image Attachment */
+                    <div
+                      className="max-w-full flex flex-col items-center justify-center transition-transform origin-top"
+                      style={{ transform: `scale(${attachmentZoom / 100})` }}
                     >
-                      <ExternalLink className="w-4 h-4" /> Tải / Xem Trực Tiếp PDF
-                    </button>
-                  </div>
+                      <img
+                        src={viewingAttachment.url}
+                        alt={viewingAttachment.name}
+                        className="max-h-[70vh] max-w-full rounded-xl object-contain border border-slate-700 shadow-2xl bg-slate-900"
+                      />
+                      <p className="text-xs text-slate-400 mt-3 italic">{viewingAttachment.name}</p>
+                    </div>
+                  ) : (
+                    /* Word Document / Docx / Digital Proposal Form */
+                    <div
+                      className="w-full max-w-4xl transition-transform origin-top mx-auto"
+                      style={{ transform: `scale(${attachmentZoom / 100})` }}
+                    >
+                      <div className="bg-white text-slate-900 rounded-xl shadow-2xl p-6 sm:p-12 border border-slate-200 min-h-[600px] leading-relaxed">
+                        {isDocxParsing ? (
+                          <div className="flex flex-col items-center justify-center py-20 text-slate-600 gap-3">
+                            <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                            <p className="text-sm font-medium">Đang giải mã và định dạng nội dung văn bản Word (.docx)...</p>
+                          </div>
+                        ) : parsedDocxHtml || viewingAttachment.html ? (
+                          /* Render Parsed Word Document HTML */
+                          <div>
+                            {/* Document top badge */}
+                            <div className="mb-6 pb-4 border-b border-slate-200 flex items-center justify-between text-xs text-slate-500">
+                              <span className="font-mono font-semibold text-blue-700 bg-blue-50 px-2.5 py-1 rounded border border-blue-200">
+                                📄 {viewingAttachment.name}
+                              </span>
+                              <span>Trích xuất trực tiếp từ file văn bản gốc</span>
+                            </div>
+
+                            {/* Formatted Docx HTML Container */}
+                            <div
+                              className="docx-content-area text-slate-900 text-sm"
+                              dangerouslySetInnerHTML={{ __html: parsedDocxHtml || viewingAttachment.html || '' }}
+                            />
+                          </div>
+                        ) : (
+                          /* High-Fidelity Official Digital Tờ Trình Format */
+                          <div className="space-y-6 text-slate-900">
+                            {/* Header Section */}
+                            <div className="grid grid-cols-2 gap-4 pb-4 border-b-2 border-slate-900 text-xs">
+                              <div className="text-left font-bold uppercase tracking-tight">
+                                <p className="text-slate-800">CÔNG TY CỔ PHẦN CÔNG TRÌNH</p>
+                                <p className="text-blue-900 font-extrabold">{viewingAttachment.proposal?.department || 'ĐỘI ĐIỆN NƯỚC CÔNG TRÌNH'}</p>
+                                <p className="font-normal font-mono text-slate-600 mt-1">
+                                  Số: <strong className="text-slate-900">{viewingAttachment.proposal?.proposalNumber || '22-DNCT/PKT'}</strong>
+                                </p>
+                              </div>
+                              <div className="text-right">
+                                <p className="font-bold uppercase tracking-wider text-slate-900">
+                                  CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM
+                                </p>
+                                <p className="font-bold underline underline-offset-4 decoration-1 mt-0.5 text-slate-800">
+                                  Độc lập - Tự do - Hạnh phúc
+                                </p>
+                                <p className="italic text-slate-600 mt-2 text-[11px]">
+                                  Ngày {viewingAttachment.proposal?.date ? viewingAttachment.proposal.date.split('-')[2] : new Date().getDate()} tháng{' '}
+                                  {viewingAttachment.proposal?.date ? viewingAttachment.proposal.date.split('-')[1] : new Date().getMonth() + 1} năm{' '}
+                                  {viewingAttachment.proposal?.date ? viewingAttachment.proposal.date.split('-')[0] : new Date().getFullYear()}
+                                </p>
+                              </div>
+                            </div>
+
+                            {/* Title */}
+                            <div className="text-center py-2 space-y-1">
+                              <h2 className="text-xl sm:text-2xl font-black text-slate-900 uppercase tracking-wide">
+                                TỜ TRÌNH ĐỀ XUẤT
+                              </h2>
+                              <p className="text-xs sm:text-sm font-bold italic text-slate-700">
+                                (V/v: {viewingAttachment.proposal?.title || 'Mua sắm và xuất kho vật tư thi công'})
+                              </p>
+                            </div>
+
+                            {/* Recipient */}
+                            <div className="text-xs space-y-1 text-slate-800 bg-slate-50 p-3.5 rounded-lg border border-slate-200">
+                              <p>
+                                <strong className="text-slate-900">Kính gửi:</strong> - Ban Giám Đốc Công Ty
+                              </p>
+                              <p className="pl-14">- Phòng Kỹ Thuật & Nghiệp Vụ Quản Lý Dự Án</p>
+                              <p className="pl-14">- Bộ Phận Quản Lý Kho & Vật Tư Thi Công</p>
+                            </div>
+
+                            {/* Content Introduction */}
+                            <div className="text-xs text-slate-800 space-y-2 leading-relaxed">
+                              <p>
+                                - Căn cứ tiến độ và nhu cầu thi công thực tế tại hiện trường công trình.
+                              </p>
+                              <p>
+                                - Căn cứ kế hoạch vật tư được giao, <strong className="text-slate-900">{viewingAttachment.proposal?.department || 'Đội Điện Nước Công Trình'}</strong> kính trình Ban Giám đốc và Phòng Kỹ thuật phê duyệt danh mục mua sắm và cấp phát vật tư chi tiết như sau:
+                              </p>
+                            </div>
+
+                            {/* Items Table */}
+                            <div className="overflow-x-auto border border-slate-300 rounded-lg">
+                              <table className="w-full text-xs text-left border-collapse">
+                                <thead>
+                                  <tr className="bg-slate-100 text-slate-900 font-bold border-b border-slate-300">
+                                    <th className="py-2.5 px-2 text-center w-10 border-r border-slate-300">STT</th>
+                                    <th className="py-2.5 px-3 border-r border-slate-300">Mã Vật Tư</th>
+                                    <th className="py-2.5 px-3 border-r border-slate-300">Tên Vật Tư & Quy Cách Kỹ Thuật</th>
+                                    <th className="py-2.5 px-2 text-center w-16 border-r border-slate-300">ĐVT</th>
+                                    <th className="py-2.5 px-3 text-right w-20 border-r border-slate-300">Số Lượng</th>
+                                    <th className="py-2.5 px-3 text-right w-28 border-r border-slate-300">Đơn Giá (VNĐ)</th>
+                                    <th className="py-2.5 px-3 text-right w-32 border-r border-slate-300">Thành Tiền (VNĐ)</th>
+                                    <th className="py-2.5 px-3">Ghi Chú</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {viewingAttachment.proposal?.items && viewingAttachment.proposal.items.length > 0 ? (
+                                    viewingAttachment.proposal.items.map((it, idx) => {
+                                      const lineTotal = (it.requestedQuantity || 0) * (it.unitPrice || 0);
+                                      return (
+                                        <tr
+                                          key={idx}
+                                          className={`border-b border-slate-200 ${idx % 2 === 1 ? 'bg-slate-50/70' : 'bg-white'}`}
+                                        >
+                                          <td className="py-2 px-2 text-center font-mono font-medium text-slate-700 border-r border-slate-200">
+                                            {idx + 1}
+                                          </td>
+                                          <td className="py-2 px-3 font-mono font-semibold text-blue-900 border-r border-slate-200">
+                                            {it.materialCode}
+                                          </td>
+                                          <td className="py-2 px-3 border-r border-slate-200">
+                                            <p className="font-bold text-slate-900">{it.materialName}</p>
+                                            {it.specification && (
+                                              <p className="text-[11px] text-slate-600 italic">{it.specification}</p>
+                                            )}
+                                          </td>
+                                          <td className="py-2 px-2 text-center font-medium text-slate-700 border-r border-slate-200">
+                                            {it.unit}
+                                          </td>
+                                          <td className="py-2 px-3 text-right font-mono font-bold text-slate-900 border-r border-slate-200">
+                                            {formatNumber(it.requestedQuantity)}
+                                          </td>
+                                          <td className="py-2 px-3 text-right font-mono text-slate-700 border-r border-slate-200">
+                                            {formatVND(it.unitPrice || 0)}
+                                          </td>
+                                          <td className="py-2 px-3 text-right font-mono font-bold text-slate-900 border-r border-slate-200">
+                                            {formatVND(lineTotal)}
+                                          </td>
+                                          <td className="py-2 px-3 text-[11px] text-slate-500 italic">
+                                            {it.notes || '-'}
+                                          </td>
+                                        </tr>
+                                      );
+                                    })
+                                  ) : (
+                                    <tr>
+                                      <td colSpan={8} className="py-4 text-center text-slate-400 italic">
+                                        Không có danh mục vật tư
+                                      </td>
+                                    </tr>
+                                  )}
+                                </tbody>
+                                <tfoot>
+                                  <tr className="bg-slate-100 font-bold text-slate-900 border-t-2 border-slate-400">
+                                    <td colSpan={4} className="py-2.5 px-3 text-right uppercase border-r border-slate-300">
+                                      Tổng Cộng Kinh Phí Dự Kiến:
+                                    </td>
+                                    <td className="py-2.5 px-3 text-right font-mono text-blue-900 border-r border-slate-300">
+                                      {formatNumber(
+                                        viewingAttachment.proposal?.items?.reduce((s, i) => s + (i.requestedQuantity || 0), 0) || 0
+                                      )}
+                                    </td>
+                                    <td className="py-2.5 px-3 border-r border-slate-300"></td>
+                                    <td className="py-2.5 px-3 text-right font-mono text-base text-rose-700 font-black border-r border-slate-300">
+                                      {formatVND(
+                                        viewingAttachment.proposal?.items?.reduce(
+                                          (s, i) => s + (i.requestedQuantity || 0) * (i.unitPrice || 0),
+                                          0
+                                        ) || 0
+                                      )}
+                                    </td>
+                                    <td></td>
+                                  </tr>
+                                </tfoot>
+                              </table>
+                            </div>
+
+                            {/* Notes & Justification */}
+                            <div className="text-xs text-slate-800 space-y-1 pt-2">
+                              <p>
+                                <strong className="text-slate-900">Ghi chú & Căn cứ phê duyệt:</strong>{' '}
+                                <span className="italic">
+                                  {viewingAttachment.proposal?.notes ||
+                                    'Vật tư phục vụ công tác lắp đặt đúng tiến độ kỹ thuật. Đã được rà soát và đối chiếu định mức.'}
+                                </span>
+                              </p>
+                              <p className="italic text-slate-700">
+                                Kính trình Ban Giám đốc xem xét phê duyệt để Đội kịp thời triển khai mua sắm và thi công.
+                              </p>
+                            </div>
+
+                            {/* Signatures */}
+                            <div className="grid grid-cols-3 gap-4 pt-8 text-center text-xs text-slate-900">
+                              <div className="space-y-1">
+                                <p className="font-bold uppercase">NGƯỜI LẬP ĐỀ XUẤT</p>
+                                <p className="italic text-[11px] text-slate-500">(Ký & ghi rõ họ tên)</p>
+                                <div className="h-16 flex items-center justify-center">
+                                  <span className="text-blue-700 font-serif italic text-sm font-semibold">
+                                    {viewingAttachment.proposal?.creatorName || 'Đã ký'}
+                                  </span>
+                                </div>
+                                <p className="font-bold text-slate-900">
+                                  {viewingAttachment.proposal?.creatorName || currentUser.fullName}
+                                </p>
+                              </div>
+
+                              <div className="space-y-1">
+                                <p className="font-bold uppercase">TRƯỞNG BỘ PHẬN</p>
+                                <p className="italic text-[11px] text-slate-500">(Ký & ghi rõ họ tên)</p>
+                                <div className="h-16 flex items-center justify-center">
+                                  <span className="text-blue-700 font-serif italic text-sm font-semibold">
+                                    Đã xác nhận
+                                  </span>
+                                </div>
+                                <p className="font-bold text-slate-900">
+                                  {viewingAttachment.proposal?.department || 'Đội Điện Nước'}
+                                </p>
+                              </div>
+
+                              <div className="space-y-1">
+                                <p className="font-bold uppercase text-rose-800">BAN GIÁM ĐỐC DUYỆT</p>
+                                <p className="italic text-[11px] text-slate-500">(Phê duyệt mua sắm)</p>
+                                <div className="h-16 flex items-center justify-center">
+                                  <div className="border-2 border-rose-600 text-rose-600 px-3 py-1 rounded text-[11px] font-bold uppercase rotate-[-6deg] shadow-sm">
+                                    ✓ ĐÃ PHÊ DUYỆT
+                                  </div>
+                                </div>
+                                <p className="font-bold text-slate-900">Ban Giám Đốc</p>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
               ) : (
-                <div className="max-w-full max-h-[70vh] flex flex-col items-center">
-                  <img
-                    src={viewingAttachment.url}
-                    alt={viewingAttachment.name}
-                    className="max-h-[65vh] max-w-full rounded-xl object-contain border border-slate-700 shadow-xl"
-                  />
-                  <p className="text-xs text-slate-400 mt-3 italic">{viewingAttachment.name}</p>
+                /* Tab 2: Structured Items & Live Reconciliation Status */
+                <div className="w-full space-y-4">
+                  <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 flex items-center justify-between flex-wrap gap-3">
+                    <div>
+                      <h4 className="text-sm font-bold text-white flex items-center gap-2">
+                        <FileCheck className="w-4 h-4 text-emerald-400" />
+                        Danh Mục Vật Tư Theo Tờ Trình Số Hóa
+                      </h4>
+                      <p className="text-xs text-slate-400 mt-0.5">
+                        Tổng số {viewingAttachment.proposal?.items?.length || 0} hạng mục vật tư đề xuất
+                      </p>
+                    </div>
+                    {viewingAttachment.proposal && (
+                      <div className="flex items-center gap-2 text-xs">
+                        <span className="text-slate-400">Tổng kinh phí đề xuất:</span>
+                        <strong className="text-emerald-400 font-mono text-sm font-bold">
+                          {formatVND(
+                            viewingAttachment.proposal.items?.reduce(
+                              (s, i) => s + (i.requestedQuantity || 0) * (i.unitPrice || 0),
+                              0
+                            ) || 0
+                          )}
+                        </strong>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Reconciled Items Table */}
+                  <div className="overflow-x-auto border border-slate-800 rounded-xl bg-slate-900 shadow">
+                    <table className="w-full text-xs text-left">
+                      <thead>
+                        <tr className="bg-slate-850 text-slate-300 font-semibold border-b border-slate-800">
+                          <th className="py-3 px-3 text-center w-12">STT</th>
+                          <th className="py-3 px-3">Mã Vật Tư</th>
+                          <th className="py-3 px-4">Tên Vật Tư & Quy Cách</th>
+                          <th className="py-3 px-3 text-center">ĐVT</th>
+                          <th className="py-3 px-3 text-right">SL Đề Xuất</th>
+                          <th className="py-3 px-3 text-right">Đã Nhập Thực Tế</th>
+                          <th className="py-3 px-3 text-right">Còn Thiếu</th>
+                          <th className="py-3 px-3 text-right">Đơn Giá</th>
+                          <th className="py-3 px-3 text-right">Thành Tiền</th>
+                          <th className="py-3 px-3 text-center">Tình Trạng</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-800/60">
+                        {viewingAttachment.reconciledItems && viewingAttachment.reconciledItems.length > 0 ? (
+                          viewingAttachment.reconciledItems.map((it, idx) => {
+                            const isDone = it.isFulfilled;
+                            const isPartial = !isDone && (it.actualImported || 0) > 0;
+                            return (
+                              <tr
+                                key={idx}
+                                className={`hover:bg-slate-800/40 transition-colors ${
+                                  isDone ? 'bg-emerald-950/10' : isPartial ? 'bg-amber-950/10' : ''
+                                }`}
+                              >
+                                <td className="py-2.5 px-3 text-center font-mono text-slate-400">{idx + 1}</td>
+                                <td className="py-2.5 px-3 font-mono font-semibold text-blue-400">{it.materialCode}</td>
+                                <td className="py-2.5 px-4">
+                                  <p className="font-bold text-white">{it.materialName}</p>
+                                  {it.specification && (
+                                    <p className="text-[11px] text-slate-400 italic">{it.specification}</p>
+                                  )}
+                                </td>
+                                <td className="py-2.5 px-3 text-center text-slate-300">{it.unit}</td>
+                                <td className="py-2.5 px-3 text-right font-mono font-bold text-white">
+                                  {formatNumber(it.requestedQuantity)}
+                                </td>
+                                <td className="py-2.5 px-3 text-right font-mono font-bold text-emerald-400">
+                                  {formatNumber(it.actualImported || 0)}
+                                </td>
+                                <td className="py-2.5 px-3 text-right font-mono font-bold">
+                                  {(it.missingQuantity || 0) > 0 ? (
+                                    <span className="text-amber-400">-{formatNumber(it.missingQuantity)}</span>
+                                  ) : (
+                                    <span className="text-slate-500">0</span>
+                                  )}
+                                </td>
+                                <td className="py-2.5 px-3 text-right font-mono text-slate-300">
+                                  {formatVND(it.unitPrice || 0)}
+                                </td>
+                                <td className="py-2.5 px-3 text-right font-mono font-bold text-white">
+                                  {formatVND((it.requestedQuantity || 0) * (it.unitPrice || 0))}
+                                </td>
+                                <td className="py-2.5 px-3 text-center">
+                                  {isDone ? (
+                                    <span className="inline-flex items-center gap-1 text-[10px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-2 py-0.5 rounded-full font-bold">
+                                      <Check className="w-3 h-3 text-emerald-400" /> Đã đủ 100%
+                                    </span>
+                                  ) : isPartial ? (
+                                    <span className="inline-flex items-center gap-1 text-[10px] bg-amber-500/20 text-amber-300 border border-amber-500/30 px-2 py-0.5 rounded-full font-bold">
+                                      Thiếu {formatNumber(it.missingQuantity)} ({it.percentFulfilled}%)
+                                    </span>
+                                  ) : (
+                                    <span className="inline-flex items-center gap-1 text-[10px] bg-slate-800 text-slate-400 border border-slate-700 px-2 py-0.5 rounded-full">
+                                      Chưa nhập
+                                    </span>
+                                  )}
+                                </td>
+                              </tr>
+                            );
+                          })
+                        ) : viewingAttachment.proposal?.items ? (
+                          viewingAttachment.proposal.items.map((it, idx) => (
+                            <tr key={idx} className="hover:bg-slate-800/40">
+                              <td className="py-2.5 px-3 text-center font-mono text-slate-400">{idx + 1}</td>
+                              <td className="py-2.5 px-3 font-mono font-semibold text-blue-400">{it.materialCode}</td>
+                              <td className="py-2.5 px-4">
+                                <p className="font-bold text-white">{it.materialName}</p>
+                                {it.specification && (
+                                  <p className="text-[11px] text-slate-400 italic">{it.specification}</p>
+                                )}
+                              </td>
+                              <td className="py-2.5 px-3 text-center text-slate-300">{it.unit}</td>
+                              <td className="py-2.5 px-3 text-right font-mono font-bold text-white">
+                                {formatNumber(it.requestedQuantity)}
+                              </td>
+                              <td className="py-2.5 px-3 text-right font-mono text-slate-400">-</td>
+                              <td className="py-2.5 px-3 text-right font-mono text-slate-400">-</td>
+                              <td className="py-2.5 px-3 text-right font-mono text-slate-300">
+                                {formatVND(it.unitPrice || 0)}
+                              </td>
+                              <td className="py-2.5 px-3 text-right font-mono font-bold text-white">
+                                {formatVND((it.requestedQuantity || 0) * (it.unitPrice || 0))}
+                              </td>
+                              <td className="py-2.5 px-3 text-center text-slate-400">-</td>
+                            </tr>
+                          ))
+                        ) : null}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               )}
             </div>
