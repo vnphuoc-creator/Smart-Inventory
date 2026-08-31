@@ -519,6 +519,9 @@ export const StockLedgerView: React.FC<StockLedgerViewProps> = ({
                 <thead>
                   {/* Row 1 Header */}
                   <tr className="bg-slate-850 text-slate-300 font-bold border-b border-slate-700 text-center">
+                    <th rowSpan={2} className="px-2.5 py-2.5 border-r border-slate-700 w-12 text-center">
+                      STT
+                    </th>
                     <th rowSpan={2} className="px-3 py-2.5 border-r border-slate-700 w-36">
                       Mã số
                     </th>
@@ -563,6 +566,9 @@ export const StockLedgerView: React.FC<StockLedgerViewProps> = ({
 
                   {/* Row 3: Category Summary / Subtotal Row (VẬT TƯ AHT) */}
                   <tr className="bg-slate-800/90 text-white font-bold border-b-2 border-slate-600">
+                    <td className="px-2 py-2 border-r border-slate-700 font-mono text-center text-[11px] text-slate-400">
+                      -
+                    </td>
                     <td className="px-3 py-2 border-r border-slate-700 font-mono text-center text-[11px] text-slate-400">
                       TỔNG CỘNG
                     </td>
@@ -605,7 +611,7 @@ export const StockLedgerView: React.FC<StockLedgerViewProps> = ({
                 <tbody className="divide-y divide-slate-800 font-mono text-xs">
                   {filteredReportData.length === 0 ? (
                     <tr>
-                      <td colSpan={12} className="px-4 py-8 text-center text-slate-500 font-sans">
+                      <td colSpan={13} className="px-4 py-8 text-center text-slate-500 font-sans">
                         Không có dữ liệu vật tư phù hợp với bộ lọc.
                       </td>
                     </tr>
@@ -617,6 +623,10 @@ export const StockLedgerView: React.FC<StockLedgerViewProps> = ({
                           idx % 2 === 0 ? 'bg-slate-900' : 'bg-slate-900/40'
                         }`}
                       >
+                        {/* STT */}
+                        <td className="px-2.5 py-2 border-r border-slate-800 text-slate-400 text-center font-mono">
+                          {idx + 1}
+                        </td>
                         {/* Mã số */}
                         <td className="px-3 py-2 border-r border-slate-800 font-bold text-blue-400 whitespace-nowrap">
                           {item.code}

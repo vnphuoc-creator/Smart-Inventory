@@ -808,7 +808,11 @@ export const TransactionManagementView: React.FC<TransactionManagementViewProps>
       attachmentName: formAttachmentName || undefined,
       attachmentUrl: formAttachmentUrl || undefined,
       attachmentHtml: formAttachmentHtml || undefined,
-      attachmentType: formAttachmentName.endsWith('.pdf') ? 'pdf' : 'image',
+      attachmentType: formAttachmentName.endsWith('.pdf')
+        ? 'pdf'
+        : formAttachmentName.endsWith('.docx') || formAttachmentName.endsWith('.doc')
+        ? 'document'
+        : 'image',
       ...(isAutoApprove && {
         approverEmail: currentUser.email,
         approverName: currentUser.fullName,
@@ -847,7 +851,11 @@ export const TransactionManagementView: React.FC<TransactionManagementViewProps>
           attachmentName: formAttachmentName || undefined,
           attachmentUrl: formAttachmentUrl || undefined,
           attachmentHtml: formAttachmentHtml || undefined,
-          attachmentType: formAttachmentName.endsWith('.pdf') ? 'pdf' : 'image',
+          attachmentType: formAttachmentName.endsWith('.pdf')
+            ? 'pdf'
+            : formAttachmentName.endsWith('.docx') || formAttachmentName.endsWith('.doc')
+            ? 'document'
+            : 'image',
           notes: formReason || `Tự động khởi tạo và theo dõi đối chiếu theo phiếu ${code}`,
           items: propItems,
           createdAt: new Date().toISOString(),

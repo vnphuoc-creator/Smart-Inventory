@@ -340,12 +340,12 @@
 }
 
 /* ========================================================================= */
-/* PRINT & PDF EXPORT STYLES (A4 LANDSCAPE CORPORATE TEMPLATE)                */
+/* PRINT & PDF EXPORT STYLES (A4 CORPORATE TEMPLATE & PROPOSALS)              */
 /* ========================================================================= */
 @media print {
   @page {
-    size: landscape;
-    margin: 5mm 5mm 5mm 5mm;
+    size: auto;
+    margin: 8mm 8mm 8mm 8mm;
   }
 
   *, *::before, *::after {
@@ -354,17 +354,18 @@
     print-color-adjust: exact !important;
   }
 
-  html, body, #root, .min-h-screen, main, div, section {
+  html, body, #root {
     background: #ffffff !important;
     background-color: #ffffff !important;
     color: #000000 !important;
     box-shadow: none !important;
     text-shadow: none !important;
+    font-family: "Times New Roman", Times, "Segoe UI", Arial, sans-serif !important;
   }
 
   body {
-    font-size: 8pt !important;
-    line-height: 1.2 !important;
+    font-size: 9pt !important;
+    line-height: 1.3 !important;
     width: 100% !important;
     margin: 0 !important;
     padding: 0 !important;
@@ -407,13 +408,30 @@
   input,
   select,
   .toast,
-  .modal-overlay:not(.printable-modal),
   .lucide {
     display: none !important;
   }
 
+  /* Modal overlay adjustments when printing modal */
+  .fixed.inset-0 {
+    position: static !important;
+    background: #ffffff !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  .bg-slate-950,
+  .bg-slate-900,
+  .bg-slate-850,
+  .bg-slate-800 {
+    background: #ffffff !important;
+    color: #000000 !important;
+    border-color: #cbd5e1 !important;
+  }
+
   /* Printable Area Container */
-  .printable-area {
+  .printable-area,
+  .proposal-print-document {
     display: block !important;
     position: relative !important;
     left: 0 !important;
@@ -429,31 +447,75 @@
     box-shadow: none !important;
   }
 
-  .printable-area * {
+  .printable-area *,
+  .proposal-print-document * {
     color: #000000 !important;
     background: transparent !important;
-    border-color: #475569 !important;
-  }
-
-  .printable-area .bg-slate-900,
-  .printable-area .bg-slate-950,
-  .printable-area .bg-slate-850,
-  .printable-area .bg-slate-800 {
-    background: #ffffff !important;
+    border-color: #334155 !important;
   }
 
   /* High-precision Table Grid */
   .printable-table,
+  .proposal-print-document table,
   table {
     width: 100% !important;
     max-width: 100% !important;
     border-collapse: collapse !important;
+    page-break-inside: auto !important;
+    font-size: 8.5pt !important;
+  }
+
+  tr {
+    page-break-inside: avoid !important;
+    page-break-after: auto !important;
+  }
+
+  th,
+  td {
+    border: 1px solid #334155 !important;
+    padding: 4px 6px !important;
+    color: #000000 !important;
+    background-color: #ffffff !important;
+  }
+
+  th {
+    background-color: #f1f5f9 !important;
+    font-weight: bold !important;
+    text-align: center !important;
+  }
+
+  /* Avoid breaking signatures across pages */
+  .signature-section,
+  .avoid-page-break {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+    margin-top: 15px !important;
+  }
+
+  /* docx preview wrapper in print mode */
+  .docx-preview-wrapper {
+    background: #ffffff !important;
+    color: #000000 !important;
+    padding: 0 !important;
+    box-shadow: none !important;
+  }
+
+  .docx-preview-wrapper section.docx {
+    box-shadow: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  .printable-table,
+  table {
     color: #000000 !important;
     background: #ffffff !important;
-    font-size: 7.5pt !important;
+    font-size: 8pt !important;
     margin: 4px 0 !important;
     page-break-inside: auto !important;
     table-layout: auto !important;
+    width: 100% !important;
+    border-collapse: collapse !important;
   }
 
   .printable-table th,
@@ -461,9 +523,9 @@
   table th,
   table td {
     border: 1px solid #334155 !important;
-    padding: 2.5px 3px !important;
+    padding: 3px 5px !important;
     color: #000000 !important;
-    font-size: 7.5pt !important;
+    font-size: 8pt !important;
     word-break: break-word !important;
     overflow-wrap: break-word !important;
   }

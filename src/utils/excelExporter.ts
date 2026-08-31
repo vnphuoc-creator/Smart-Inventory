@@ -203,6 +203,7 @@ export function exportToOfficialExcel(
 
   // Row 8 (Index 7): Header Main Row
   aoa.push([
+    'STT',
     'Mã số',
     'Mặt hàng',
     'Đvt',
@@ -222,6 +223,7 @@ export function exportToOfficialExcel(
     '',
     '',
     '',
+    '',
     'Số lượng',
     'Giá trị (VNĐ)',
     'Số lượng',
@@ -235,6 +237,7 @@ export function exportToOfficialExcel(
 
   // Row 10 (Index 9): Summary Category Total Row (VẬT TƯ ĐỘI ĐIỆN NƯỚC)
   aoa.push([
+    '',
     '',
     'TỔNG CỘNG VẬT TƯ ĐỘI ĐIỆN NƯỚC',
     '',
@@ -251,6 +254,7 @@ export function exportToOfficialExcel(
 
   // Group by category
   const categories = Array.from(new Set(items.map((i) => i.category)));
+  let sttCounter = 1;
 
   categories.forEach((cat) => {
     const catItems = items.filter((i) => i.category === cat);
@@ -281,6 +285,7 @@ export function exportToOfficialExcel(
     // Group Subheader
     aoa.push([
       '',
+      '',
       `[NHÓM] ${cat.toUpperCase()}`,
       '',
       catTotals.openingQty,
@@ -297,6 +302,7 @@ export function exportToOfficialExcel(
     // Items under group
     catItems.forEach((item) => {
       aoa.push([
+        sttCounter++,
         item.code,
         item.name,
         item.unit,

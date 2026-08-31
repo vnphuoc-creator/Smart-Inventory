@@ -409,7 +409,7 @@ export const ExcelStockImportModal: React.FC<ExcelStockImportModalProps> = ({
             unit: String(rawUnit || existing?.unit || 'Cái'),
             category: String(rawCategoryVal || existing?.category || 'Vật tư Điện & Phụ kiện tiêu hao'),
             stock: stockNum,
-            unitPrice: priceNum || 50000,
+            unitPrice: priceNum || (existing ? existing.unitPrice : 0),
             minStock: Number(rawMinVal) || existing?.minStock || 5,
             maxStock: Number(rawMaxVal) || existing?.maxStock || 100,
             location: String(rawLocationVal || existing?.location || 'Kho Tổng AHT'),

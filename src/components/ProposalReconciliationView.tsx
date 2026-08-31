@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import mammoth from 'mammoth';
+import { renderAsync } from 'docx-preview';
 import {
   FileCheck,
   Plus,
@@ -42,6 +43,8 @@ import {
   FileSpreadsheet,
   Layers,
   FileCode,
+  FileUp,
+  RefreshCw,
 } from 'lucide-react';
 import {
   PurchaseProposal,
@@ -93,7 +96,9 @@ export const ProposalReconciliationView: React.FC<ProposalReconciliationViewProp
   const [attachmentTab, setAttachmentTab] = useState<'document' | 'items'>('document');
   const [attachmentZoom, setAttachmentZoom] = useState<number>(100);
   const [parsedDocxHtml, setParsedDocxHtml] = useState<string>('');
+  const [hasNativeDocxRender, setHasNativeDocxRender] = useState<boolean>(false);
   const [isDocxParsing, setIsDocxParsing] = useState<boolean>(false);
+  const docxContainerRef = useRef<HTMLDivElement>(null);
   const [proposalToDelete, setProposalToDelete] = useState<PurchaseProposal | null>(null);
   const [proposalToCloseEarly, setProposalToCloseEarly] = useState<PurchaseProposal | null>(null);
   const [closeEarlyReason, setCloseEarlyReason] = useState<string>('Nghiệm thu theo số lượng thực nhận, nhà cung cấp không giao tiếp phần còn thiếu.');
@@ -109,10 +114,11 @@ export const ProposalReconciliationView: React.FC<ProposalReconciliationViewProp
   const [newPropAttachmentUrl, setNewPropAttachmentUrl] = useState('');
   const [newPropAttachmentHtml, setNewPropAttachmentHtml] = useState('');
 
-  // On-the-fly Mammoth docx parser when viewing attachment
+  // High fidelity docx-preview & mammoth parser when viewing attachment
   useEffect(() => {
     if (!viewingAttachment) {
       setParsedDocxHtml('');
+      setHasNativeDocxRender(false);
       setIsDocxParsing(false);
       return;
     }
@@ -121,12 +127,6 @@ export const ProposalReconciliationView: React.FC<ProposalReconciliationViewProp
       viewingAttachment.name.endsWith('.docx') ||
       viewingAttachment.name.endsWith('.doc') ||
       viewingAttachment.type === 'document';
-
-    if (viewingAttachment.html && viewingAttachment.html.trim()) {
-      setParsedDocxHtml(viewingAttachment.html);
-      setIsDocxParsing(false);
-      return;
-    }
 
     if (isDocx && viewingAttachment.url && viewingAttachment.url.startsWith('data:')) {
       setIsDocxParsing(true);
@@ -139,33 +139,68 @@ export const ProposalReconciliationView: React.FC<ProposalReconciliationViewProp
           for (let i = 0; i < len; i++) {
             bytes[i] = binaryString.charCodeAt(i);
           }
-          mammoth
-            .convertToHtml({ arrayBuffer: bytes.buffer })
-            .then((result) => {
-              if (result && result.value) {
-                setParsedDocxHtml(result.value);
-              } else {
-                setParsedDocxHtml('');
-              }
+
+          // Attempt docx-preview high-fidelity canvas render first
+          if (docxContainerRef.current) {
+            docxContainerRef.current.innerHTML = '';
+            renderAsync(bytes.buffer, docxContainerRef.current, undefined, {
+              className: 'docx-preview-wrapper',
+              inWrapper: false,
+              ignoreWidth: false,
+              ignoreHeight: false,
+              ignoreFonts: false,
+              breakPages: true,
             })
-            .catch((err) => {
-              console.warn('Docx on-the-fly parse error:', err);
-              setParsedDocxHtml('');
-            })
-            .finally(() => {
-              setIsDocxParsing(false);
-            });
-          return;
+              .then(() => {
+                setHasNativeDocxRender(true);
+                setIsDocxParsing(false);
+              })
+              .catch((err) => {
+                console.warn('docx-preview error, fallback to mammoth HTML:', err);
+                mammoth
+                  .convertToHtml({ arrayBuffer: bytes.buffer })
+                  .then((result) => {
+                    setParsedDocxHtml(result.value || '');
+                    setHasNativeDocxRender(false);
+                  })
+                  .catch((mErr) => {
+                    console.warn('Mammoth fallback error:', mErr);
+                    setParsedDocxHtml('');
+                    setHasNativeDocxRender(false);
+                  })
+                  .finally(() => {
+                    setIsDocxParsing(false);
+                  });
+              });
+            return;
+          } else {
+            // If ref not ready yet, parse with mammoth as fallback
+            mammoth
+              .convertToHtml({ arrayBuffer: bytes.buffer })
+              .then((result) => {
+                setParsedDocxHtml(result.value || '');
+                setHasNativeDocxRender(false);
+              })
+              .finally(() => {
+                setIsDocxParsing(false);
+              });
+            return;
+          }
         }
       } catch (e) {
         console.warn('Failed decoding base64 docx:', e);
       }
       setIsDocxParsing(false);
+    } else if (viewingAttachment.html && viewingAttachment.html.trim()) {
+      setParsedDocxHtml(viewingAttachment.html);
+      setHasNativeDocxRender(false);
+      setIsDocxParsing(false);
     } else {
       setParsedDocxHtml('');
+      setHasNativeDocxRender(false);
       setIsDocxParsing(false);
     }
-  }, [viewingAttachment]);
+  }, [viewingAttachment, attachmentTab]);
   const [newPropItems, setNewPropItems] = useState<ProposalItem[]>([
     {
       materialCode: materials[0]?.code || 'DN_CC_00ACB_01',
@@ -267,21 +302,36 @@ export const ProposalReconciliationView: React.FC<ProposalReconciliationViewProp
             break;
           }
         }
+        // Strict user intent priority: if user modified or saved materialName on proposal, respect it!
         const resolvedName =
-          mat?.name && mat.name.trim() !== 'Vật tư'
-            ? mat.name
-            : it.materialName && it.materialName.trim() !== 'Vật tư'
+          it.materialName && it.materialName.trim() !== '' && it.materialName.trim() !== 'Vật tư'
             ? it.materialName
-            : txMatName || mat?.name || it.materialName || 'Vật tư';
-        const resolvedUnit = mat?.unit || txUnit || it.unit || 'Cái';
-        const resolvedSpec = mat?.specification || (it as any).specification || it.notes || '';
+            : mat?.name && mat.name.trim() !== 'Vật tư'
+            ? mat.name
+            : txMatName || it.materialName || mat?.name || 'Vật tư';
+
+        // Strict user intent priority for specification/description:
+        const resolvedSpec =
+          (it as any).specification && (it as any).specification.trim() !== ''
+            ? (it as any).specification
+            : it.notes && it.notes.trim() !== ''
+            ? it.notes
+            : mat?.specification || '';
+
+        const resolvedUnit = it.unit || mat?.unit || txUnit || 'Cái';
+
+        // Fix unitPrice: if it.unitPrice is greater than 0 and not bogus default, use it; else fallback to mat.unitPrice
+        const resolvedPrice =
+          typeof it.unitPrice === 'number' && it.unitPrice > 0
+            ? it.unitPrice
+            : mat?.unitPrice || 0;
 
         return {
           ...it,
           materialName: resolvedName,
           specification: resolvedSpec,
           unit: resolvedUnit,
-          unitPrice: it.unitPrice || mat?.unitPrice || 0,
+          unitPrice: resolvedPrice,
         };
       });
 
@@ -648,6 +698,35 @@ export const ProposalReconciliationView: React.FC<ProposalReconciliationViewProp
     onUpdateProposal(updatedProp);
   };
 
+  // Sync Prices for a Proposal from AHT Catalog
+  const handleSyncProposalPrices = (targetProp: PurchaseProposal) => {
+    if (!onUpdateProposal) return;
+    let updatedCount = 0;
+    const updatedItems = (targetProp.items || []).map((it) => {
+      const mat =
+        materials.find((m) => m.code === it.materialCode) ||
+        materials.find((m) => m.name.toLowerCase().trim() === (it.materialName || '').toLowerCase().trim());
+      const standardPrice = mat?.unitPrice && mat.unitPrice > 0 ? mat.unitPrice : it.unitPrice;
+      if (standardPrice !== it.unitPrice && standardPrice > 0) {
+        updatedCount++;
+      }
+      return {
+        ...it,
+        materialName: it.materialName || mat?.name || 'Vật tư',
+        specification: (it as any).specification || it.notes || mat?.specification || '',
+        unit: it.unit || mat?.unit || 'Cái',
+        unitPrice: standardPrice || it.unitPrice || 0,
+      };
+    });
+
+    const updated: PurchaseProposal = {
+      ...targetProp,
+      items: updatedItems,
+    };
+    onUpdateProposal(updated);
+    alert(`Đã đồng bộ đơn giá chuẩn từ Danh mục AHT cho Tờ trình ${targetProp.proposalNumber} (${updatedCount} vật tư được cập nhật giá chuẩn)!`);
+  };
+
   // Open Edit Proposal Modal
   const handleOpenEditProposal = (prop: PurchaseProposal) => {
     setEditingProposal(prop);
@@ -661,13 +740,40 @@ export const ProposalReconciliationView: React.FC<ProposalReconciliationViewProp
         const mat = materials.find((m) => m.code === it.materialCode);
         return {
           materialCode: it.materialCode,
-          materialName: (mat?.name && mat.name.trim() !== 'Vật tư') ? mat.name : it.materialName,
-          unit: mat?.unit || it.unit || 'Cái',
+          materialName: (it.materialName && it.materialName.trim() !== '' && it.materialName.trim() !== 'Vật tư')
+            ? it.materialName
+            : mat?.name || it.materialName || 'Vật tư',
+          specification: (it as any).specification || it.notes || mat?.specification || '',
+          unit: it.unit || mat?.unit || 'Cái',
           requestedQuantity: it.requestedQuantity,
-          unitPrice: it.unitPrice || mat?.unitPrice || 0,
+          unitPrice: (typeof it.unitPrice === 'number' && it.unitPrice > 0 && it.unitPrice !== 50000)
+            ? it.unitPrice
+            : mat?.unitPrice || it.unitPrice || 0,
         };
       })
     );
+  };
+
+  // Sync prices inside edit modal
+  const handleSyncAllEditItemsPrices = () => {
+    let count = 0;
+    setEditPropItems((prev) =>
+      prev.map((item) => {
+        const mat =
+          materials.find((m) => m.code === item.materialCode) ||
+          materials.find((m) => m.name.toLowerCase().trim() === item.materialName.toLowerCase().trim());
+        if (mat?.unitPrice && mat.unitPrice > 0) {
+          count++;
+          return {
+            ...item,
+            unitPrice: mat.unitPrice,
+            specification: item.specification || mat.specification || '',
+          };
+        }
+        return item;
+      })
+    );
+    alert(`Đã cập nhật đơn giá theo danh mục chuẩn AHT cho ${count} vật tư.`);
   };
 
   // Add Item in Edit Proposal
@@ -1202,6 +1308,45 @@ export const ProposalReconciliationView: React.FC<ProposalReconciliationViewProp
                         </button>
                       )}
 
+                      {/* Button: Đồng bộ giá chuẩn từ Danh mục AHT */}
+                      {onUpdateProposal && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleSyncProposalPrices(proposal);
+                          }}
+                          className="bg-slate-800 hover:bg-emerald-950/60 text-emerald-400 hover:text-emerald-300 border border-slate-700 hover:border-emerald-600/50 px-2.5 py-2 rounded-xl text-xs font-semibold flex items-center gap-1 transition-all"
+                          title="Đồng bộ lại đơn giá chuẩn theo Danh mục AHT (sửa lỗi giá 50.000đ)"
+                        >
+                          <RefreshCw className="w-3.5 h-3.5" />
+                          <span>Đồng bộ giá AHT</span>
+                        </button>
+                      )}
+
+                      {/* Button: Xem & In Tờ Trình (Word / A4 / Đối Soát) */}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setViewingAttachment({
+                            url: proposal.attachmentUrl || '',
+                            name: proposal.attachmentName || `Tờ trình ${proposal.proposalNumber}.docx`,
+                            type: proposal.attachmentType || (proposal.attachmentName?.endsWith('.pdf') ? 'pdf' : proposal.attachmentName?.endsWith('.docx') ? 'document' : 'image'),
+                            html: proposal.attachmentHtml || '',
+                            proposal: proposal,
+                            reconciledItems: reconciledItems,
+                          });
+                          setAttachmentTab('document');
+                          setAttachmentZoom(100);
+                        }}
+                        className="bg-slate-800 hover:bg-blue-900/60 text-blue-300 hover:text-blue-200 border border-slate-700 hover:border-blue-500/50 px-2.5 py-2 rounded-xl text-xs font-semibold flex items-center gap-1 transition-all"
+                        title="Mở tài liệu Tờ trình Word / A4 và Bảng đối soát tiến độ"
+                      >
+                        <FileText className="w-3.5 h-3.5" />
+                        <span>Xem & In Tờ Trình</span>
+                      </button>
+
                       {/* Button: Sửa Tờ Trình */}
                       {onUpdateProposal && (
                         <button
@@ -1211,7 +1356,7 @@ export const ProposalReconciliationView: React.FC<ProposalReconciliationViewProp
                             handleOpenEditProposal(proposal);
                           }}
                           className="p-2 rounded-xl bg-slate-800 hover:bg-blue-900/50 text-slate-400 hover:text-blue-300 border border-slate-700 hover:border-blue-500/40 transition-colors"
-                          title="Chỉnh sửa thông tin và danh sách vật tư Tờ trình này"
+                          title="Chỉnh sửa thông tin, tên vật tư, quy cách và đơn giá Tờ trình này"
                         >
                           <Edit3 className="w-3.5 h-3.5" />
                         </button>
