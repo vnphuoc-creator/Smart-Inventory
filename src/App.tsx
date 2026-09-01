@@ -273,8 +273,11 @@ export function App() {
     root.classList.remove(
       'light-theme',
       'dark',
+      'slate-theme',
       'oled-theme',
       'navy-theme',
+      'danang-ibms-theme',
+      'liquid-glass-theme',
       'density-compact',
       'density-comfortable',
       'font-scale-sm',
@@ -286,15 +289,20 @@ export function App() {
       'glass-disabled'
     );
 
-    // Canvas brightness mode
-    if (themeConfig.canvasMode === 'light-modern') {
+    // Canvas brightness & aesthetic mode
+    if (themeConfig.canvasMode === 'danang-ibms') {
+      root.classList.add('danang-ibms-theme', 'light-theme');
+    } else if (themeConfig.canvasMode === 'light-modern') {
       root.classList.add('light-theme');
+    } else if (themeConfig.canvasMode === 'liquid-glass') {
+      root.classList.add('dark', 'liquid-glass-theme');
     } else if (themeConfig.canvasMode === 'dark-oled') {
       root.classList.add('dark', 'oled-theme');
     } else if (themeConfig.canvasMode === 'dark-navy') {
       root.classList.add('dark', 'navy-theme');
     } else {
-      root.classList.add('dark');
+      // Default dark-slate (AHT Default, Emerald, Cyber, etc.)
+      root.classList.add('dark', 'slate-theme');
     }
 
     // Table density
@@ -336,7 +344,8 @@ export function App() {
   const handleApplyThemeConfig = (newConfig: UIThemeConfig) => {
     setThemeConfig(newConfig);
     localStorage.setItem('smart_ui_theme_config_v2', JSON.stringify(newConfig));
-    localStorage.setItem('smart_theme_mode', newConfig.canvasMode === 'light-modern' ? 'light' : 'dark');
+    const isLight = newConfig.canvasMode === 'light-modern' || newConfig.canvasMode === 'danang-ibms';
+    localStorage.setItem('smart_theme_mode', isLight ? 'light' : 'dark');
   };
 
   const handleResetThemeConfig = () => {
@@ -346,12 +355,12 @@ export function App() {
   };
 
   const handleToggleTheme = () => {
-    const isLight = themeConfig.canvasMode === 'light-modern';
-    const nextCanvas = isLight ? 'dark-slate' : 'light-modern';
+    const isCurrentlyLight = themeConfig.canvasMode === 'light-modern' || themeConfig.canvasMode === 'danang-ibms';
+    const nextCanvas: CanvasMode = isCurrentlyLight ? 'dark-slate' : 'light-modern';
     const updated: UIThemeConfig = {
       ...themeConfig,
       canvasMode: nextCanvas,
-      preset: isLight ? 'aht-default' : 'light-corporate',
+      preset: isCurrentlyLight ? 'aht-default' : 'light-corporate',
     };
     handleApplyThemeConfig(updated);
     showToast(
@@ -883,19 +892,19 @@ export function App() {
           onOpenChangePassword={() => setIsChangePasswordOpen(true)}
           onOpenUserGuide={() => setIsUserGuideOpen(true)}
           onToggleSidebar={() => setIsMobileSidebarOpen(!isMobileSidebarOpen)}
-          theme={themeConfig.canvasMode === 'light-modern' ? 'light' : 'dark'}
+          theme={themeConfig.canvasMode === 'light-modern' || themeConfig.canvasMode === 'danang-ibms' ? 'light' : 'dark'}
           onToggleTheme={handleToggleTheme}
         />
 
         {/* View Content Area */}
         <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 bg-slate-950/50">
-          {activeTab === 'dashboard' && (
+          {(activeTab === 'dashboard' || activeTab === 'dashboard_child') && (
             <DashboardView
               currentUser={currentUser}
               calculatedStocks={calculatedStocks}
               transactions={transactions}
               onNavigateTab={(tab, filter) => {
-                if (tab === 'transactions') {
+                if (tab === 'transactions' || tab === 'transfers' || tab === 'requests') {
                   if (filter === 'IMPORT' || filter === 'EXPORT') {
                     setTransactionTypePreset(filter);
                     setTransactionStatusFilterPreset(undefined);
@@ -930,7 +939,7 @@ export function App() {
             />
           )}
 
-          {activeTab === 'transactions' && (
+          {(activeTab === 'transactions' || activeTab === 'transfers' || activeTab === 'requests') && (
             <TransactionManagementView
               currentUser={currentUser}
               allUsers={users}
@@ -945,7 +954,7 @@ export function App() {
               onApproveTransaction={handleApproveTransaction}
               onRejectTransaction={handleRejectTransaction}
               onDeleteTransaction={handleDeleteTransaction}
-              initialType={transactionTypePreset}
+              initialType={activeTab === 'transfers' ? 'EXPORT' : transactionTypePreset}
               initialStatusFilter={transactionStatusFilterPreset}
               preselectedMaterialCode={preselectedMaterialCode}
             />

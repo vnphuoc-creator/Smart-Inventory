@@ -5,19 +5,15 @@ import {
   Bell,
   ChevronDown,
   LogOut,
-  ShieldCheck,
   User as UserIcon,
   KeyRound,
   Sun,
   Moon,
-  CheckCircle2,
-  ExternalLink,
   BookOpen,
-  Cloud,
-  CloudCheck,
+  Clock,
+  Calendar,
 } from 'lucide-react';
 import { User } from '../types';
-import { AHTLogo } from './AHTLogo';
 
 interface NavbarProps {
   currentUser: User;
@@ -49,6 +45,30 @@ export const Navbar: React.FC<NavbarProps> = ({
   const [showUserDropdown, setShowUserDropdown] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
+  // Real-time Clock & Date state
+  const [currentDate, setCurrentDate] = useState<Date>(new Date());
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentDate(new Date());
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const timeString = currentDate.toLocaleTimeString('en-GB', {
+    hour12: false,
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  });
+
+  const dateString = currentDate.toLocaleDateString('vi-VN', {
+    weekday: 'short',
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  });
+
   // Close dropdown on outside click
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -60,292 +80,204 @@ export const Navbar: React.FC<NavbarProps> = ({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Tab Title mapping
-  const getTabTitle = () => {
-    switch (activeTab) {
-      case 'dashboard':
-        return 'Tổng Quan & Thống Kê Kho';
-      case 'materials':
-        return 'Danh Mục Vật Tư Điện Nước';
-      case 'transactions':
-        return 'Quản Lý Phiếu Xuất - Nhập - Tồn';
-      case 'ledger':
-        return 'Thẻ Kho & Báo Cáo Tổng Hợp NXT';
-      case 'users':
-        return 'Phân Quyền & Quản Trị Người Dùng';
-      case 'error_transactions':
-        return 'Quản Lý & Sửa / Xóa Chứng Từ Sai';
-      case 'settings':
-        return 'Cài Đặt & Cấu Hình Hệ Thống';
-      case 'ai':
-        return 'Trợ Lý AI Kho Thông Minh';
-      default:
-        return 'Hệ Thống Quản Lý Kho';
-    }
-  };
+  const userInitials = currentUser.fullName
+    .split(' ')
+    .map((n) => n[0])
+    .slice(-2)
+    .join('')
+    .toUpperCase();
 
   return (
-    <header className="bg-slate-900/95 border-b border-slate-800 text-white sticky top-0 z-30 shadow-sm no-print transition-colors duration-200">
+    <header className="bg-slate-900 border-b border-slate-800 text-white sticky top-0 z-30 shadow-md no-print select-none">
       {/* Prominent Pending Approval Notification Bar for Admin */}
       {currentUser.role === 'ADMIN' && pendingApprovalsCount > 0 && (
-        <div className="bg-gradient-to-r from-amber-500/20 via-orange-500/25 to-amber-500/20 border-b border-amber-500/40 px-4 py-2 flex items-center justify-between animate-in fade-in">
+        <div className="bg-gradient-to-r from-amber-500/20 via-orange-500/25 to-amber-500/20 border-b border-amber-500/40 px-4 py-1.5 flex items-center justify-between animate-in fade-in">
           <div className="flex items-center gap-2.5 min-w-0">
-            <div className="p-1 rounded-lg bg-amber-500 text-slate-950 animate-bounce shrink-0">
+            <div className="p-1 rounded-lg bg-amber-400 text-slate-950 animate-bounce shrink-0">
               <Bell className="w-3.5 h-3.5" />
             </div>
             <p className="text-xs font-semibold text-amber-200 truncate">
-              <span className="font-bold text-amber-300">Thông báo quan trọng:</span> Có{' '}
+              <span className="font-bold text-amber-300">Thông báo kho:</span> Có{' '}
               <span className="font-black text-white underline underline-offset-2">
-                {pendingApprovalsCount} phiếu kho
+                {pendingApprovalsCount} phiếu
               </span>{' '}
-              đang chờ bạn kiểm tra & phê duyệt.
+              đang chờ duyệt.
             </p>
           </div>
           <button
             type="button"
             onClick={() => onTabChange('transactions')}
-            className="shrink-0 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold px-3 py-1 rounded-lg text-xs flex items-center gap-1 transition-all shadow-md shadow-amber-500/30"
+            className="shrink-0 bg-amber-400 hover:bg-amber-300 text-slate-950 font-bold px-3 py-1 rounded-lg text-xs flex items-center gap-1 transition-all shadow-md shadow-amber-500/30"
           >
-            <span>Xem & Duyệt Ngay</span>
+            <span>Xem Ngay</span>
             <span>&rarr;</span>
           </button>
         </div>
       )}
 
       <div className="w-full px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16 gap-3 sm:gap-4">
-          {/* Left: Mobile Toggle & Page Title */}
-          <div className="flex items-center gap-3 min-w-0">
+        <div className="flex items-center justify-between h-16 gap-3">
+          {/* Left: Organization / System Branding (Exact match with screenshot) */}
+          <div className="flex items-center gap-3">
             <button
               type="button"
               onClick={onToggleSidebar}
-              className="lg:hidden p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-colors"
+              className="lg:hidden p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 transition-colors"
               title="Mở thanh điều hướng"
             >
               <Menu className="w-5 h-5" />
             </button>
 
-            {/* Mobile Logo display */}
-            <div className="lg:hidden flex items-center">
-              <a
-                href={window.location.href}
-                onClick={(e) => {
-                  if (e.button === 0 && !e.ctrlKey && !e.metaKey) {
-                    e.preventDefault();
-                    onTabChange('dashboard');
-                  }
-                }}
-                title="Bấm để trở về Trang Chủ (Bảng Điều Khiển)"
-                className="flex items-center cursor-pointer hover:opacity-90 transition-opacity focus:outline-none"
-              >
-                <AHTLogo className="h-7" showPlane={false} allowUpload={false} />
-              </a>
-            </div>
-
-            <div className="hidden sm:block truncate">
-              <h1 className="text-sm sm:text-base font-bold text-white tracking-tight truncate">
-                Cảng HKQT Đà Nẵng • Nhà Ga Quốc Tế T2
-              </h1>
-              <p className="text-[11px] text-blue-300 font-medium truncate flex items-center gap-1.5">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse inline-block"></span>
-                Quản lý Xuất - Nhập - Tồn Vật Tư Kỹ Thuật
+            <div className="min-w-0">
+              <h2 className="text-white font-bold text-sm sm:text-base tracking-wide flex items-center gap-2 truncate header-brand-title">
+                <span>Cảng HKQT Đà Nẵng</span>
+                <span className="text-slate-400 font-bold">&bull;</span>
+                <span className="text-slate-200 font-semibold text-xs sm:text-sm header-brand-sub">Nhà Ga Quốc Tế T2</span>
+              </h2>
+              <p className="text-cyan-400 text-xs font-semibold flex items-center gap-1.5 mt-0.5 truncate header-brand-desc">
+                <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse"></span>
+                <span>Quản Lý Xuất - Nhập - Tồn Vật Tư Kỹ Thuật</span>
               </p>
             </div>
           </div>
 
-          {/* Center: Smart Search Trigger */}
-          <div className="flex-1 max-w-md mx-2 hidden md:block">
+          {/* Center: AI Search Trigger Bar (Exact match with screenshot) */}
+          <div className="hidden md:flex flex-1 max-w-md mx-4">
             <button
               type="button"
               id="btn-ai-search-quick"
               onClick={onOpenAiSearch}
-              className="w-full flex items-center gap-2.5 bg-slate-800/80 hover:bg-slate-800 border border-slate-700/80 hover:border-blue-500/50 text-slate-300 hover:text-white px-3.5 py-2 rounded-xl text-xs transition-all shadow-inner group"
+              className="w-full flex items-center justify-between bg-slate-950/80 hover:bg-slate-950 border border-slate-700/80 hover:border-blue-500/80 text-slate-400 hover:text-slate-200 px-4 py-2 rounded-xl text-xs transition-all shadow-inner group"
             >
-              <Sparkles className="w-4 h-4 text-amber-400 group-hover:rotate-12 transition-transform shrink-0" />
-              <span className="flex-1 text-left truncate">Tìm kiếm nhanh mã DN_* bằng AI...</span>
-              <kbd className="text-[10px] bg-slate-900 text-slate-400 px-1.5 py-0.5 rounded border border-slate-700 font-mono">
+              <div className="flex items-center gap-2 truncate">
+                <Sparkles className="w-3.5 h-3.5 text-amber-400 group-hover:rotate-12 transition-transform" />
+                <span className="truncate">Tìm kiếm nhanh mã DN_* bằng AI...</span>
+              </div>
+              <span className="text-[10px] bg-purple-900/60 text-purple-300 border border-purple-500/40 px-1.5 py-0.5 rounded font-mono font-bold">
                 AI
-              </kbd>
+              </span>
             </button>
           </div>
 
-          {/* Right section: Theme Switcher & User Profile */}
+          {/* Right Section: Theme toggle & User Menu (Clock removed as it's already in the sidebar) */}
           <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-            {/* Mobile AI button */}
-            <button
-              type="button"
-              onClick={onOpenAiSearch}
-              className="md:hidden p-2 rounded-xl bg-slate-800 text-amber-400 border border-slate-700"
-              title="Tìm kiếm AI"
-            >
-              <Sparkles className="w-4 h-4" />
-            </button>
-
-            {/* Theme Toggle Button (Light / Dark Mode) */}
+            {/* Light / Dark Mode Toggle Button */}
             {onToggleTheme && (
               <button
                 type="button"
-                id="btn-toggle-theme"
+                id="btn-header-theme-toggle"
                 onClick={onToggleTheme}
-                className="p-2 sm:px-3 sm:py-1.5 rounded-xl bg-slate-800/80 hover:bg-slate-800 border border-slate-700/80 text-slate-200 hover:text-amber-300 flex items-center gap-1.5 text-xs transition-all shadow-sm group"
-                title={theme === 'dark' ? 'Chuyển sang giao diện Sáng' : 'Chuyển sang giao diện Tối'}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs transition-all shadow-sm font-medium ${
+                  theme === 'dark'
+                    ? 'bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 hover:text-white'
+                    : 'bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-800 hover:text-slate-950 font-semibold'
+                }`}
+                title={theme === 'dark' ? 'Chuyển sang Giao diện Sáng (Light Mode)' : 'Chuyển sang Giao diện Tối (Dark Mode)'}
               >
                 {theme === 'dark' ? (
                   <>
-                    <Sun className="w-4 h-4 text-amber-400 group-hover:rotate-45 transition-transform" />
-                    <span className="hidden md:inline font-medium text-slate-300 group-hover:text-white">Giao diện Sáng</span>
+                    <Sun className="w-3.5 h-3.5 text-amber-400" />
+                    <span className="hidden sm:inline text-xs">Giao diện Sáng</span>
                   </>
                 ) : (
                   <>
-                    <Moon className="w-4 h-4 text-indigo-400 group-hover:-rotate-12 transition-transform" />
-                    <span className="hidden md:inline font-medium text-slate-300 group-hover:text-white">Giao diện Tối</span>
+                    <Moon className="w-3.5 h-3.5 text-blue-600" />
+                    <span className="hidden sm:inline text-xs">Giao diện Tối</span>
                   </>
                 )}
               </button>
             )}
 
-            {/* User Profile Pill */}
+            {/* User Greeting Pill & Dropdown (Exact match with screenshot) */}
             <div className="relative" ref={dropdownRef}>
               <button
                 type="button"
                 id="btn-user-profile-menu"
                 onClick={() => setShowUserDropdown(!showUserDropdown)}
-                className="flex items-center gap-2 bg-slate-800/90 hover:bg-slate-800 border border-slate-700 px-3 py-1.5 rounded-xl text-xs transition-colors"
+                className="flex items-center gap-2 bg-blue-950/50 hover:bg-blue-900/60 border border-blue-600/40 px-3 py-1.5 rounded-xl text-xs transition-all shadow-sm group"
               >
-                <div className="w-7 h-7 rounded-lg bg-blue-600/30 border border-blue-500/40 text-blue-300 font-bold flex items-center justify-center text-xs">
-                  {currentUser.fullName
-                    .split(' ')
-                    .map((n) => n[0])
-                    .slice(-2)
-                    .join('')}
+                <div className="w-6 h-6 rounded-lg bg-blue-600 text-white font-bold flex items-center justify-center text-[10px] shadow">
+                  {userInitials}
                 </div>
-                <div className="text-left hidden sm:block max-w-[170px] truncate">
-                  <div className="font-bold text-white truncate text-xs">
+                <div className="text-left hidden sm:block max-w-[160px] truncate">
+                  <span className="font-semibold text-slate-100 text-xs truncate">
                     Xin chào, {currentUser.fullName}
-                  </div>
+                  </span>
                 </div>
-                <ChevronDown className="w-3.5 h-3.5 text-slate-400 ml-0.5" />
+                <ChevronDown className="w-3.5 h-3.5 text-blue-300 group-hover:translate-y-0.5 transition-transform" />
               </button>
 
-              {/* Personal Account Profile Menu (No switch user list) */}
+              {/* User Dropdown */}
               {showUserDropdown && (
                 <div className="absolute right-0 mt-2 w-72 bg-slate-900 border border-slate-700 rounded-2xl p-3 shadow-2xl z-50 animate-in fade-in zoom-in-95">
-                  {/* User info card */}
-                  <div className="p-3 bg-slate-850 rounded-xl border border-slate-800 mb-2">
+                  <div className="p-3 bg-slate-800/90 rounded-xl border border-slate-700 mb-2">
                     <div className="flex items-center gap-2.5">
-                      <div className="w-9 h-9 rounded-xl bg-blue-600/30 border border-blue-500/40 text-blue-300 font-bold flex items-center justify-center text-sm shrink-0">
-                        {currentUser.fullName
-                          .split(' ')
-                          .map((n) => n[0])
-                          .slice(-2)
-                          .join('')}
+                      <div className="w-9 h-9 rounded-xl bg-blue-600 text-white font-bold flex items-center justify-center text-xs shrink-0">
+                        {userInitials}
                       </div>
                       <div className="truncate min-w-0">
                         <div className="text-xs font-bold text-white truncate">
                           {currentUser.fullName}
                         </div>
-                        <div className="text-[11px] text-slate-400 truncate">
+                        <div className="text-[11px] text-slate-400 truncate font-mono">
                           {currentUser.email}
                         </div>
                       </div>
                     </div>
-
-                    <div className="mt-2.5 pt-2 border-t border-slate-800/80 flex items-center justify-between text-[11px]">
-                      <span className="text-slate-400">{currentUser.department || 'Đội Điện Nước'}</span>
-                      {currentUser.role === 'ADMIN' ? (
-                        <span className="bg-rose-500/20 text-rose-300 border border-rose-500/30 px-2 py-0.5 rounded-full font-semibold text-[10px]">
-                          Quản lý (Admin)
-                        </span>
-                      ) : (
-                        <span className="bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-2 py-0.5 rounded-full font-semibold text-[10px]">
-                          Nhân viên
-                        </span>
-                      )}
+                    <div className="mt-2 pt-2 border-t border-slate-700 flex items-center justify-between text-[11px]">
+                      <span className="text-slate-400">Vai trò:</span>
+                      <span
+                        className={`font-bold px-2 py-0.5 rounded text-[10px] ${
+                          currentUser.role === 'ADMIN'
+                            ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
+                            : 'bg-blue-500/20 text-blue-300 border border-blue-500/30'
+                        }`}
+                      >
+                        {currentUser.roleName}
+                      </span>
                     </div>
                   </div>
 
-                  {/* Actions list */}
                   <div className="space-y-1">
-                    {/* User Guide Option */}
                     {onOpenUserGuide && (
                       <button
                         type="button"
-                        id="btn-menu-user-guide"
                         onClick={() => {
                           setShowUserDropdown(false);
                           onOpenUserGuide();
                         }}
-                        className="w-full text-left px-3 py-2.5 rounded-xl text-xs text-blue-300 hover:bg-blue-900/30 hover:text-white flex items-center gap-2.5 transition-colors font-medium border border-blue-500/20"
+                        className="w-full flex items-center gap-2.5 px-3 py-2 text-xs text-slate-300 hover:text-white hover:bg-slate-800 rounded-xl transition-colors text-left"
                       >
-                        <BookOpen className="w-4 h-4 text-blue-400" />
-                        <span>Hướng dẫn sử dụng chi tiết</span>
+                        <BookOpen className="w-4 h-4 text-cyan-400" />
+                        <span>Hướng dẫn sử dụng hệ thống</span>
                       </button>
                     )}
 
-                    {/* Change Password Option */}
                     {onOpenChangePassword && (
                       <button
                         type="button"
-                        id="btn-menu-change-password"
                         onClick={() => {
                           setShowUserDropdown(false);
                           onOpenChangePassword();
                         }}
-                        className="w-full text-left px-3 py-2.5 rounded-xl text-xs text-slate-200 hover:bg-slate-800 hover:text-white flex items-center gap-2.5 transition-colors font-medium"
+                        className="w-full flex items-center gap-2.5 px-3 py-2 text-xs text-slate-300 hover:text-white hover:bg-slate-800 rounded-xl transition-colors text-left"
                       >
-                        <KeyRound className="w-4 h-4 text-blue-400" />
+                        <KeyRound className="w-4 h-4 text-amber-400" />
                         <span>Đổi mật khẩu tài khoản</span>
                       </button>
                     )}
 
-                    {/* Open in New Tab (Cleanly hidden in menu) */}
-                    <a
-                      href={window.location.href}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      onClick={() => setShowUserDropdown(false)}
-                      className="w-full text-left px-3 py-2.5 rounded-xl text-xs text-slate-200 hover:bg-slate-800 hover:text-white flex items-center gap-2.5 transition-colors font-medium"
-                    >
-                      <ExternalLink className="w-4 h-4 text-sky-400" />
-                      <span>Mở giao diện trong Tab mới</span>
-                    </a>
-
-                    {/* Quick Theme toggle in menu */}
-                    {onToggleTheme && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          onToggleTheme();
-                        }}
-                        className="w-full text-left px-3 py-2.5 rounded-xl text-xs text-slate-200 hover:bg-slate-800 hover:text-white flex items-center justify-between transition-colors font-medium"
-                      >
-                        <span className="flex items-center gap-2.5">
-                          {theme === 'dark' ? (
-                            <Sun className="w-4 h-4 text-amber-400" />
-                          ) : (
-                            <Moon className="w-4 h-4 text-indigo-400" />
-                          )}
-                          <span>Giao diện {theme === 'dark' ? 'Sáng' : 'Tối'}</span>
-                        </span>
-                        <span className="text-[10px] text-slate-400 uppercase font-mono">
-                          {theme}
-                        </span>
-                      </button>
-                    )}
-
-                    {/* Logout Option */}
                     {onLogout && (
                       <button
                         type="button"
-                        id="btn-menu-logout"
                         onClick={() => {
                           setShowUserDropdown(false);
                           onLogout();
                         }}
-                        className="w-full text-left px-3 py-2.5 rounded-xl text-xs text-rose-400 hover:bg-rose-950/30 flex items-center gap-2.5 transition-colors font-medium border-t border-slate-800 mt-1"
+                        className="w-full flex items-center gap-2.5 px-3 py-2 text-xs text-rose-400 hover:text-rose-200 hover:bg-rose-950/40 rounded-xl transition-colors text-left"
                       >
                         <LogOut className="w-4 h-4" />
-                        <span>Đăng xuất tài khoản</span>
+                        <span>Đăng xuất</span>
                       </button>
                     )}
                   </div>

@@ -653,15 +653,15 @@ export const MaterialCatalogueView: React.FC<MaterialCatalogueViewProps> = ({
                       className="hover:bg-slate-800/60 transition-colors group"
                     >
                       {/* Material Code */}
-                      <td className="py-3 px-4 font-mono font-bold text-blue-400">
-                        <span className="bg-blue-950/80 border border-blue-800/70 px-2 py-0.5 rounded text-[11px]">
+                      <td className="py-3 px-4 font-mono font-bold">
+                        <span className="material-code-badge inline-block font-mono font-bold px-2.5 py-0.5 rounded-md text-[11px] bg-blue-950/90 border border-blue-700/80 text-cyan-300 shadow-sm tracking-wide">
                           {mat.code}
                         </span>
                       </td>
 
                       {/* Name & Specification */}
                       <td className="py-3 px-4">
-                        <div className="font-semibold text-white text-xs">{mat.name}</div>
+                        <div className="material-table-name font-semibold text-white text-xs">{mat.name}</div>
                         <div className="text-[11px] text-slate-400 truncate max-w-xs mt-0.5" title={mat.specification}>
                           {mat.specification}
                         </div>
@@ -669,7 +669,7 @@ export const MaterialCatalogueView: React.FC<MaterialCatalogueViewProps> = ({
 
                       {/* Category & Location */}
                       <td className="py-3 px-3">
-                        <div className="text-slate-300 text-[11px]">{mat.category}</div>
+                        <div className="material-table-category text-slate-300 text-[11px] font-medium">{mat.category}</div>
                         <div className="text-[10px] text-slate-400 flex items-center gap-1 mt-0.5">
                           <span className="w-1.5 h-1.5 rounded-full bg-slate-500"></span>
                           {mat.location}
@@ -687,30 +687,30 @@ export const MaterialCatalogueView: React.FC<MaterialCatalogueViewProps> = ({
                       </td>
 
                       {/* Total In */}
-                      <td className="py-3 px-3 text-right font-mono text-blue-400">
+                      <td className="py-3 px-3 text-right font-mono text-blue-400 font-semibold">
                         +{formatNumber(mat.totalImported)}
                       </td>
 
                       {/* Total Out */}
-                      <td className="py-3 px-3 text-right font-mono text-amber-400">
+                      <td className="py-3 px-3 text-right font-mono text-amber-400 font-semibold">
                         -{formatNumber(mat.totalExported)}
                       </td>
 
                       {/* Current Calculated Stock */}
-                      <td className="py-3 px-3 text-right font-mono font-bold text-sm bg-slate-800/40">
+                      <td className="py-3 px-3 text-right font-mono font-bold text-sm bg-slate-800/40 table-cell-stock">
                         <span
                           className={
                             mat.currentStock <= 0
-                              ? 'text-rose-400'
+                              ? 'text-rose-400 font-black'
                               : mat.currentStock <= mat.minStock
-                              ? 'text-amber-400'
-                              : 'text-white'
+                              ? 'text-amber-400 font-black'
+                              : 'text-white font-black'
                           }
                         >
                           {formatNumber(mat.currentStock)}
                         </span>
                         {mat.pendingExport > 0 && (
-                          <div className="text-[10px] text-amber-400 font-sans font-normal">
+                          <div className="text-[10px] text-amber-400 font-sans font-medium">
                             (Chờ xuất: {mat.pendingExport})
                           </div>
                         )}
@@ -729,22 +729,22 @@ export const MaterialCatalogueView: React.FC<MaterialCatalogueViewProps> = ({
                       {/* Status Badge */}
                       <td className="py-3 px-3 text-center">
                         {mat.stockStatus === 'OUT_OF_STOCK' && (
-                          <span className="inline-flex items-center gap-1 text-[10px] bg-rose-500/20 text-rose-300 border border-rose-500/30 px-2 py-0.5 rounded-full font-medium">
+                          <span className="status-badge-out-of-stock inline-flex items-center gap-1 text-[10px] bg-rose-500/20 text-rose-300 border border-rose-500/30 px-2 py-0.5 rounded-full font-bold">
                             <AlertCircle className="w-3 h-3" /> Hết hàng
                           </span>
                         )}
                         {mat.stockStatus === 'LOW_STOCK' && (
-                          <span className="inline-flex items-center gap-1 text-[10px] bg-amber-500/20 text-amber-300 border border-amber-500/30 px-2 py-0.5 rounded-full font-medium">
+                          <span className="status-badge-low-stock inline-flex items-center gap-1 text-[10px] bg-amber-500/20 text-amber-300 border border-amber-500/30 px-2 py-0.5 rounded-full font-bold">
                             <AlertTriangle className="w-3 h-3" /> Cảnh báo min
                           </span>
                         )}
                         {mat.stockStatus === 'OVER_STOCK' && (
-                          <span className="inline-flex items-center gap-1 text-[10px] bg-purple-500/20 text-purple-300 border border-purple-500/30 px-2 py-0.5 rounded-full font-medium">
+                          <span className="status-badge-over-stock inline-flex items-center gap-1 text-[10px] bg-purple-500/20 text-purple-300 border border-purple-500/30 px-2 py-0.5 rounded-full font-bold">
                             Tồn vượt max
                           </span>
                         )}
                         {mat.stockStatus === 'OPTIMAL' && (
-                          <span className="inline-flex items-center gap-1 text-[10px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-2 py-0.5 rounded-full font-medium">
+                          <span className="status-badge-optimal inline-flex items-center gap-1 text-[10px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-2 py-0.5 rounded-full font-bold">
                             <CheckCircle2 className="w-3 h-3" /> An toàn
                           </span>
                         )}

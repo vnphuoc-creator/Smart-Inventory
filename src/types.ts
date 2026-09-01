@@ -228,7 +228,9 @@ export interface ProposalReconciliation {
 }
 
 export type ThemeColorPreset =
+  | 'danang-ibms'
   | 'aht-default'
+  | 'liquid-glass'
   | 'emerald-airport'
   | 'royal-indigo'
   | 'cyber-amber'
@@ -237,7 +239,7 @@ export type ThemeColorPreset =
   | 'midnight-oled'
   | 'light-corporate';
 
-export type CanvasMode = 'dark-slate' | 'dark-oled' | 'dark-navy' | 'light-modern';
+export type CanvasMode = 'dark-slate' | 'dark-oled' | 'dark-navy' | 'light-modern' | 'danang-ibms' | 'liquid-glass';
 export type TableDensity = 'compact' | 'standard' | 'comfortable';
 export type FontSizeScale = 'small' | 'standard' | 'large';
 export type BorderRadiusOption = 'sharp' | 'standard' | 'rounded' | 'full';

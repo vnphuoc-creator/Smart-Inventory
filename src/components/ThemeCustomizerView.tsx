@@ -60,8 +60,32 @@ interface PresetOption {
 
 const PRESET_LIST: PresetOption[] = [
   {
+    id: 'danang-ibms',
+    name: 'Đà Nẵng IBMS Enterprise (Theo Ảnh Mẫu)',
+    description: 'Header xanh Navy đậm, Sidebar đồng hồ Real-time, Top Logo Cyan và Nút cam Coral nổi bật',
+    canvasMode: 'danang-ibms',
+    primaryColor: '#00a8cc',
+    accentColor: '#e66428',
+    previewBg: 'bg-[#f4f6fa]',
+    previewBorder: 'border-[#00a8cc]',
+    previewText: 'text-[#0b2356]',
+    badge: 'Khuyên Dùng ⭐',
+  },
+  {
+    id: 'liquid-glass',
+    name: 'Liquid Glass (Kính Thủy Tinh Mờ)',
+    description: 'Phong cách kính mờ thủy tinh tương lai (Frosted Glassmorphism), ánh sáng lỏng viền cyan/violet và hiệu ứng khúc xạ chiều sâu',
+    canvasMode: 'liquid-glass',
+    primaryColor: '#06b6d4',
+    accentColor: '#8b5cf6',
+    previewBg: 'bg-slate-900/60 backdrop-blur-xl',
+    previewBorder: 'border-cyan-400/50',
+    previewText: 'text-cyan-300',
+    badge: 'Mới • Liquid Glass ✨',
+  },
+  {
     id: 'aht-default',
-    name: 'AHT Slate Navy (Mặc Định)',
+    name: 'AHT Slate Navy',
     description: 'Xanh dương công vụ & Slate trầm lịch lãm của Nhà ga Quốc tế Đà Nẵng',
     canvasMode: 'dark-slate',
     primaryColor: '#2563eb',
@@ -202,6 +226,8 @@ export const ThemeCustomizerView: React.FC<ThemeCustomizerViewProps> = ({
 
   const handleSavePermanently = () => {
     localStorage.setItem('smart_ui_theme_config_v2', JSON.stringify(config));
+    localStorage.setItem('smart_theme_mode', config.canvasMode === 'light-modern' ? 'light' : 'dark');
+    onApplyConfig(config);
     setIsSaved(true);
     onShowToast('Đã lưu cấu hình thiết kế giao diện thành công!', 'success');
     setTimeout(() => setIsSaved(false), 3000);
@@ -390,10 +416,40 @@ export const ThemeCustomizerView: React.FC<ThemeCustomizerViewProps> = ({
               </div>
             </div>
 
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5">
+              <button
+                onClick={() => updateConfig({ canvasMode: 'danang-ibms' })}
+                className={`p-3 rounded-xl border text-center transition flex flex-col items-center gap-1.5 ${
+                  config.canvasMode === 'danang-ibms'
+                    ? 'border-[#00a8cc] bg-blue-950/40 text-white font-bold ring-2 ring-[#00a8cc]/40'
+                    : 'border-slate-800 bg-slate-950/60 text-slate-400 hover:text-white'
+                }`}
+              >
+                <div className="w-8 h-8 rounded-lg bg-[#0b2356] border border-[#00a8cc] flex items-center justify-center text-[#00a8cc] shadow">
+                  <Sparkles className="w-4 h-4 text-cyan-300" />
+                </div>
+                <div className="text-xs">Đà Nẵng IBMS</div>
+                <div className="text-[10px] text-cyan-300">Theo Ảnh Mẫu ⭐</div>
+              </button>
+
+              <button
+                onClick={() => updateConfig({ canvasMode: 'liquid-glass' })}
+                className={`p-3 rounded-xl border text-center transition flex flex-col items-center gap-1.5 ${
+                  config.canvasMode === 'liquid-glass'
+                    ? 'border-cyan-400 bg-cyan-950/40 text-white font-bold ring-2 ring-cyan-400/40'
+                    : 'border-slate-800 bg-slate-950/60 text-slate-400 hover:text-white'
+                }`}
+              >
+                <div className="w-8 h-8 rounded-lg bg-slate-800/80 backdrop-blur-md border border-cyan-400/60 flex items-center justify-center text-cyan-300 shadow">
+                  <Sparkles className="w-4 h-4 text-cyan-400 animate-pulse" />
+                </div>
+                <div className="text-xs font-bold text-cyan-300">Liquid Glass</div>
+                <div className="text-[10px] text-purple-300">Kính Thủy Tinh ✨</div>
+              </button>
+
               <button
                 onClick={() => updateConfig({ canvasMode: 'dark-slate' })}
-                className={`p-3 rounded-xl border text-center transition flex flex-col items-center gap-2 ${
+                className={`p-3 rounded-xl border text-center transition flex flex-col items-center gap-1.5 ${
                   config.canvasMode === 'dark-slate'
                     ? 'border-blue-500 bg-blue-950/30 text-white font-bold'
                     : 'border-slate-800 bg-slate-950/60 text-slate-400 hover:text-white'
@@ -408,7 +464,7 @@ export const ThemeCustomizerView: React.FC<ThemeCustomizerViewProps> = ({
 
               <button
                 onClick={() => updateConfig({ canvasMode: 'dark-oled' })}
-                className={`p-3 rounded-xl border text-center transition flex flex-col items-center gap-2 ${
+                className={`p-3 rounded-xl border text-center transition flex flex-col items-center gap-1.5 ${
                   config.canvasMode === 'dark-oled'
                     ? 'border-blue-500 bg-blue-950/30 text-white font-bold'
                     : 'border-slate-800 bg-slate-950/60 text-slate-400 hover:text-white'
@@ -423,7 +479,7 @@ export const ThemeCustomizerView: React.FC<ThemeCustomizerViewProps> = ({
 
               <button
                 onClick={() => updateConfig({ canvasMode: 'dark-navy' })}
-                className={`p-3 rounded-xl border text-center transition flex flex-col items-center gap-2 ${
+                className={`p-3 rounded-xl border text-center transition flex flex-col items-center gap-1.5 ${
                   config.canvasMode === 'dark-navy'
                     ? 'border-blue-500 bg-blue-950/30 text-white font-bold'
                     : 'border-slate-800 bg-slate-950/60 text-slate-400 hover:text-white'
@@ -438,7 +494,7 @@ export const ThemeCustomizerView: React.FC<ThemeCustomizerViewProps> = ({
 
               <button
                 onClick={() => updateConfig({ canvasMode: 'light-modern' })}
-                className={`p-3 rounded-xl border text-center transition flex flex-col items-center gap-2 ${
+                className={`p-3 rounded-xl border text-center transition flex flex-col items-center gap-1.5 ${
                   config.canvasMode === 'light-modern'
                     ? 'border-blue-500 bg-blue-950/30 text-white font-bold'
                     : 'border-slate-800 bg-slate-950/60 text-slate-400 hover:text-white'

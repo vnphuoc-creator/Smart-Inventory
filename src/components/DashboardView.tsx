@@ -115,13 +115,13 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   return (
     <div className="space-y-6 pb-12">
       {/* Role permission info banner */}
-      <div className="bg-gradient-to-r from-slate-900 via-slate-850 to-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-5 shadow-sm">
+      <div className="dashboard-greeting-banner bg-gradient-to-r from-slate-900 via-slate-850 to-slate-900 border border-slate-700/80 rounded-2xl p-4 sm:p-5 shadow-md transition-all">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div className="flex items-start sm:items-center gap-3">
+          <div className="flex items-start sm:items-center gap-3.5">
             <div
-              className={`w-11 h-11 rounded-xl ${
+              className={`w-12 h-12 rounded-xl ${
                 currentUser.avatarColor || 'bg-blue-600'
-              } text-white flex items-center justify-center font-black text-sm shadow-md shrink-0`}
+              } text-white flex items-center justify-center font-black text-sm shadow-md ring-2 ring-white/10 shrink-0`}
             >
               {currentUser.fullName
                 .split(' ')
@@ -130,33 +130,20 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 .join('')}
             </div>
             <div>
-              <h1 className="text-base sm:text-lg font-bold text-white">
+              <h1 className="dashboard-greeting-title text-base sm:text-xl font-bold text-white tracking-wide">
                 Xin chào, {currentUser.fullName}
               </h1>
-              <p className="text-xs text-slate-300 mt-0.5">
-                Hệ thống Quản lý Vật tư Kho Đội Điện Nước Công Trình (DOIDNCT) - Cảng HKQT Đà Nẵng
+              <p className="dashboard-greeting-subtitle text-xs sm:text-sm text-slate-300 font-medium mt-0.5">
+                Hệ thống Quản lý Vật tư Kho Đội Điện Nước Công Trình (DOIDNCT) &bull; Cảng HKQT Đà Nẵng
               </p>
             </div>
           </div>
 
-          {/* Quick action buttons */}
           <div className="flex items-center gap-2 shrink-0">
-            <button
-              id="btn-dash-create-export"
-              onClick={() => onOpenCreateTransaction('EXPORT')}
-              className="bg-amber-600/20 hover:bg-amber-600/30 text-amber-300 border border-amber-500/40 px-3.5 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors"
-            >
-              <ArrowUpRight className="w-4 h-4" />
-              <span>{currentUser.role === 'ADMIN' ? '+ Lập Phiếu Xuất' : '+ Đề Xuất Xuất'}</span>
-            </button>
-            <button
-              id="btn-dash-create-import"
-              onClick={() => onOpenCreateTransaction('IMPORT')}
-              className="bg-blue-600 hover:bg-blue-500 text-white px-3.5 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-sm shadow-blue-600/30"
-            >
-              <ArrowDownRight className="w-4 h-4" />
-              <span>{currentUser.role === 'ADMIN' ? '+ Lập Phiếu Nhập' : '+ Đề Xuất Nhập'}</span>
-            </button>
+            <span className="dashboard-greeting-role-badge inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-blue-950/80 border border-blue-500/40 text-xs font-bold text-cyan-300 shadow-sm">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+              {currentUser.role === 'ADMIN' ? 'Quản trị viên kho (Admin)' : 'Nhân viên kỹ thuật (Staff)'}
+            </span>
           </div>
         </div>
       </div>

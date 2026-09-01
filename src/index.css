@@ -67,7 +67,7 @@
 .light-theme .bg-slate-900\/95,
 .light-theme .bg-slate-900\/90,
 .light-theme .bg-slate-900\/80 {
-  background-color: rgba(255, 255, 255, 0.98) !important;
+  background-color: #ffffff !important;
   border-color: #e2e8f0 !important;
 }
 
@@ -131,7 +131,7 @@
 }
 
 .light-theme .text-slate-400 {
-  color: #475569 !important;
+  color: #64748b !important;
 }
 
 .light-theme .text-slate-500 {
@@ -143,6 +143,11 @@
 }
 
 /* High contrast color accents for Light Mode */
+.light-theme .text-cyan-400,
+.light-theme .text-cyan-300 {
+  color: #0284c7 !important;
+}
+
 .light-theme .text-blue-400,
 .light-theme .text-blue-300 {
   color: #1d4ed8 !important;
@@ -177,6 +182,52 @@
 .light-theme .text-sky-400,
 .light-theme .text-sky-300 {
   color: #0369a1 !important;
+}
+
+/* Header & Sidebar in Light Mode */
+.light-theme header {
+  background-color: #ffffff !important;
+  border-color: #e2e8f0 !important;
+  color: #0f172a !important;
+}
+
+.light-theme header h2 {
+  color: #0f172a !important;
+}
+
+.light-theme header #btn-ai-search-quick {
+  background-color: #f1f5f9 !important;
+  border-color: #cbd5e1 !important;
+  color: #334155 !important;
+}
+
+.light-theme header #btn-ai-search-quick:hover {
+  background-color: #e2e8f0 !important;
+  border-color: #94a3b8 !important;
+}
+
+.light-theme header #btn-user-profile-menu {
+  background-color: #eff6ff !important;
+  border-color: #bfdbfe !important;
+  color: #1e40af !important;
+}
+
+.light-theme aside {
+  background-color: #ffffff !important;
+  border-color: #e2e8f0 !important;
+}
+
+.light-theme aside h1 {
+  color: #0f172a !important;
+}
+
+.light-theme #sidebar-realtime-clock-widget {
+  background: #f1f5f9 !important;
+  border-color: #cbd5e1 !important;
+}
+
+.light-theme #sidebar-realtime-clock-widget span {
+  color: #0f172a !important;
 }
 
 /* Badges & Chips in Light Mode */
@@ -281,7 +332,7 @@
   color: #94a3b8 !important;
 }
 
-/* Table styles */
+/* Table styles in Light Mode */
 .light-theme table thead,
 .light-theme thead.bg-slate-850,
 .light-theme thead.bg-slate-900 {
@@ -308,7 +359,11 @@
   background-color: #f1f5f9 !important;
 }
 
-/* Retain crisp white text on solid buttons & badges */
+.light-theme table tbody td {
+  color: #0f172a !important;
+}
+
+/* Retain crisp white text on solid buttons & colored pills */
 .light-theme .bg-blue-600,
 .light-theme .bg-blue-700,
 .light-theme .bg-indigo-600,
@@ -319,24 +374,65 @@
 .light-theme .bg-amber-600,
 .light-theme .bg-amber-500,
 .light-theme .bg-sky-600,
+.light-theme .bg-cyan-600,
+.light-theme .bg-cyan-500,
+.light-theme .bg-teal-600,
 .light-theme button.bg-blue-600,
+.light-theme button.bg-blue-500,
 .light-theme button.bg-indigo-600,
 .light-theme button.bg-emerald-600,
 .light-theme button.bg-rose-600,
-.light-theme button.bg-amber-600 {
+.light-theme button.bg-amber-600,
+.light-theme button.bg-amber-500,
+.light-theme button.bg-cyan-600,
+.light-theme button.bg-teal-600 {
   color: #ffffff !important;
 }
 
 .light-theme .bg-blue-600 *,
+.light-theme .bg-blue-500 *,
 .light-theme .bg-indigo-600 *,
 .light-theme .bg-emerald-600 *,
 .light-theme .bg-rose-600 *,
 .light-theme .bg-red-600 *,
 .light-theme .bg-amber-600 *,
+.light-theme .bg-amber-500 *,
+.light-theme .bg-cyan-600 *,
+.light-theme .bg-teal-600 *,
 .light-theme button.bg-blue-600 *,
+.light-theme button.bg-blue-500 *,
 .light-theme button.bg-indigo-600 *,
-.light-theme button.bg-emerald-600 * {
+.light-theme button.bg-emerald-600 *,
+.light-theme button.bg-rose-600 *,
+.light-theme button.bg-amber-600 *,
+.light-theme button.bg-cyan-600 *,
+.light-theme button.bg-teal-600 * {
   color: #ffffff !important;
+}
+
+/* Light Mode Recharts & Tooltips */
+.light-theme .recharts-default-tooltip {
+  background-color: #ffffff !important;
+  border: 1px solid #cbd5e1 !important;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1) !important;
+  border-radius: 8px !important;
+}
+
+.light-theme .recharts-tooltip-label {
+  color: #0f172a !important;
+  font-weight: 700 !important;
+}
+
+.light-theme .recharts-tooltip-item {
+  color: #334155 !important;
+}
+
+.light-theme .recharts-cartesian-grid line {
+  stroke: #e2e8f0 !important;
+}
+
+.light-theme .recharts-text {
+  fill: #64748b !important;
 }
 
 /* ========================================================================= */
@@ -354,48 +450,57 @@
     print-color-adjust: exact !important;
   }
 
-  html, body, #root {
+  html, body, #root, .app-root-container {
     background: #ffffff !important;
     background-color: #ffffff !important;
     color: #000000 !important;
     box-shadow: none !important;
     text-shadow: none !important;
     font-family: "Times New Roman", Times, "Segoe UI", Arial, sans-serif !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    overflow: visible !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
   }
 
   body {
     font-size: 9pt !important;
-    line-height: 1.3 !important;
-    width: 100% !important;
-    margin: 0 !important;
-    padding: 0 !important;
-    overflow: visible !important;
+    line-height: 1.35 !important;
   }
 
-  /* Force all main containers to full width and eliminate centering margins */
+  /* Force all main containers to full width and eliminate max-height / overflow clips */
   .min-h-screen,
+  .h-screen,
   main,
+  .flex-1,
   .max-w-7xl,
   .max-w-5xl,
   .max-w-6xl,
   .max-w-4xl,
-  .max-w-3xl {
+  .max-w-3xl,
+  .max-w-2xl,
+  .overflow-x-auto,
+  .overflow-y-auto,
+  .overflow-hidden,
+  [class*="max-h-"],
+  [class*="min-h-"] {
     max-width: 100% !important;
     width: 100% !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
     margin: 0 !important;
     padding: 0 !important;
     display: block !important;
-  }
-
-  .overflow-x-auto,
-  .overflow-y-auto,
-  .overflow-hidden {
     overflow: visible !important;
-    width: 100% !important;
-    max-width: 100% !important;
+    position: static !important;
+    transform: none !important;
   }
 
-  /* Hide all non-printable UI */
+  /* Hide all non-printable UI chrome */
   .no-print,
   nav,
   aside,
@@ -408,32 +513,54 @@
   input,
   select,
   .toast,
-  .lucide {
+  .lucide,
+  .recharts-responsive-container,
+  .recharts-wrapper {
     display: none !important;
   }
 
   /* Modal overlay adjustments when printing modal */
-  .fixed.inset-0 {
+  .fixed.inset-0,
+  .fixed,
+  .backdrop-blur-sm,
+  .backdrop-blur-md,
+  .backdrop-blur-lg,
+  .backdrop-blur-xl {
     position: static !important;
     background: #ffffff !important;
+    background-color: #ffffff !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
     padding: 0 !important;
     margin: 0 !important;
+    box-shadow: none !important;
+    border: none !important;
+    width: 100% !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    overflow: visible !important;
   }
 
   .bg-slate-950,
   .bg-slate-900,
   .bg-slate-850,
-  .bg-slate-800 {
+  .bg-slate-800,
+  .bg-slate-700,
+  .bg-slate-50,
+  .bg-slate-100 {
     background: #ffffff !important;
+    background-color: #ffffff !important;
     color: #000000 !important;
-    border-color: #cbd5e1 !important;
+    border-color: #000000 !important;
   }
 
-  /* Printable Area Container */
+  /* Printable Area Container & all nested elements */
   .printable-area,
-  .proposal-print-document {
+  .proposal-print-document,
+  .docx-preview-wrapper {
     display: block !important;
-    position: relative !important;
+    position: static !important;
     left: 0 !important;
     top: 0 !important;
     width: 100% !important;
@@ -442,19 +569,46 @@
     padding: 0 !important;
     overflow: visible !important;
     background: #ffffff !important;
+    background-color: #ffffff !important;
     color: #000000 !important;
     border: none !important;
     box-shadow: none !important;
   }
 
   .printable-area *,
-  .proposal-print-document * {
+  .proposal-print-document *,
+  .docx-preview-wrapper * {
     color: #000000 !important;
-    background: transparent !important;
-    border-color: #334155 !important;
+    text-shadow: none !important;
+    box-shadow: none !important;
   }
 
-  /* High-precision Table Grid */
+  .printable-area p,
+  .printable-area span,
+  .printable-area div,
+  .printable-area strong,
+  .printable-area b,
+  .printable-area td,
+  .printable-area th {
+    color: #000000 !important;
+  }
+
+  .printable-area h1,
+  .printable-area h2 {
+    color: #000000 !important;
+    font-weight: 900 !important;
+    text-align: center !important;
+    margin: 4px 0 !important;
+  }
+
+  .printable-area h3,
+  .printable-area h4 {
+    color: #000000 !important;
+    font-weight: 700 !important;
+    margin: 2px 0 !important;
+  }
+
+  /* High-precision Table Grid for Printing */
   .printable-table,
   .proposal-print-document table,
   table {
@@ -463,87 +617,39 @@
     border-collapse: collapse !important;
     page-break-inside: auto !important;
     font-size: 8.5pt !important;
+    color: #000000 !important;
+    background: #ffffff !important;
+    margin: 6px 0 !important;
   }
 
-  tr {
+  tr,
+  .printable-table tr {
     page-break-inside: avoid !important;
     page-break-after: auto !important;
   }
 
   th,
-  td {
-    border: 1px solid #334155 !important;
+  td,
+  .printable-table th,
+  .printable-table td {
+    border: 1px solid #000000 !important;
     padding: 4px 6px !important;
     color: #000000 !important;
+    background: #ffffff !important;
     background-color: #ffffff !important;
-  }
-
-  th {
-    background-color: #f1f5f9 !important;
-    font-weight: bold !important;
-    text-align: center !important;
-  }
-
-  /* Avoid breaking signatures across pages */
-  .signature-section,
-  .avoid-page-break {
-    page-break-inside: avoid !important;
-    break-inside: avoid !important;
-    margin-top: 15px !important;
-  }
-
-  /* docx preview wrapper in print mode */
-  .docx-preview-wrapper {
-    background: #ffffff !important;
-    color: #000000 !important;
-    padding: 0 !important;
-    box-shadow: none !important;
-  }
-
-  .docx-preview-wrapper section.docx {
-    box-shadow: none !important;
-    margin: 0 !important;
-    padding: 0 !important;
-  }
-
-  .printable-table,
-  table {
-    color: #000000 !important;
-    background: #ffffff !important;
-    font-size: 8pt !important;
-    margin: 4px 0 !important;
-    page-break-inside: auto !important;
-    table-layout: auto !important;
-    width: 100% !important;
-    border-collapse: collapse !important;
-  }
-
-  .printable-table th,
-  .printable-table td,
-  table th,
-  table td {
-    border: 1px solid #334155 !important;
-    padding: 3px 5px !important;
-    color: #000000 !important;
-    font-size: 8pt !important;
+    font-size: 8.5pt !important;
     word-break: break-word !important;
     overflow-wrap: break-word !important;
   }
 
-  .printable-table th,
-  table th {
-    background-color: #e2e8f0 !important;
+  th,
+  .printable-table th {
+    background-color: #f1f5f9 !important;
     font-weight: 700 !important;
     text-align: center !important;
-    color: #0f172a !important;
+    color: #000000 !important;
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
-  }
-
-  .printable-table tr,
-  table tr {
-    page-break-inside: avoid !important;
-    page-break-after: auto !important;
   }
 
   .printable-table thead,
@@ -556,26 +662,30 @@
     display: table-footer-group !important;
   }
 
-  /* Header & Logo styling for print */
-  .printable-area h1,
-  .printable-area h2,
-  .printable-area h3,
-  .printable-area h4 {
-    color: #0f172a !important;
-    margin: 2px 0 !important;
-  }
-
-  /* Signatures section */
-  .print-signatures {
+  /* Avoid breaking signatures across pages */
+  .signature-section,
+  .print-signatures,
+  .avoid-page-break {
     page-break-inside: avoid !important;
-    margin-top: 14px !important;
-    padding-top: 10px !important;
-    border-top: 1px dashed #94a3b8 !important;
+    break-inside: avoid !important;
+    margin-top: 18px !important;
+    padding-top: 8px !important;
+    border-top: 1px dashed #64748b !important;
     background: transparent !important;
     width: 100% !important;
+    display: block !important;
   }
 
+  .signature-section *,
   .print-signatures * {
+    color: #000000 !important;
+  }
+
+  /* docx preview wrapper in print mode */
+  .docx-preview-wrapper section.docx {
+    box-shadow: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
     color: #000000 !important;
   }
 }
@@ -683,6 +793,130 @@
 }
 
 /* ========================================================================= */
+/* DA NANG IBMS THEME OVERRIDES (MATCHING ATTACHED SCREENSHOT)               */
+/* ========================================================================= */
+.danang-ibms-theme body,
+.danang-ibms-theme .app-root-container {
+  background-color: #f4f6fa !important;
+  color: #0f172a !important;
+}
+
+.danang-ibms-theme aside {
+  background-color: #0b1d3d !important;
+  border-color: #122852 !important;
+}
+
+.danang-ibms-theme header {
+  background-color: #091f4d !important;
+  border-color: #152d68 !important;
+}
+
+.danang-ibms-theme .bg-slate-950,
+.danang-ibms-theme .bg-slate-950\/50,
+.danang-ibms-theme .bg-slate-950\/80 {
+  background-color: #f4f6fa !important;
+}
+
+.danang-ibms-theme .bg-slate-900,
+.danang-ibms-theme .bg-slate-900\/95,
+.danang-ibms-theme .bg-slate-900\/90,
+.danang-ibms-theme .bg-slate-900\/80,
+.danang-ibms-theme .bg-slate-850 {
+  background-color: #ffffff !important;
+  border-color: #e2e8f0 !important;
+  color: #0f172a !important;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05) !important;
+}
+
+.danang-ibms-theme .bg-slate-800,
+.danang-ibms-theme .bg-slate-800\/90,
+.danang-ibms-theme .bg-slate-800\/80,
+.danang-ibms-theme .bg-slate-800\/50,
+.danang-ibms-theme .bg-slate-800\/30 {
+  background-color: #f8fafc !important;
+  border-color: #cbd5e1 !important;
+  color: #1e293b !important;
+}
+
+.danang-ibms-theme .border-slate-800,
+.danang-ibms-theme .border-slate-700 {
+  border-color: #e2e8f0 !important;
+}
+
+/* In IBMS mode, table headers are deep navy */
+.danang-ibms-theme table thead tr,
+.danang-ibms-theme thead {
+  background-color: #0b2356 !important;
+  color: #ffffff !important;
+}
+
+.danang-ibms-theme table thead th {
+  color: #ffffff !important;
+  font-weight: 700 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.05em !important;
+  border-color: #153375 !important;
+}
+
+.danang-ibms-theme table tbody tr {
+  border-color: #e2e8f0 !important;
+}
+
+.danang-ibms-theme table tbody tr:hover {
+  background-color: #f1f5f9 !important;
+}
+
+.danang-ibms-theme table tbody td {
+  color: #1e293b !important;
+}
+
+/* Text colors in IBMS mode */
+.danang-ibms-theme .text-white {
+  color: #0f172a !important;
+}
+
+/* Keep text white inside sidebar, header, dark banners & buttons */
+.danang-ibms-theme aside .text-white,
+.danang-ibms-theme header .text-white,
+.danang-ibms-theme table thead .text-white,
+.danang-ibms-theme .ibms-header-title,
+.danang-ibms-theme .ibms-top-cyan-box,
+.danang-ibms-theme .ibms-clock-widget,
+.danang-ibms-theme .ibms-clock-widget *,
+.danang-ibms-theme button.bg-blue-600,
+.danang-ibms-theme button.bg-blue-500,
+.danang-ibms-theme button.bg-emerald-600,
+.danang-ibms-theme button.bg-rose-600,
+.danang-ibms-theme button.bg-amber-500,
+.danang-ibms-theme button.ibms-btn-orange,
+.danang-ibms-theme button.ibms-btn-navy,
+.danang-ibms-theme button.ibms-btn-red,
+.danang-ibms-theme .ibms-sidebar-item {
+  color: #ffffff !important;
+}
+
+.danang-ibms-theme .ibms-sidebar-item-active {
+  background-color: #00a8cc !important;
+  color: #0a1c42 !important;
+}
+
+.danang-ibms-theme .ibms-sidebar-item-active * {
+  color: #0a1c42 !important;
+}
+
+.danang-ibms-theme .text-slate-300,
+.danang-ibms-theme .text-slate-400 {
+  color: #64748b !important;
+}
+
+.danang-ibms-theme aside .text-slate-300,
+.danang-ibms-theme aside .text-slate-400,
+.danang-ibms-theme header .text-slate-300,
+.danang-ibms-theme header .text-slate-400 {
+  color: #94a3b8 !important;
+}
+
+/* ========================================================================= */
 /* ADVANCED THEME & UI CUSTOMIZATION OVERRIDES                               */
 /* ========================================================================= */
 
@@ -748,6 +982,217 @@
 .navy-theme .border-slate-800,
 .navy-theme .border-slate-700 {
   border-color: #1b2a47 !important;
+}
+
+/* ========================================================================= */
+/* LIQUID GLASS THEME (FROSTED GLASSMORPHISM & REFRACTION)                   */
+/* ========================================================================= */
+.liquid-glass-theme {
+  color-scheme: dark;
+}
+
+.liquid-glass-theme body,
+.liquid-glass-theme .app-root-container {
+  background: radial-gradient(circle at 50% 0%, #0d2348 0%, #060e20 50%, #020617 100%) !important;
+  background-attachment: fixed !important;
+  color: #f8fafc !important;
+}
+
+.liquid-glass-theme aside {
+  background: rgba(8, 18, 38, 0.75) !important;
+  backdrop-filter: blur(20px) !important;
+  -webkit-backdrop-filter: blur(20px) !important;
+  border-right: 1px solid rgba(56, 189, 248, 0.25) !important;
+  box-shadow: 4px 0 24px rgba(0, 0, 0, 0.5) !important;
+}
+
+.liquid-glass-theme header {
+  background: rgba(8, 18, 38, 0.8) !important;
+  backdrop-filter: blur(20px) !important;
+  -webkit-backdrop-filter: blur(20px) !important;
+  border-bottom: 1px solid rgba(56, 189, 248, 0.25) !important;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4) !important;
+}
+
+.liquid-glass-theme .bg-slate-950,
+.liquid-glass-theme .bg-slate-950\/50,
+.liquid-glass-theme .bg-slate-950\/80 {
+  background-color: transparent !important;
+}
+
+.liquid-glass-theme .bg-slate-900,
+.liquid-glass-theme .bg-slate-900\/95,
+.liquid-glass-theme .bg-slate-900\/90,
+.liquid-glass-theme .bg-slate-900\/80,
+.liquid-glass-theme .bg-slate-850 {
+  background: rgba(15, 23, 42, 0.65) !important;
+  backdrop-filter: blur(16px) !important;
+  -webkit-backdrop-filter: blur(16px) !important;
+  border: 1px solid rgba(56, 189, 248, 0.25) !important;
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.4), inset 0 1px 0 0 rgba(255, 255, 255, 0.1) !important;
+}
+
+.liquid-glass-theme .bg-slate-800,
+.liquid-glass-theme .bg-slate-800\/90,
+.liquid-glass-theme .bg-slate-800\/80,
+.liquid-glass-theme .bg-slate-800\/50,
+.liquid-glass-theme .bg-slate-800\/40,
+.liquid-glass-theme .bg-slate-800\/30 {
+  background: rgba(30, 41, 59, 0.55) !important;
+  backdrop-filter: blur(12px) !important;
+  -webkit-backdrop-filter: blur(12px) !important;
+  border-color: rgba(56, 189, 248, 0.2) !important;
+}
+
+.liquid-glass-theme .border-slate-800,
+.liquid-glass-theme .border-slate-700 {
+  border-color: rgba(56, 189, 248, 0.2) !important;
+}
+
+.liquid-glass-theme table thead,
+.liquid-glass-theme thead {
+  background: rgba(8, 24, 52, 0.85) !important;
+  backdrop-filter: blur(16px) !important;
+  color: #67e8f9 !important;
+  border-color: rgba(56, 189, 248, 0.3) !important;
+}
+
+.liquid-glass-theme table thead th {
+  color: #67e8f9 !important;
+  border-color: rgba(56, 189, 248, 0.25) !important;
+}
+
+.liquid-glass-theme table tbody tr {
+  border-color: rgba(56, 189, 248, 0.15) !important;
+}
+
+.liquid-glass-theme table tbody tr:hover {
+  background-color: rgba(56, 189, 248, 0.1) !important;
+}
+
+.liquid-glass-theme input:not([type="checkbox"]):not([type="radio"]),
+.liquid-glass-theme select,
+.liquid-glass-theme textarea {
+  background: rgba(10, 20, 40, 0.75) !important;
+  backdrop-filter: blur(12px) !important;
+  border: 1px solid rgba(56, 189, 248, 0.3) !important;
+  color: #f1f5f9 !important;
+}
+
+.liquid-glass-theme input:focus,
+.liquid-glass-theme select:focus,
+.liquid-glass-theme textarea:focus {
+  border-color: #06b6d4 !important;
+  box-shadow: 0 0 16px rgba(6, 182, 212, 0.4) !important;
+}
+
+/* ========================================================================= */
+/* GREETING BANNER & BADGES ACROSS ALL THEMES                                 */
+/* ========================================================================= */
+/* Light Theme Banner & Badges */
+.light-theme .dashboard-greeting-banner {
+  background: linear-gradient(135deg, #ffffff 0%, #f8fafc 50%, #eff6ff 100%) !important;
+  border: 1px solid #cbd5e1 !important;
+  box-shadow: 0 4px 14px -2px rgba(0, 0, 0, 0.08) !important;
+}
+
+.light-theme .dashboard-greeting-title {
+  color: #0f172a !important;
+  font-weight: 800 !important;
+}
+
+.light-theme .dashboard-greeting-subtitle {
+  color: #475569 !important;
+  font-weight: 600 !important;
+}
+
+.light-theme .dashboard-greeting-role-badge {
+  background-color: #eff6ff !important;
+  border-color: #93c5fd !important;
+  color: #1d4ed8 !important;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05) !important;
+}
+
+.light-theme .material-code-badge {
+  background-color: #e0f2fe !important;
+  color: #0369a1 !important;
+  border-color: #7dd3fc !important;
+  font-weight: 800 !important;
+}
+
+.light-theme .material-table-name {
+  color: #0f172a !important;
+  font-weight: 700 !important;
+}
+
+.light-theme .material-table-category {
+  color: #334155 !important;
+}
+
+.light-theme .table-cell-stock {
+  background-color: #f1f5f9 !important;
+}
+
+.light-theme .table-cell-stock span {
+  color: #0f172a !important;
+}
+
+.light-theme .status-badge-out-of-stock {
+  background-color: #fee2e2 !important;
+  color: #991b1b !important;
+  border-color: #fca5a5 !important;
+}
+
+.light-theme .status-badge-low-stock {
+  background-color: #fef3c7 !important;
+  color: #92400e !important;
+  border-color: #fcd34d !important;
+}
+
+.light-theme .status-badge-over-stock {
+  background-color: #f3e8ff !important;
+  color: #6b21a8 !important;
+  border-color: #d8b4fe !important;
+}
+
+.light-theme .status-badge-in-stock,
+.light-theme .status-badge-optimal {
+  background-color: #d1fae5 !important;
+  color: #065f46 !important;
+  border-color: #6ee7b7 !important;
+}
+
+/* Liquid Glass Banner & Badges */
+.liquid-glass-theme .dashboard-greeting-banner {
+  background: linear-gradient(135deg, rgba(15, 23, 42, 0.8) 0%, rgba(30, 41, 59, 0.6) 100%) !important;
+  backdrop-filter: blur(20px) !important;
+  -webkit-backdrop-filter: blur(20px) !important;
+  border: 1px solid rgba(56, 189, 248, 0.35) !important;
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.45), inset 0 1px 0 0 rgba(255, 255, 255, 0.12) !important;
+}
+
+.liquid-glass-theme .dashboard-greeting-title {
+  color: #ffffff !important;
+  text-shadow: 0 2px 12px rgba(6, 182, 212, 0.45) !important;
+}
+
+.liquid-glass-theme .dashboard-greeting-subtitle {
+  color: #cbd5e1 !important;
+}
+
+.liquid-glass-theme .dashboard-greeting-role-badge {
+  background: rgba(8, 145, 178, 0.3) !important;
+  border: 1px solid rgba(6, 182, 212, 0.6) !important;
+  color: #67e8f9 !important;
+  backdrop-filter: blur(12px) !important;
+  box-shadow: 0 0 14px rgba(6, 182, 212, 0.25) !important;
+}
+
+.liquid-glass-theme .material-code-badge {
+  background: rgba(8, 145, 178, 0.25) !important;
+  border-color: rgba(6, 182, 212, 0.6) !important;
+  color: #67e8f9 !important;
+  box-shadow: 0 0 10px rgba(6, 182, 212, 0.25) !important;
 }
 
 /* Density Compact Mode */
