@@ -227,3 +227,55 @@ export interface ProposalReconciliation {
   relatedImportTxs: InventoryTransaction[];
 }
 
+export type ThemeColorPreset =
+  | 'aht-default'
+  | 'emerald-airport'
+  | 'royal-indigo'
+  | 'cyber-amber'
+  | 'crimson-tech'
+  | 'monochrome-titan'
+  | 'midnight-oled'
+  | 'light-corporate';
+
+export type CanvasMode = 'dark-slate' | 'dark-oled' | 'dark-navy' | 'light-modern';
+export type TableDensity = 'compact' | 'standard' | 'comfortable';
+export type FontSizeScale = 'small' | 'standard' | 'large';
+export type BorderRadiusOption = 'sharp' | 'standard' | 'rounded' | 'full';
+export type NavigationStyle = 'floating' | 'solid' | 'compact';
+
+export interface UIThemeConfig {
+  preset: ThemeColorPreset;
+  canvasMode: CanvasMode;
+  primaryColor: string;
+  accentColor: string;
+  tableDensity: TableDensity;
+  fontSizeScale: FontSizeScale;
+  borderRadius: BorderRadiusOption;
+  enableGlassmorphism: boolean;
+  enableCardGlow: boolean;
+  enableAnimations: boolean;
+  navigationStyle: NavigationStyle;
+  showAirportBanner: boolean;
+  customBannerUrl?: string;
+  sidebarCollapsedDefault: boolean;
+  customAppTitle?: string;
+}
+
+export const DEFAULT_THEME_CONFIG: UIThemeConfig = {
+  preset: 'aht-default',
+  canvasMode: 'dark-slate',
+  primaryColor: '#2563eb',
+  accentColor: '#3b82f6',
+  tableDensity: 'standard',
+  fontSizeScale: 'standard',
+  borderRadius: 'standard',
+  enableGlassmorphism: true,
+  enableCardGlow: true,
+  enableAnimations: true,
+  navigationStyle: 'solid',
+  showAirportBanner: true,
+  customBannerUrl: '',
+  sidebarCollapsedDefault: false,
+  customAppTitle: 'Hệ Thống Quản Lý Kho Vật Tư AHT',
+};
+

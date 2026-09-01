@@ -682,3 +682,140 @@
   background-color: #f8fafc;
 }
 
+/* ========================================================================= */
+/* ADVANCED THEME & UI CUSTOMIZATION OVERRIDES                               */
+/* ========================================================================= */
+
+/* OLED Pure Black Mode */
+.oled-theme body,
+.oled-theme .bg-slate-950,
+.oled-theme .bg-slate-950\/50,
+.oled-theme .bg-slate-950\/80 {
+  background-color: #000000 !important;
+}
+
+.oled-theme aside,
+.oled-theme header,
+.oled-theme .bg-slate-900,
+.oled-theme .bg-slate-900\/95,
+.oled-theme .bg-slate-900\/90,
+.oled-theme .bg-slate-900\/80 {
+  background-color: #080808 !important;
+  border-color: #1c1c1c !important;
+}
+
+.oled-theme .bg-slate-800,
+.oled-theme .bg-slate-800\/90,
+.oled-theme .bg-slate-800\/80,
+.oled-theme .bg-slate-800\/50,
+.oled-theme .bg-slate-800\/30 {
+  background-color: #121212 !important;
+  border-color: #222222 !important;
+}
+
+.oled-theme .border-slate-800,
+.oled-theme .border-slate-700 {
+  border-color: #1f1f1f !important;
+}
+
+/* Midnight Navy Mode */
+.navy-theme body,
+.navy-theme .bg-slate-950,
+.navy-theme .bg-slate-950\/50,
+.navy-theme .bg-slate-950\/80 {
+  background-color: #070d19 !important;
+}
+
+.navy-theme aside,
+.navy-theme header,
+.navy-theme .bg-slate-900,
+.navy-theme .bg-slate-900\/95,
+.navy-theme .bg-slate-900\/90,
+.navy-theme .bg-slate-900\/80 {
+  background-color: #0c162c !important;
+  border-color: #1b2a47 !important;
+}
+
+.navy-theme .bg-slate-800,
+.navy-theme .bg-slate-800\/90,
+.navy-theme .bg-slate-800\/80,
+.navy-theme .bg-slate-800\/50,
+.navy-theme .bg-slate-800\/30 {
+  background-color: #14223d !important;
+  border-color: #23375c !important;
+}
+
+.navy-theme .border-slate-800,
+.navy-theme .border-slate-700 {
+  border-color: #1b2a47 !important;
+}
+
+/* Density Compact Mode */
+.density-compact table th,
+.density-compact table td {
+  padding-top: 5px !important;
+  padding-bottom: 5px !important;
+  padding-left: 6px !important;
+  padding-right: 6px !important;
+  font-size: 0.725rem !important;
+}
+
+/* Density Comfortable Mode */
+.density-comfortable table th,
+.density-comfortable table td {
+  padding-top: 14px !important;
+  padding-bottom: 14px !important;
+  padding-left: 14px !important;
+  padding-right: 14px !important;
+}
+
+/* Font Scale Modes */
+.font-scale-sm {
+  font-size: 13px !important;
+}
+
+.font-scale-lg {
+  font-size: 15.5px !important;
+}
+
+/* Border Radius Customizations */
+.radius-sharp,
+.radius-sharp * {
+  border-radius: 0px !important;
+}
+
+.radius-rounded button,
+.radius-rounded input,
+.radius-rounded select,
+.radius-rounded .rounded-xl {
+  border-radius: 14px !important;
+}
+
+.radius-rounded .rounded-2xl {
+  border-radius: 18px !important;
+}
+
+.radius-full button,
+.radius-full input,
+.radius-full select,
+.radius-full .rounded-xl {
+  border-radius: 9999px !important;
+}
+
+.radius-full .rounded-2xl {
+  border-radius: 24px !important;
+}
+
+/* Animation & Glass Toggles */
+.anim-disabled,
+.anim-disabled * {
+  animation: none !important;
+  transition: none !important;
+}
+
+.glass-disabled,
+.glass-disabled * {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+

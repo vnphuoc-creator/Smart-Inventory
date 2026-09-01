@@ -38,6 +38,7 @@ import {
   Radio,
   FileCheck2,
   ShieldAlert,
+  Palette,
 } from 'lucide-react';
 import { STANDARD_UNITS } from '../data/seedData';
 import {
@@ -51,11 +52,14 @@ import {
   TransactionStatus,
   ActivityLog,
   ActivityActionType,
+  UIThemeConfig,
+  DEFAULT_THEME_CONFIG,
 } from '../types';
 import { formatVND, formatNumber, formatDisplayDate } from '../utils/inventoryEngine';
 import { AHTLogo } from './AHTLogo';
 import { ExcelStockImportModal } from './ExcelStockImportModal';
 import { SearchableMaterialSelect } from './SearchableMaterialSelect';
+import { ThemeCustomizerView } from './ThemeCustomizerView';
 
 interface SettingsViewProps {
   currentUser: User;
@@ -64,6 +68,10 @@ interface SettingsViewProps {
   transactions: InventoryTransaction[];
   proposals?: PurchaseProposal[];
   activityLogs?: ActivityLog[];
+  themeConfig?: UIThemeConfig;
+  onApplyThemeConfig?: (config: UIThemeConfig) => void;
+  onResetThemeConfig?: () => void;
+  onShowToast?: (message: string, type?: 'success' | 'info' | 'error') => void;
   onClearActivityLogs?: () => void;
   onUpdateMaterials?: (materials: Material[]) => void;
   onUpdateUsers?: (users: User[]) => void;
@@ -82,6 +90,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   transactions,
   proposals = [],
   activityLogs = [],
+  themeConfig,
+  onApplyThemeConfig,
+  onResetThemeConfig,
+  onShowToast,
   onClearActivityLogs,
   onUpdateMaterials,
   onUpdateUsers,
@@ -98,8 +110,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     currentUser.email.toLowerCase().trim() === 'vn.phuoc235';
 
   const [activeTab, setActiveTab] = useState<
-    'ACTIVITY_LOGS' | 'UNITS_PASSWORD' | 'LOGO_COMPANY' | 'IMPORT_STOCK' | 'BACKUP'
-  >(isMasterAdmin ? 'ACTIVITY_LOGS' : 'UNITS_PASSWORD');
+    'ACTIVITY_LOGS' | 'CUSTOMIZE_UI' | 'UNITS_PASSWORD' | 'LOGO_COMPANY' | 'IMPORT_STOCK' | 'BACKUP'
+  >(isMasterAdmin ? 'ACTIVITY_LOGS' : 'CUSTOMIZE_UI');
 
   // --- UNIT MANAGEMENT STATE ---
   const [units, setUnits] = useState<string[]>(() => {
@@ -470,6 +482,21 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             </span>
           </button>
         )}
+
+        <button
+          onClick={() => setActiveTab('CUSTOMIZE_UI')}
+          className={`px-4 py-3 text-xs font-bold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${
+            activeTab === 'CUSTOMIZE_UI'
+              ? 'border-blue-500 text-blue-400 bg-blue-500/10 rounded-t-xl'
+              : 'border-transparent text-slate-400 hover:text-slate-200'
+          }`}
+        >
+          <Palette className="w-4 h-4 text-blue-400" />
+          <span>Tùy Biến Thiết Kế Giao Diện</span>
+          <span className="px-1.5 py-0.5 rounded-full text-[10px] bg-blue-500/20 text-blue-300 font-semibold">
+            Mới
+          </span>
+        </button>
 
         <button
           onClick={() => setActiveTab('UNITS_PASSWORD')}
@@ -856,6 +883,27 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             </div>
           </div>
         </div>
+      )}
+
+      {/* ===================== TAB: CUSTOMIZE UI ===================== */}
+      {activeTab === 'CUSTOMIZE_UI' && (
+        <ThemeCustomizerView
+          currentConfig={themeConfig || DEFAULT_THEME_CONFIG}
+          onApplyConfig={(cfg) => {
+            if (onApplyThemeConfig) onApplyThemeConfig(cfg);
+          }}
+          onResetDefault={() => {
+            if (onResetThemeConfig) onResetThemeConfig();
+          }}
+          onShowToast={(msg, type) => {
+            if (onShowToast) {
+              onShowToast(msg, type);
+            } else {
+              setUnitToast(msg);
+              setTimeout(() => setUnitToast(null), 3000);
+            }
+          }}
+        />
       )}
 
       {/* ===================== TAB: UNITS & PASSWORD ===================== */}

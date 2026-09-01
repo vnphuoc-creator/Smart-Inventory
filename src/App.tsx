@@ -28,6 +28,8 @@ import {
   NaturalSearchFilters,
   ActivityLog,
   ActivityActionType,
+  UIThemeConfig,
+  DEFAULT_THEME_CONFIG,
 } from './types';
 import { calculateAllMaterialStocks, formatVND } from './utils/inventoryEngine';
 import {
@@ -246,34 +248,118 @@ export function App() {
   const [transactionTypePreset, setTransactionTypePreset] = useState<'IMPORT' | 'EXPORT'>('EXPORT');
   const [transactionStatusFilterPreset, setTransactionStatusFilterPreset] = useState<string | undefined>(undefined);
 
-  // Theme State (Dark / Light)
-  const [theme, setTheme] = useState<'dark' | 'light'>(() => {
-    const saved = localStorage.getItem('smart_theme_mode');
-    return saved === 'light' ? 'light' : 'dark';
+  // Advanced UI Theme Configuration State
+  const [themeConfig, setThemeConfig] = useState<UIThemeConfig>(() => {
+    const saved = localStorage.getItem('smart_ui_theme_config_v2');
+    if (saved) {
+      try {
+        return { ...DEFAULT_THEME_CONFIG, ...JSON.parse(saved) };
+      } catch {
+        return DEFAULT_THEME_CONFIG;
+      }
+    }
+    const legacyTheme = localStorage.getItem('smart_theme_mode');
+    if (legacyTheme === 'light') {
+      return { ...DEFAULT_THEME_CONFIG, canvasMode: 'light-modern', preset: 'light-corporate' };
+    }
+    return DEFAULT_THEME_CONFIG;
   });
 
+  // Apply theme classes and CSS variables globally
   useEffect(() => {
-    localStorage.setItem('smart_theme_mode', theme);
-    if (theme === 'light') {
-      document.documentElement.classList.add('light-theme');
-      document.documentElement.classList.remove('dark');
+    const root = document.documentElement;
+
+    // Reset base classes
+    root.classList.remove(
+      'light-theme',
+      'dark',
+      'oled-theme',
+      'navy-theme',
+      'density-compact',
+      'density-comfortable',
+      'font-scale-sm',
+      'font-scale-lg',
+      'radius-sharp',
+      'radius-rounded',
+      'radius-full',
+      'anim-disabled',
+      'glass-disabled'
+    );
+
+    // Canvas brightness mode
+    if (themeConfig.canvasMode === 'light-modern') {
+      root.classList.add('light-theme');
+    } else if (themeConfig.canvasMode === 'dark-oled') {
+      root.classList.add('dark', 'oled-theme');
+    } else if (themeConfig.canvasMode === 'dark-navy') {
+      root.classList.add('dark', 'navy-theme');
     } else {
-      document.documentElement.classList.remove('light-theme');
-      document.documentElement.classList.add('dark');
+      root.classList.add('dark');
     }
-  }, [theme]);
+
+    // Table density
+    if (themeConfig.tableDensity === 'compact') {
+      root.classList.add('density-compact');
+    } else if (themeConfig.tableDensity === 'comfortable') {
+      root.classList.add('density-comfortable');
+    }
+
+    // Font size scale
+    if (themeConfig.fontSizeScale === 'small') {
+      root.classList.add('font-scale-sm');
+    } else if (themeConfig.fontSizeScale === 'large') {
+      root.classList.add('font-scale-lg');
+    }
+
+    // Border radius
+    if (themeConfig.borderRadius === 'sharp') {
+      root.classList.add('radius-sharp');
+    } else if (themeConfig.borderRadius === 'rounded') {
+      root.classList.add('radius-rounded');
+    } else if (themeConfig.borderRadius === 'full') {
+      root.classList.add('radius-full');
+    }
+
+    // Visual effects
+    if (!themeConfig.enableAnimations) {
+      root.classList.add('anim-disabled');
+    }
+    if (!themeConfig.enableGlassmorphism) {
+      root.classList.add('glass-disabled');
+    }
+
+    // Set custom CSS variables for accent and brand colors
+    root.style.setProperty('--primary-color', themeConfig.primaryColor);
+    root.style.setProperty('--accent-color', themeConfig.accentColor);
+  }, [themeConfig]);
+
+  const handleApplyThemeConfig = (newConfig: UIThemeConfig) => {
+    setThemeConfig(newConfig);
+    localStorage.setItem('smart_ui_theme_config_v2', JSON.stringify(newConfig));
+    localStorage.setItem('smart_theme_mode', newConfig.canvasMode === 'light-modern' ? 'light' : 'dark');
+  };
+
+  const handleResetThemeConfig = () => {
+    setThemeConfig(DEFAULT_THEME_CONFIG);
+    localStorage.removeItem('smart_ui_theme_config_v2');
+    localStorage.setItem('smart_theme_mode', 'dark');
+  };
 
   const handleToggleTheme = () => {
-    setTheme((prev) => {
-      const next = prev === 'dark' ? 'light' : 'dark';
-      showToast(
-        next === 'light'
-          ? 'Đã chuyển sang Giao diện Sáng (Light Theme).'
-          : 'Đã chuyển sang Giao diện Tối (Dark Theme).',
-        'info'
-      );
-      return next;
-    });
+    const isLight = themeConfig.canvasMode === 'light-modern';
+    const nextCanvas = isLight ? 'dark-slate' : 'light-modern';
+    const updated: UIThemeConfig = {
+      ...themeConfig,
+      canvasMode: nextCanvas,
+      preset: isLight ? 'aht-default' : 'light-corporate',
+    };
+    handleApplyThemeConfig(updated);
+    showToast(
+      nextCanvas === 'light-modern'
+        ? 'Đã chuyển sang Giao diện Sáng (Light Theme).'
+        : 'Đã chuyển sang Giao diện Tối (Dark Theme).',
+      'info'
+    );
   };
 
   // Toast notification
@@ -797,7 +883,7 @@ export function App() {
           onOpenChangePassword={() => setIsChangePasswordOpen(true)}
           onOpenUserGuide={() => setIsUserGuideOpen(true)}
           onToggleSidebar={() => setIsMobileSidebarOpen(!isMobileSidebarOpen)}
-          theme={theme}
+          theme={themeConfig.canvasMode === 'light-modern' ? 'light' : 'dark'}
           onToggleTheme={handleToggleTheme}
         />
 
@@ -941,49 +1027,35 @@ export function App() {
           )}
 
           {activeTab === 'settings' && (
-            isMasterAdmin ? (
-              <SettingsView
-                currentUser={currentUser}
-                allUsers={users}
-                materials={materials}
-                transactions={transactions}
-                proposals={proposals}
-                activityLogs={activityLogs}
-                onClearActivityLogs={handleClearActivityLogs}
-                onUpdateProposal={handleUpdateProposal}
-                onUpdateTransaction={handleUpdateTransaction}
-                onDeleteProposal={handleDeleteProposal}
-                onDeleteTransaction={handleDeleteTransaction}
-                onResetDemoData={handleResetDemoData}
-                onClearAllTransactionsAndProposals={handleClearAllTransactionsAndProposals}
-                onUpdateMaterials={(newMats) => {
-                  setMaterials(newMats);
-                  newMats.forEach((m) => saveMaterialToCloud(m));
-                  showToast(`Đã cập nhật danh mục gồm ${newMats.length} vật tư.`);
-                }}
-                onUpdateUsers={(newUsers) => {
-                  setUsers(newUsers);
-                  newUsers.forEach((u) => saveUserToCloud(u));
-                  showToast(`Đã cập nhật danh sách người dùng và đồng bộ lên Cloud.`);
-                }}
-              />
-            ) : (
-              <div className="bg-slate-900 border border-red-500/30 rounded-2xl p-8 text-center max-w-lg mx-auto my-12">
-                <div className="w-16 h-16 rounded-full bg-red-500/10 text-red-400 flex items-center justify-center mx-auto mb-4 border border-red-500/20">
-                  <ShieldAlert className="w-8 h-8" />
-                </div>
-                <h3 className="text-xl font-bold text-white mb-2">Quyền Truy Cập Bị Giới Hạn</h3>
-                <p className="text-slate-400 text-sm mb-6 leading-relaxed">
-                  Mục Cài Đặt Hệ Thống chỉ dành riêng cho tài khoản Quản trị viên cấp cao <strong className="text-amber-300">vn.phuoc235@gmail.com</strong>.
-                </p>
-                <button
-                  onClick={() => setActiveTab('dashboard')}
-                  className="px-6 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-sm font-semibold transition shadow-lg shadow-blue-600/30"
-                >
-                  Quay lại Bảng Điều Khiển
-                </button>
-              </div>
-            )
+            <SettingsView
+              currentUser={currentUser}
+              allUsers={users}
+              materials={materials}
+              transactions={transactions}
+              proposals={proposals}
+              activityLogs={activityLogs}
+              themeConfig={themeConfig}
+              onApplyThemeConfig={handleApplyThemeConfig}
+              onResetThemeConfig={handleResetThemeConfig}
+              onShowToast={showToast}
+              onClearActivityLogs={handleClearActivityLogs}
+              onUpdateProposal={handleUpdateProposal}
+              onUpdateTransaction={handleUpdateTransaction}
+              onDeleteProposal={handleDeleteProposal}
+              onDeleteTransaction={handleDeleteTransaction}
+              onResetDemoData={handleResetDemoData}
+              onClearAllTransactionsAndProposals={handleClearAllTransactionsAndProposals}
+              onUpdateMaterials={(newMats) => {
+                setMaterials(newMats);
+                newMats.forEach((m) => saveMaterialToCloud(m));
+                showToast(`Đã cập nhật danh mục gồm ${newMats.length} vật tư.`);
+              }}
+              onUpdateUsers={(newUsers) => {
+                setUsers(newUsers);
+                newUsers.forEach((u) => saveUserToCloud(u));
+                showToast(`Đã cập nhật danh sách người dùng và đồng bộ lên Cloud.`);
+              }}
+            />
           )}
 
           {activeTab === 'ai' && (
