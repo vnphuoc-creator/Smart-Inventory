@@ -516,6 +516,235 @@ Trả về định dạng JSON duy nhất:
   });
 });
 
+// AI Multi-source Smart Material Importer Endpoint (Excel, Word, Image, Google Sheet, Text)
+app.post("/api/ai/scan-import-materials", async (req, res) => {
+  const { fileData, fileName, fileText, fileType, categories, rawRows } = req.body;
+
+  const validCategories = Array.isArray(categories) && categories.length > 0
+    ? categories
+    : [
+        "Vật tư Điện & Phụ kiện tiêu hao",
+        "Thiết bị Điện & Trạm trung thế",
+        "Hệ thống Chiếu sáng & Đèn công trình",
+        "Vật tư Đường ống & Phụ kiện cấp thoát nước",
+        "Thiết bị vệ sinh & Xử lý nước",
+      ];
+
+  const ai = getGemini();
+
+  if (ai && (fileData || fileText || (rawRows && rawRows.length > 0))) {
+    try {
+      let contents: any[] = [];
+
+      // Handle image base64 if provided
+      if (fileData && typeof fileData === "string" && fileData.startsWith("data:")) {
+        const matches = fileData.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
+        if (matches && matches.length === 3) {
+          const mimeType = matches[1];
+          const base64Data = matches[2];
+          contents.push({
+            inlineData: {
+              data: base64Data,
+              mimeType: mimeType,
+            },
+          });
+        }
+      }
+
+      const promptText = `Bạn là chuyên gia bóc tách dữ liệu danh mục vật tư cơ điện và cấp thoát nước nhà ga quốc tế AHT (Đà Nẵng).
+Nhiệm vụ của bạn là nhận diện, bóc tách tất cả các dòng vật tư/thiết bị từ tài liệu (Hình ảnh hóa đơn/tờ trình, văn bản Word/Excel, bảng dữ liệu) và TỰ ĐỘNG PHÂN LOẠI CHÍNH XÁC vào 1 trong các nhóm ngành hàng sau:
+
+CÁC NHÓM NGÀNH HÀNG HỢP LỆ (BẮT BUỘC CHỌN ĐÚNG 1 TRONG CÁC NHÓM NÀY CHO TỪNG VẬT TƯ):
+${validCategories.map((c: string, i: number) => `${i + 1}. "${c}"`).join("\n")}
+
+QUY TẮC NHẬN DIỆN & PHÂN LOẠI:
+1. "Vật tư Điện & Phụ kiện tiêu hao": Dây điện đơn CV, cáp điện CXV, CB, MCB tép, công tắc, ổ cắm, băng keo điện, cầu chì, đầu cosse, co nhiệt, tủ điện nhỏ, v.v.
+2. "Thiết bị Điện & Trạm trung thế": Máy biến áp, tủ trung thế, ACB, MCCB khối lớn, khởi động từ contactor, rơle bảo vệ, tủ hòa đồng bộ, tụ bù hạ thế, đồng hồ MFM383A, v.v.
+3. "Hệ thống Chiếu sáng & Đèn công trình": Đèn LED panel, đèn Highbay, đèn pha chiếu sân đỗ, đèn downlight, đèn Exit thoát nạn, đèn chiếu sáng khẩn cấp sự cố PCCC, bộ nguồn driver LED, bóng tuýp LED, chóa đèn, máng đèn, v.v.
+4. "Vật tư Đường ống & Phụ kiện cấp thoát nước": Ống nhựa PPR hàn nhiệt PN10/PN20, ống uPVC, ống HDPE, van bướm tay gạt/tay quay, van cổng, van bi, van 1 chiều, van xả khí, đồng hồ đo lưu lượng nước, rọ bơm, lọc y, khớp nối mềm cao su, co, tê, măng sông, đai khởi thủy, cút hàn, v.v.
+5. "Thiết bị vệ sinh & Xử lý nước": Vòi chậu lavabo cảm ứng (TOTO/Inax), van xả tiểu nam cảm ứng, xiphong thoát nước, bệ xí, bồn tiểu, máy bơm tăng áp, bơm chìm nước thải, phao điện, van phao cơ, lõi lọc nước, phụ kiện nhà vệ sinh ga hành khách, v.v.
+
+Dữ liệu đầu vào:
+${fileName ? `Tên file: ${fileName}\n` : ""}
+${fileText ? `Nội dung trích xuất:\n${fileText.slice(0, 15000)}\n` : ""}
+${rawRows && rawRows.length > 0 ? `Dữ liệu dòng bảng thô:\n${JSON.stringify(rawRows.slice(0, 100))}\n` : ""}
+
+YÊU CẦU ĐẦU RA JSON CHUẨN:
+{
+  "items": [
+    {
+      "name": "Tên và quy cách kỹ thuật đầy đủ của vật tư",
+      "code": "Mã vật tư nếu có trong tài liệu (nếu không có để trống)",
+      "unit": "Đơn vị tính chuẩn (Cái, Bộ, Mét, Cây, Cuộn, Thùng, Hộp, Bình, Kg, Lít, v.v.)",
+      "category": "Tên chính xác 1 trong các nhóm ngành hàng nêu trên",
+      "initialStock": 10,
+      "unitPrice": 150000,
+      "minStock": 5,
+      "maxStock": 50,
+      "location": "Vị trí kho gợi ý (ví dụ: Kho Điện A1, Kho Thiết Bị Vệ Sinh, Kho Ống Nước K1, v.v.)",
+      "specification": "Quy cách kỹ thuật tóm tắt"
+    }
+  ]
+}`;
+
+      contents.push(promptText);
+
+      const response = await ai.models.generateContent({
+        model: "gemini-3.7-flash",
+        contents: contents,
+        config: {
+          responseMimeType: "application/json",
+          systemInstruction:
+            "Bạn là chuyên gia OCR, chuẩn hóa dữ liệu và phân loại ngành hàng vật tư kỹ thuật nhà ga quốc tế AHT. Chỉ trả về danh mục vật tư thực tế, không lấy tiêu đề hành chính hay chữ ký.",
+        },
+      });
+
+      const outputText = response.text || "{}";
+      const parsed = JSON.parse(outputText);
+      if (parsed && parsed.items && Array.isArray(parsed.items) && parsed.items.length > 0) {
+        return res.json({
+          success: true,
+          items: parsed.items,
+          source: "gemini_ai",
+        });
+      }
+    } catch (err: unknown) {
+      console.warn("Gemini Material Importer API error, switching to fallback:", err);
+    }
+  }
+
+  // Local Rule-based Fallback Parser
+  const items: any[] = [];
+  if (rawRows && Array.isArray(rawRows)) {
+    rawRows.forEach((r: any) => {
+      const name = String(r.name || r.ten || r.tenVatTu || r.description || "").trim();
+      if (!name || name.length < 2) return;
+
+      // Smart category classification based on name
+      let category = validCategories[0];
+      const nameLower = name.toLowerCase();
+      if (
+        nameLower.includes("toto") ||
+        nameLower.includes("lavabo") ||
+        nameLower.includes("vòi") ||
+        nameLower.includes("xiphong") ||
+        nameLower.includes("tiểu nam") ||
+        nameLower.includes("bệt") ||
+        nameLower.includes("bồn cầu") ||
+        nameLower.includes("bơm thải") ||
+        nameLower.includes("lõi lọc")
+      ) {
+        category = "Thiết bị vệ sinh & Xử lý nước";
+      } else if (
+        nameLower.includes("ống") ||
+        nameLower.includes("ppr") ||
+        nameLower.includes("upvc") ||
+        nameLower.includes("hdpe") ||
+        nameLower.includes("van bướm") ||
+        nameLower.includes("van bi") ||
+        nameLower.includes("van 1 chiều") ||
+        nameLower.includes("van cổng") ||
+        nameLower.includes("khớp nối mềm") ||
+        nameLower.includes("co ") ||
+        nameLower.includes("tê ") ||
+        nameLower.includes("măng sông")
+      ) {
+        category = "Vật tư Đường ống & Phụ kiện cấp thoát nước";
+      } else if (
+        nameLower.includes("đèn") ||
+        nameLower.includes("led") ||
+        nameLower.includes("highbay") ||
+        nameLower.includes("downlight") ||
+        nameLower.includes("exit") ||
+        nameLower.includes("sự cố") ||
+        nameLower.includes("khẩn cấp") ||
+        nameLower.includes("driver") ||
+        nameLower.includes("chấn lưu") ||
+        nameLower.includes("tuýp")
+      ) {
+        category = "Hệ thống Chiếu sáng & Đèn công trình";
+      } else if (
+        nameLower.includes("biến áp") ||
+        nameLower.includes("acb") ||
+        nameLower.includes("mccb") ||
+        nameLower.includes("tủ điện msb") ||
+        nameLower.includes("contactor") ||
+        nameLower.includes("tụ bù") ||
+        nameLower.includes("mfm383") ||
+        nameLower.includes("trung thế")
+      ) {
+        category = "Thiết bị Điện & Trạm trung thế";
+      } else {
+        category = "Vật tư Điện & Phụ kiện tiêu hao";
+      }
+
+      items.push({
+        name: name,
+        code: r.code || r.ma || "",
+        unit: r.unit || r.dvt || "Cái",
+        category: category,
+        initialStock: Number(r.stock || r.quantity || r.ton || 0),
+        unitPrice: Number(r.price || r.unitPrice || r.donGia || 0),
+        minStock: Number(r.min || 5),
+        maxStock: Number(r.max || 50),
+        location: r.location || "Kho Tổng",
+        specification: r.specification || "",
+      });
+    });
+  }
+
+  return res.json({
+    success: true,
+    items: items,
+    source: "local_heuristic",
+  });
+});
+
+// Proxy Google Sheet CSV Endpoint
+app.post("/api/ai/fetch-google-sheet", async (req, res) => {
+  const { sheetUrl } = req.body;
+  if (!sheetUrl || typeof sheetUrl !== "string") {
+    return res.status(400).json({ error: "sheetUrl is required" });
+  }
+
+  try {
+    // Extract sheet ID and gid
+    const idMatch = sheetUrl.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
+    if (!idMatch) {
+      return res.status(400).json({ error: "URL Google Sheet không hợp lệ. Vui lòng cung cấp link dạng: https://docs.google.com/spreadsheets/d/ID/edit" });
+    }
+    const sheetId = idMatch[1];
+    let gid = "0";
+    const gidMatch = sheetUrl.match(/[#&?]gid=([0-9]+)/);
+    if (gidMatch) {
+      gid = gidMatch[1];
+    }
+
+    const exportUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=csv&gid=${gid}`;
+    const response = await fetch(exportUrl, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+      },
+    });
+
+    if (!response.ok) {
+      return res.status(400).json({
+        error: `Không thể tải file từ Google Sheet (Mã lỗi ${response.status}). Vui lòng đảm bảo bảng tính được chia sẻ công khai ("Bất kỳ ai có đường liên kết đều có thể xem") hoặc copy dán trực tiếp dữ liệu.`,
+      });
+    }
+
+    const csvText = await response.text();
+    return res.json({
+      success: true,
+      csvText: csvText,
+    });
+  } catch (err: any) {
+    return res.status(500).json({
+      error: `Lỗi khi kết nối Google Sheet: ${err?.message || "Không xác định"}`,
+    });
+  }
+});
+
 async function startServer() {
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({

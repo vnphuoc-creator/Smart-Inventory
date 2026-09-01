@@ -39,6 +39,7 @@ import {
   FileCheck2,
   ShieldAlert,
   Palette,
+  Sparkles,
 } from 'lucide-react';
 import { STANDARD_UNITS } from '../data/seedData';
 import {
@@ -60,6 +61,7 @@ import { AHTLogo } from './AHTLogo';
 import { ExcelStockImportModal } from './ExcelStockImportModal';
 import { SearchableMaterialSelect } from './SearchableMaterialSelect';
 import { ThemeCustomizerView } from './ThemeCustomizerView';
+import { SmartMaterialImportSection } from './SmartMaterialImportSection';
 
 interface SettingsViewProps {
   currentUser: User;
@@ -110,8 +112,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     currentUser.email.toLowerCase().trim() === 'vn.phuoc235';
 
   const [activeTab, setActiveTab] = useState<
-    'ACTIVITY_LOGS' | 'CUSTOMIZE_UI' | 'UNITS_PASSWORD' | 'LOGO_COMPANY' | 'IMPORT_STOCK' | 'BACKUP'
-  >(isMasterAdmin ? 'ACTIVITY_LOGS' : 'CUSTOMIZE_UI');
+    'ACTIVITY_LOGS' | 'CUSTOMIZE_UI' | 'IMPORT_SMART' | 'UNITS_PASSWORD' | 'LOGO_COMPANY' | 'IMPORT_STOCK' | 'BACKUP'
+  >(isMasterAdmin ? 'ACTIVITY_LOGS' : 'IMPORT_SMART');
 
   // --- UNIT MANAGEMENT STATE ---
   const [units, setUnits] = useState<string[]>(() => {
@@ -453,13 +455,13 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
           </p>
         </div>
 
-        {/* Quick button to open Excel stock importer */}
+        {/* Quick button to open Smart Material Importer */}
         <button
-          onClick={() => setIsExcelModalOpen(true)}
+          onClick={() => setActiveTab('IMPORT_SMART')}
           className="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2 transition-all shadow-md shadow-emerald-600/30 shrink-0"
         >
-          <FileSpreadsheet className="w-4 h-4" />
-          <span>Import File Tồn Kho &amp; Cập Nhật Số Lượng</span>
+          <Sparkles className="w-4 h-4" />
+          <span>Import Vật Tư Đa Năng (AI / Excel / Word / Ảnh)</span>
         </button>
       </div>
 
@@ -484,6 +486,21 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         )}
 
         <button
+          onClick={() => setActiveTab('IMPORT_SMART')}
+          className={`px-4 py-3 text-xs font-bold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${
+            activeTab === 'IMPORT_SMART'
+              ? 'border-emerald-500 text-emerald-400 bg-emerald-500/10 rounded-t-xl'
+              : 'border-transparent text-slate-400 hover:text-slate-200'
+          }`}
+        >
+          <Sparkles className="w-4 h-4 text-emerald-400" />
+          <span>Import Vật Tư Đa Năng</span>
+          <span className="px-1.5 py-0.5 rounded-full text-[10px] bg-emerald-500/20 text-emerald-300 font-bold">
+            Excel/Word/Ảnh/Sheets
+          </span>
+        </button>
+
+        <button
           onClick={() => setActiveTab('CUSTOMIZE_UI')}
           className={`px-4 py-3 text-xs font-bold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${
             activeTab === 'CUSTOMIZE_UI'
@@ -493,9 +510,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         >
           <Palette className="w-4 h-4 text-blue-400" />
           <span>Tùy Biến Thiết Kế Giao Diện</span>
-          <span className="px-1.5 py-0.5 rounded-full text-[10px] bg-blue-500/20 text-blue-300 font-semibold">
-            Mới
-          </span>
         </button>
 
         <button
@@ -1179,6 +1193,16 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             </div>
           </div>
         </div>
+      )}
+
+      {/* ===================== TAB: SMART MATERIAL IMPORTER ===================== */}
+      {activeTab === 'IMPORT_SMART' && (
+        <SmartMaterialImportSection
+          currentUser={currentUser}
+          currentMaterials={materials}
+          onApplyMaterialsUpdate={onUpdateMaterials || (() => {})}
+          onShowToast={onShowToast}
+        />
       )}
 
       {/* ===================== TAB: IMPORT STOCK ===================== */}

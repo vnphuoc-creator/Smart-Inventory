@@ -29,6 +29,7 @@ import {
   ActivityLog,
   ActivityActionType,
   UIThemeConfig,
+  CanvasMode,
   DEFAULT_THEME_CONFIG,
 } from './types';
 import { calculateAllMaterialStocks, formatVND } from './utils/inventoryEngine';
