@@ -230,9 +230,13 @@ export const SmartMaterialImportSection: React.FC<SmartMaterialImportSectionProp
         // Keep category from matched existing material if exists
         category = matchResult.matchedMaterial.category || category;
       } else {
-        // Generate new sequential code if not valid code
-        if (!finalCode || !finalCode.startsWith('DN_')) {
-          finalCode = generateNextMaterialCode(category, [...workingExisting, ...results.map(r => ({ code: r.code } as Material))], name);
+        // If code was not provided in the import data, generate a new sequential AHT code
+        if (!finalCode) {
+          finalCode = generateNextMaterialCode(
+            category,
+            [...workingExisting, ...results.map((r) => ({ code: r.code } as Material))],
+            name
+          );
         }
       }
 
@@ -240,7 +244,15 @@ export const SmartMaterialImportSection: React.FC<SmartMaterialImportSectionProp
       const unitPrice = Number(raw.unitPrice) >= 0 ? Number(raw.unitPrice) : 0;
       const minStock = Number(raw.minStock) > 0 ? Number(raw.minStock) : 5;
       const maxStock = Number(raw.maxStock) > 0 ? Number(raw.maxStock) : Math.max(50, initialStock * 2);
-      const location = (raw.location || '').trim() || (category.includes('Điện') ? 'Kho Điện' : category.includes('vệ sinh') ? 'Kho Thiết Bị Vệ Sinh' : category.includes('Đường ống') ? 'Kho Ống Nước' : 'Kho Tổng');
+      const location =
+        (raw.location || '').trim() ||
+        (category.includes('Điện')
+          ? 'Kho Điện'
+          : category.includes('vệ sinh')
+          ? 'Kho Thiết Bị Vệ Sinh'
+          : category.includes('Đường ống')
+          ? 'Kho Ống Nước'
+          : 'Kho Tổng');
 
       results.push({
         id: `import-${Date.now()}-${idx}`,
@@ -268,10 +280,390 @@ export const SmartMaterialImportSection: React.FC<SmartMaterialImportSectionProp
       setParsedItems(results);
       setIsProcessed(true);
       setErrorMessage(null);
-      onShowToast?.(`Đã bóc tách thành công ${results.length} vật tư (${results.filter(r => !r.isExisting).length} vật tư mới).`, 'success');
+      onShowToast?.(
+        `Đã bóc tách thành công ${results.length} vật tư (${results.filter((r) => !r.isExisting).length} vật tư mới).`,
+        'success'
+      );
     }
 
     setLoading(false);
+  };
+
+  // Helper unit and code detection routines
+  const KNOWN_UNITS_SET = new Set([
+    'cái', 'cai', 'bộ', 'bo', 'mét', 'met', 'm', 'm.', 'cây', 'cay', 'cuộn', 'cuon',
+    'hộp', 'hop', 'thùng', 'thung', 'bình', 'binh', 'chai', 'can', 'bao', 'kg', 'kilo',
+    'lít', 'lit', 'l', 'tấm', 'tam', 'sợi', 'soi', 'đôi', 'doi', 'cặp', 'cap',
+    'gói', 'goi', 'bịch', 'bich', 'ống', 'ong', 'viên', 'vien', 'quả', 'qua',
+    'lon', 'thanh', 'hạt', 'hat', 'chiếc', 'chiec', 'dây', 'day', 'set', 'roll',
+    'box', 'ctn', 'pcs', 'pc', 'ea'
+  ]);
+
+  const isKnownUnitValue = (val: any): boolean => {
+    if (val === null || val === undefined) return false;
+    const str = String(val).trim().toLowerCase();
+    if (!str || str.length > 15) return false;
+    return (
+      KNOWN_UNITS_SET.has(str) ||
+      str.startsWith('mét') ||
+      str.startsWith('cây') ||
+      str.startsWith('cuộn') ||
+      str.startsWith('thùng') ||
+      str.startsWith('hộp') ||
+      str.startsWith('cái') ||
+      str.startsWith('bộ') ||
+      str.startsWith('ống')
+    );
+  };
+
+  const isProbableMaterialCodeValue = (val: any): boolean => {
+    if (val === null || val === undefined) return false;
+    const str = String(val).trim().toUpperCase();
+    if (str.length < 3 || str.length > 40) return false;
+    if (/^\d+$/.test(str)) return false; // Pure number is index/count
+    if (isKnownUnitValue(str)) return false;
+    if (/^(DN_|VT_|TB_|DEN_|ONG_|VS_|DD_|CV_|CXV_|MCB_|MCCB_|LED_|PPR_|HDPE_|PVC_)/i.test(str)) return true;
+    if (
+      /^[A-Z0-9_\-\.]{3,30}$/.test(str) &&
+      (str.includes('_') || str.includes('-') || (/\d/.test(str) && /[A-Z]/.test(str)))
+    ) {
+      return true;
+    }
+    return false;
+  };
+
+  const isProbableSTTValue = (val: any): boolean => {
+    if (val === null || val === undefined) return false;
+    const str = String(val).trim();
+    return /^\d{1,5}$/.test(str);
+  };
+
+  // Unified Intelligent Tabular Matrix Parser for Excel, Google Sheets, TSV, and Pasted text
+  const parseTabularMatrix = (matrix: any[][]) => {
+    if (!matrix || matrix.length === 0) return [];
+
+    let colCode = -1;
+    let colName = -1;
+    let colUnit = -1;
+    let colCategory = -1;
+    let colStock = -1;
+    let colPrice = -1;
+    let colLocation = -1;
+    let colSpec = -1;
+    let headerRowIdx = -1;
+
+    // Phase 1: Header detection in top 25 rows
+    for (let r = 0; r < Math.min(25, matrix.length); r++) {
+      const row = matrix[r];
+      if (!Array.isArray(row) || row.length === 0) continue;
+
+      let dCode = -1;
+      let dName = -1;
+      let dUnit = -1;
+      let dCat = -1;
+      let dStock = -1;
+      let dPrice = -1;
+      let dLoc = -1;
+      let dSpec = -1;
+
+      row.forEach((cell, c) => {
+        const str = String(cell || '').toLowerCase().trim();
+        if (!str) return;
+
+        // Code header detection
+        if (
+          str.includes('mã vt') ||
+          str.includes('mã vật tư') ||
+          str.includes('mã sản phẩm') ||
+          str.includes('mã sp') ||
+          str.includes('mã hàng') ||
+          str === 'mã số' ||
+          str === 'mã' ||
+          str === 'code' ||
+          str === 'sku' ||
+          str === 'item code'
+        ) {
+          if (dCode === -1) dCode = c;
+        }
+        // Name header detection (e.g. TÊN SẢN PHẨM, Tên vật tư, Tên hàng, Mặt hàng)
+        else if (
+          str.includes('tên sản phẩm') ||
+          str.includes('tên vật tư') ||
+          str.includes('tên hàng') ||
+          str.includes('mặt hàng') ||
+          str.includes('tên & quy cách') ||
+          str.includes('tên hàng hóa') ||
+          str.includes('quy cách vật tư') ||
+          str.includes('sản phẩm') ||
+          str === 'tên' ||
+          str === 'name' ||
+          str === 'item name' ||
+          str.includes('danh mục')
+        ) {
+          if (dName === -1) dName = c;
+        }
+        // Unit header detection (ĐƠN VỊ, ĐVT, DVT, Đơn vị tính, Unit)
+        else if (
+          str === 'đvt' ||
+          str === 'dvt' ||
+          str === 'đv' ||
+          str.includes('đơn vị tính') ||
+          str.includes('đơn vị') ||
+          str === 'unit' ||
+          str === 'uom'
+        ) {
+          if (dUnit === -1) dUnit = c;
+        }
+        // Category header
+        else if (
+          str.includes('nhóm') ||
+          str.includes('ngành hàng') ||
+          str.includes('phân loại') ||
+          str.includes('loại vật tư') ||
+          str.includes('loại hàng') ||
+          str === 'category'
+        ) {
+          if (dCat === -1) dCat = c;
+        }
+        // Stock header
+        else if (
+          str.includes('số lượng') ||
+          str.includes('tồn') ||
+          str.includes('cuối kỳ') ||
+          str.includes('tồn đầu') ||
+          str === 'sl' ||
+          str === 'qty' ||
+          str === 'stock'
+        ) {
+          if (dStock === -1) dStock = c;
+        }
+        // Price header
+        else if (
+          str.includes('đơn giá') ||
+          str.includes('giá tiền') ||
+          str.includes('thành tiền') ||
+          str === 'giá' ||
+          str === 'price' ||
+          str === 'cost'
+        ) {
+          if (dPrice === -1) dPrice = c;
+        }
+        // Location header
+        else if (str.includes('vị trí') || str.includes('kho') || str === 'location') {
+          if (dLoc === -1) dLoc = c;
+        }
+        // Specification header
+        else if (
+          str.includes('quy cách') ||
+          str.includes('thông số') ||
+          str.includes('kỹ thuật') ||
+          str === 'spec' ||
+          str === 'specification'
+        ) {
+          if (dSpec === -1) dSpec = c;
+        }
+      });
+
+      // Valid header match found
+      if (dName !== -1 || (dCode !== -1 && dUnit !== -1) || (dCode !== -1 && dName !== -1)) {
+        headerRowIdx = r;
+        colCode = dCode;
+        colName = dName;
+        colUnit = dUnit;
+        colCategory = dCat;
+        colStock = dStock;
+        colPrice = dPrice;
+        colLocation = dLoc;
+        colSpec = dSpec;
+        break;
+      }
+    }
+
+    // Phase 2: Heuristic column profiling if headers are missing or ambiguous
+    const startScan = headerRowIdx !== -1 ? headerRowIdx + 1 : 0;
+    const sampleRows = matrix.slice(startScan, startScan + 40).filter((r) => Array.isArray(r) && r.length > 0);
+
+    if (sampleRows.length > 0) {
+      const maxCols = Math.max(...sampleRows.map((r) => r.length));
+      const colStats = Array.from({ length: maxCols }, () => ({
+        codeMatches: 0,
+        unitMatches: 0,
+        sttMatches: 0,
+        textMatches: 0,
+      }));
+
+      sampleRows.forEach((row) => {
+        row.forEach((cell, c) => {
+          const val = String(cell || '').trim();
+          if (!val) return;
+          if (isProbableMaterialCodeValue(val)) colStats[c].codeMatches++;
+          if (isKnownUnitValue(val)) colStats[c].unitMatches++;
+          if (isProbableSTTValue(val)) colStats[c].sttMatches++;
+          if (
+            val.length > 3 &&
+            isNaN(Number(val)) &&
+            !isProbableMaterialCodeValue(val) &&
+            !isKnownUnitValue(val)
+          ) {
+            colStats[c].textMatches++;
+          }
+        });
+      });
+
+      if (colCode === -1) {
+        let bestCodeIdx = -1;
+        let maxCode = 0;
+        colStats.forEach((st, c) => {
+          if (c !== colName && c !== colUnit && st.codeMatches > maxCode) {
+            maxCode = st.codeMatches;
+            bestCodeIdx = c;
+          }
+        });
+        if (bestCodeIdx !== -1 && maxCode >= 1) {
+          colCode = bestCodeIdx;
+        }
+      }
+
+      if (colUnit === -1) {
+        let bestUnitIdx = -1;
+        let maxUnit = 0;
+        colStats.forEach((st, c) => {
+          if (c !== colName && c !== colCode && st.unitMatches > maxUnit) {
+            maxUnit = st.unitMatches;
+            bestUnitIdx = c;
+          }
+        });
+        if (bestUnitIdx !== -1 && maxUnit >= 1) {
+          colUnit = bestUnitIdx;
+        }
+      }
+
+      if (colName === -1) {
+        let bestNameIdx = -1;
+        let maxName = 0;
+        colStats.forEach((st, c) => {
+          if (c !== colCode && c !== colUnit && st.textMatches > maxName) {
+            maxName = st.textMatches;
+            bestNameIdx = c;
+          }
+        });
+        if (bestNameIdx !== -1) {
+          colName = bestNameIdx;
+        }
+      }
+    }
+
+    // Phase 3: Row extraction
+    const rawExtracted: Array<{
+      name: string;
+      code?: string;
+      unit?: string;
+      category?: string;
+      initialStock?: number;
+      unitPrice?: number;
+      location?: string;
+      specification?: string;
+    }> = [];
+
+    const startRow = headerRowIdx !== -1 ? headerRowIdx + 1 : 0;
+
+    for (let r = startRow; r < matrix.length; r++) {
+      const row = matrix[r];
+      if (!Array.isArray(row) || row.length === 0) continue;
+
+      const nonBlank = row.filter((c) => String(c || '').trim() !== '');
+      if (nonBlank.length === 0) continue;
+
+      let rawName = colName !== -1 && row[colName] !== undefined ? String(row[colName]).trim() : '';
+      let rawCode = colCode !== -1 && row[colCode] !== undefined ? String(row[colCode]).trim() : '';
+      let rawUnit = colUnit !== -1 && row[colUnit] !== undefined ? String(row[colUnit]).trim() : '';
+      let rawCat = colCategory !== -1 && row[colCategory] !== undefined ? String(row[colCategory]).trim() : '';
+      let rawStock = colStock !== -1 && row[colStock] !== undefined ? parseFloat(String(row[colStock]).replace(/[^0-9.-]/g, '')) || 0 : 0;
+      let rawPrice = colPrice !== -1 && row[colPrice] !== undefined ? parseFloat(String(row[colPrice]).replace(/[^0-9.-]/g, '')) || 0 : 0;
+      let rawLocation = colLocation !== -1 && row[colLocation] !== undefined ? String(row[colLocation]).trim() : '';
+      let rawSpec = colSpec !== -1 && row[colSpec] !== undefined ? String(row[colSpec]).trim() : '';
+
+      // Positional pattern fallback when unaligned
+      if (!rawName || !rawCode || !rawUnit) {
+        const cells = row.map((c) => String(c || '').trim()).filter(Boolean);
+        if (cells.length >= 4 && isProbableSTTValue(cells[0])) {
+          // [STT, Tên sản phẩm, Mã vật tư, Đơn vị] -> Exactly user's format!
+          if (!rawName) rawName = cells[1];
+          if (!rawCode) rawCode = cells[2];
+          if (!rawUnit) rawUnit = cells[3];
+        } else if (cells.length === 3) {
+          if (isProbableMaterialCodeValue(cells[1]) && isKnownUnitValue(cells[2])) {
+            // [Tên, Mã, Đơn vị]
+            if (!rawName) rawName = cells[0];
+            if (!rawCode) rawCode = cells[1];
+            if (!rawUnit) rawUnit = cells[2];
+          } else if (isProbableMaterialCodeValue(cells[0]) && isKnownUnitValue(cells[2])) {
+            // [Mã, Tên, Đơn vị]
+            if (!rawCode) rawCode = cells[0];
+            if (!rawName) rawName = cells[1];
+            if (!rawUnit) rawUnit = cells[2];
+          }
+        }
+      }
+
+      // Per-row safety cross-check:
+      // If rawUnit holds a material code and rawCode is empty or invalid
+      if (isProbableMaterialCodeValue(rawUnit) && !isProbableMaterialCodeValue(rawCode)) {
+        rawCode = rawUnit;
+        rawUnit = 'Cái';
+      }
+
+      // If rawName holds a code and rawCode holds the name
+      if (isProbableMaterialCodeValue(rawName) && rawCode && !isProbableMaterialCodeValue(rawCode)) {
+        const tmp = rawName;
+        rawName = rawCode;
+        rawCode = tmp;
+      }
+
+      // Fallback: Find name from row if still empty
+      if (!rawName || rawName.length < 2) {
+        let longestText = '';
+        row.forEach((cell) => {
+          const s = String(cell || '').trim();
+          if (
+            s.length > longestText.length &&
+            !isProbableMaterialCodeValue(s) &&
+            !isKnownUnitValue(s) &&
+            isNaN(Number(s))
+          ) {
+            longestText = s;
+          }
+        });
+        if (longestText.length >= 2) {
+          rawName = longestText;
+        }
+      }
+
+      // Skip header repetitions or empty lines
+      if (!rawName || rawName.length < 2 || isProbableSTTValue(rawName)) continue;
+      const lowerName = rawName.toLowerCase();
+      if (
+        lowerName === 'tên sản phẩm' ||
+        lowerName === 'tên vật tư' ||
+        lowerName === 'mã vật tư' ||
+        lowerName === 'đơn vị tính'
+      ) {
+        continue;
+      }
+
+      rawExtracted.push({
+        name: rawName,
+        code: rawCode,
+        unit: rawUnit || 'Cái',
+        category: rawCat,
+        initialStock: rawStock,
+        unitPrice: rawPrice,
+        location: rawLocation,
+        specification: rawSpec || rawName,
+      });
+    }
+
+    return rawExtracted;
   };
 
   // --- HANDLER 1: EXCEL / CSV IMPORT ---
@@ -295,122 +687,7 @@ export const SmartMaterialImportSection: React.FC<SmartMaterialImportSectionProp
       }
 
       setLoadingStep('Đang nhận diện các cột dữ liệu & phân loại ngành hàng...');
-
-      // Find header row in top 25 rows
-      let colCode = -1;
-      let colName = -1;
-      let colUnit = -1;
-      let colCategory = -1;
-      let colStock = -1;
-      let colPrice = -1;
-      let colMin = -1;
-      let colMax = -1;
-      let colLocation = -1;
-      let colSpec = -1;
-      let headerRowIdx = -1;
-
-      for (let r = 0; r < Math.min(25, matrix.length); r++) {
-        const row = matrix[r];
-        if (!Array.isArray(row)) continue;
-
-        let detectedCode = -1;
-        let detectedName = -1;
-        let detectedUnit = -1;
-        let detectedCategory = -1;
-        let detectedStock = -1;
-        let detectedPrice = -1;
-        let detectedLocation = -1;
-        let detectedSpec = -1;
-
-        row.forEach((cell, c) => {
-          const str = String(cell || '').toLowerCase().trim();
-          if (!str) return;
-
-          if (str.includes('mã vt') || str.includes('mã vật tư') || str === 'mã số' || str === 'mã' || str === 'code') {
-            if (detectedCode === -1) detectedCode = c;
-          } else if (
-            str.includes('tên vật tư') ||
-            str.includes('tên hàng') ||
-            str.includes('mặt hàng') ||
-            str.includes('tên & quy cách') ||
-            str === 'tên' ||
-            str === 'name' ||
-            str.includes('danh mục')
-          ) {
-            if (detectedName === -1) detectedName = c;
-          } else if (str === 'đvt' || str === 'dvt' || str.includes('đơn vị') || str === 'unit') {
-            if (detectedUnit === -1) detectedUnit = c;
-          } else if (str.includes('nhóm') || str.includes('ngành hàng') || str.includes('phân loại') || str === 'category') {
-            if (detectedCategory === -1) detectedCategory = c;
-          } else if (str.includes('số lượng') || str.includes('tồn') || str.includes('cuối kỳ') || str === 'qty' || str === 'stock') {
-            if (detectedStock === -1) detectedStock = c;
-          } else if (str.includes('đơn giá') || str.includes('giá') || str === 'price') {
-            if (detectedPrice === -1) detectedPrice = c;
-          } else if (str.includes('vị trí') || str.includes('kho') || str === 'location') {
-            if (detectedLocation === -1) detectedLocation = c;
-          } else if (str.includes('quy cách') || str.includes('kỹ thuật') || str === 'spec' || str === 'specification') {
-            if (detectedSpec === -1) detectedSpec = c;
-          }
-        });
-
-        if (detectedName !== -1 || (detectedCode !== -1 && detectedUnit !== -1)) {
-          headerRowIdx = r;
-          colCode = detectedCode;
-          colName = detectedName;
-          colUnit = detectedUnit;
-          colCategory = detectedCategory;
-          colStock = detectedStock;
-          colPrice = detectedPrice;
-          colLocation = detectedLocation;
-          colSpec = detectedSpec;
-          break;
-        }
-      }
-
-      // If no explicit header found, fallback to standard column order
-      const startRow = headerRowIdx !== -1 ? headerRowIdx + 1 : 1;
-      const rawExtracted: any[] = [];
-
-      for (let r = startRow; r < matrix.length; r++) {
-        const row = matrix[r];
-        if (!Array.isArray(row) || row.length === 0) continue;
-
-        let name = '';
-        if (colName !== -1 && row[colName]) {
-          name = String(row[colName]).trim();
-        } else {
-          // Find first text cell with length > 2
-          for (let c = 0; c < row.length; c++) {
-            const val = String(row[c] || '').trim();
-            if (val.length > 2 && isNaN(Number(val)) && !val.toUpperCase().startsWith('DN_')) {
-              name = val;
-              break;
-            }
-          }
-        }
-
-        if (!name || name.length < 2) continue;
-
-        let code = colCode !== -1 && row[colCode] ? String(row[colCode]).trim() : '';
-        let unit = colUnit !== -1 && row[colUnit] ? String(row[colUnit]).trim() : 'Cái';
-        let category = colCategory !== -1 && row[colCategory] ? String(row[colCategory]).trim() : '';
-        let stock = colStock !== -1 ? parseFloat(String(row[colStock]).replace(/[^0-9.-]/g, '')) || 0 : 0;
-        let price = colPrice !== -1 ? parseFloat(String(row[colPrice]).replace(/[^0-9.-]/g, '')) || 0 : 0;
-        let location = colLocation !== -1 && row[colLocation] ? String(row[colLocation]).trim() : 'Kho Tổng';
-        let spec = colSpec !== -1 && row[colSpec] ? String(row[colSpec]).trim() : '';
-
-        rawExtracted.push({
-          name,
-          code,
-          unit,
-          category,
-          initialStock: stock,
-          unitPrice: price,
-          location,
-          specification: spec,
-        });
-      }
-
+      const rawExtracted = parseTabularMatrix(matrix);
       processExtractedItems(rawExtracted);
     } catch (err: any) {
       setErrorMessage(`Lỗi đọc file Excel: ${err?.message || 'Không thể xử lý'}`);
@@ -455,17 +732,17 @@ export const SmartMaterialImportSection: React.FC<SmartMaterialImportSectionProp
       }
 
       const data = await response.json();
-      if (data.items && Array.isArray(data.items)) {
+      if (data.items && Array.isArray(data.items) && data.items.length > 0) {
         processExtractedItems(data.items);
       } else {
-        // Fallback: Line-by-line parsing
-        const lines = fullText.split('\n').map((l) => l.trim()).filter((l) => l.length > 3);
-        const fallbackItems = lines.map((l) => ({
-          name: l.replace(/^\d+[\.\-\)]\s*/, ''),
-          unit: 'Cái',
-          initialStock: 1,
-        }));
-        processExtractedItems(fallbackItems);
+        // Fallback: Parse lines
+        const lines = fullText
+          .split('\n')
+          .map((l) => l.trim())
+          .filter((l) => l.length > 3);
+        const matrix = lines.map((l) => l.split(/\t|\|/).map((p) => p.trim()));
+        const rawExtracted = parseTabularMatrix(matrix);
+        processExtractedItems(rawExtracted);
       }
     } catch (err: any) {
       setErrorMessage(`Lỗi phân tích file Word: ${err?.message || 'Không thể xử lý'}`);
@@ -547,51 +824,8 @@ export const SmartMaterialImportSection: React.FC<SmartMaterialImportSectionProp
       const worksheet = workbook.Sheets[sheetName];
       const matrix: any[][] = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: '' });
 
-      // Pass matrix into Excel parser logic
-      let colName = -1;
-      let colCode = -1;
-      let colUnit = -1;
-      let colCat = -1;
-      let colStock = -1;
-      let colPrice = -1;
-      let startRow = 1;
-
-      for (let r = 0; r < Math.min(15, matrix.length); r++) {
-        const row = matrix[r];
-        if (!Array.isArray(row)) continue;
-        row.forEach((cell, c) => {
-          const str = String(cell || '').toLowerCase();
-          if (str.includes('tên') || str.includes('hàng') || str.includes('vật tư')) colName = c;
-          if (str.includes('mã')) colCode = c;
-          if (str.includes('đvt') || str.includes('đơn vị')) colUnit = c;
-          if (str.includes('nhóm') || str.includes('loại')) colCat = c;
-          if (str.includes('tồn') || str.includes('số lượng')) colStock = c;
-          if (str.includes('giá')) colPrice = c;
-        });
-        if (colName !== -1) {
-          startRow = r + 1;
-          break;
-        }
-      }
-
-      const rawItems: any[] = [];
-      for (let r = startRow; r < matrix.length; r++) {
-        const row = matrix[r];
-        if (!Array.isArray(row) || row.length === 0) continue;
-        const name = colName !== -1 ? String(row[colName] || '').trim() : String(row[0] || '').trim();
-        if (!name || name.length < 2) continue;
-
-        rawItems.push({
-          name,
-          code: colCode !== -1 ? String(row[colCode] || '').trim() : '',
-          unit: colUnit !== -1 ? String(row[colUnit] || '').trim() : 'Cái',
-          category: colCat !== -1 ? String(row[colCat] || '').trim() : '',
-          initialStock: colStock !== -1 ? parseFloat(String(row[colStock]).replace(/[^0-9.-]/g, '')) || 0 : 0,
-          unitPrice: colPrice !== -1 ? parseFloat(String(row[colPrice]).replace(/[^0-9.-]/g, '')) || 0 : 0,
-        });
-      }
-
-      processExtractedItems(rawItems);
+      const rawExtracted = parseTabularMatrix(matrix);
+      processExtractedItems(rawExtracted);
     } catch (err: any) {
       setErrorMessage(`Lỗi tải Google Sheet: ${err?.message || 'Vui lòng kiểm tra quyền chia sẻ công khai của bảng tính'}`);
       setLoading(false);
@@ -612,13 +846,12 @@ export const SmartMaterialImportSection: React.FC<SmartMaterialImportSectionProp
 
     try {
       const lines = pastedText.trim().split('\n');
-      const rawRows: any[] = [];
+      const matrix: string[][] = [];
 
       lines.forEach((line) => {
         const trimmed = line.trim();
         if (!trimmed) return;
 
-        // Detect tab or semicolon or comma or pipe delimiter
         let parts: string[] = [];
         if (trimmed.includes('\t')) {
           parts = trimmed.split('\t');
@@ -631,43 +864,15 @@ export const SmartMaterialImportSection: React.FC<SmartMaterialImportSectionProp
         } else {
           parts = [trimmed];
         }
-
-        const cleanParts = parts.map((p) => p.trim());
-        if (cleanParts.length >= 2) {
-          // If first part looks like index number, skip it
-          let nameIdx = 0;
-          let codeIdx = -1;
-          if (/^\d+$/.test(cleanParts[0]) && cleanParts.length > 1) {
-            nameIdx = 1;
-          }
-          if (cleanParts[0].toUpperCase().startsWith('DN_')) {
-            codeIdx = 0;
-            nameIdx = 1;
-          }
-
-          const name = cleanParts[nameIdx] || '';
-          if (name && name.length > 1 && isNaN(Number(name))) {
-            rawRows.push({
-              code: codeIdx !== -1 ? cleanParts[codeIdx] : '',
-              name: name,
-              unit: cleanParts[nameIdx + 1] || 'Cái',
-              initialStock: parseFloat(cleanParts[nameIdx + 2]?.replace(/[^0-9.-]/g, '')) || 0,
-              unitPrice: parseFloat(cleanParts[nameIdx + 3]?.replace(/[^0-9.-]/g, '')) || 0,
-            });
-          }
-        } else if (cleanParts.length === 1 && cleanParts[0].length > 2) {
-          rawRows.push({
-            name: cleanParts[0].replace(/^\d+[\.\-\)]\s*/, ''),
-            unit: 'Cái',
-            initialStock: 1,
-          });
-        }
+        matrix.push(parts.map((p) => p.trim()));
       });
 
-      if (rawRows.length > 0) {
-        processExtractedItems(rawRows);
+      const rawExtracted = parseTabularMatrix(matrix);
+
+      if (rawExtracted.length > 0) {
+        processExtractedItems(rawExtracted);
       } else {
-        // Use AI endpoint for unstructured pasted text
+        // Fallback to AI parser
         const response = await fetch('/api/ai/scan-import-materials', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -678,7 +883,7 @@ export const SmartMaterialImportSection: React.FC<SmartMaterialImportSectionProp
           }),
         });
         const data = await response.json();
-        if (data.items && Array.isArray(data.items)) {
+        if (data.items && Array.isArray(data.items) && data.items.length > 0) {
           processExtractedItems(data.items);
         } else {
           setErrorMessage('Không nhận diện được cấu trúc vật tư từ nội dung đã dán.');

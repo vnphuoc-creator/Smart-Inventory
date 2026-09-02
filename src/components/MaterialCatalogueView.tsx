@@ -26,6 +26,13 @@ import {
   ChevronsLeft,
   ChevronsRight,
   MoveHorizontal,
+  LayoutGrid,
+  List,
+  Image as ImageIcon,
+  ZoomIn,
+  ExternalLink,
+  MapPin,
+  Tag,
 } from 'lucide-react';
 import {
   Material,
@@ -36,6 +43,8 @@ import {
 import { formatVND, formatNumber, validateMaterialCode } from '../utils/inventoryEngine';
 import { MATERIAL_CATEGORIES, STANDARD_UNITS } from '../data/seedData';
 import { exportMaterialCatalogueToExcel } from '../utils/excelExporter';
+import { resolveMaterialImageUrl, getMaterialVisualDossier } from '../utils/materialImageResolver';
+import { MaterialImageModal } from './MaterialImageModal';
 
 interface MaterialCatalogueViewProps {
   currentUser: User;
@@ -70,6 +79,8 @@ export const MaterialCatalogueView: React.FC<MaterialCatalogueViewProps> = ({
   const [selectedStatus, setSelectedStatus] = useState(appliedFilters?.stockStatus || 'ALL');
   const [sortBy, setSortBy] = useState<'code' | 'name' | 'stock' | 'value'>('code');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+  const [viewMode, setViewMode] = useState<'TABLE' | 'GRID'>('TABLE');
+  const [selectedImageModalMaterial, setSelectedImageModalMaterial] = useState<Material | null>(null);
 
   // Modal State for adding/editing material
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -87,6 +98,7 @@ export const MaterialCatalogueView: React.FC<MaterialCatalogueViewProps> = ({
     unitPrice: 100000,
     allocatedStaffEmails: [],
     notes: '',
+    image: '',
   });
   const [codeError, setCodeError] = useState<string | null>(null);
 
@@ -245,6 +257,7 @@ export const MaterialCatalogueView: React.FC<MaterialCatalogueViewProps> = ({
       unitPrice: 0,
       allocatedStaffEmails: [],
       notes: '',
+      image: '',
     });
     setCodeError(null);
     setIsModalOpen(true);
@@ -252,7 +265,10 @@ export const MaterialCatalogueView: React.FC<MaterialCatalogueViewProps> = ({
 
   const handleOpenEdit = (mat: Material) => {
     setEditingMaterial(mat);
-    setFormData({ ...mat });
+    setFormData({
+      ...mat,
+      image: mat.image || '',
+    });
     setCodeError(null);
     setIsModalOpen(true);
   };
@@ -317,6 +333,36 @@ export const MaterialCatalogueView: React.FC<MaterialCatalogueViewProps> = ({
         </div>
 
         <div className="flex items-center gap-2 shrink-0 flex-wrap sm:flex-nowrap">
+          {/* View Mode Toggle: Table vs Grid Gallery */}
+          <div className="bg-slate-800 p-1 rounded-xl border border-slate-700 flex items-center gap-1 shadow-sm">
+            <button
+              type="button"
+              onClick={() => setViewMode('TABLE')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all ${
+                viewMode === 'TABLE'
+                  ? 'bg-blue-600 text-white shadow-sm'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-700/60'
+              }`}
+              title="Xem danh mục dạng bảng chi tiết đầy đủ cột số liệu"
+            >
+              <List className="w-3.5 h-3.5" />
+              <span>Dạng Bảng</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode('GRID')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all ${
+                viewMode === 'GRID'
+                  ? 'bg-blue-600 text-white shadow-sm'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-700/60'
+              }`}
+              title="Xem danh mục dạng lưới thẻ ảnh kỹ thuật trực quan"
+            >
+              <LayoutGrid className="w-3.5 h-3.5" />
+              <span>Thẻ Ảnh ({materials.length})</span>
+            </button>
+          </div>
+
           <button
             id="btn-export-materials-csv"
             onClick={handleExportCSV}
@@ -324,7 +370,7 @@ export const MaterialCatalogueView: React.FC<MaterialCatalogueViewProps> = ({
             title="Xuất file Excel báo cáo danh mục và định mức vật tư chuẩn AHT"
           >
             <Download className="w-4 h-4 text-emerald-400" />
-            <span>Xuất Excel Danh Mục</span>
+            <span>Xuất Excel</span>
           </button>
 
           {currentUser.role === 'ADMIN' ? (
@@ -334,7 +380,7 @@ export const MaterialCatalogueView: React.FC<MaterialCatalogueViewProps> = ({
               className="bg-blue-600 hover:bg-blue-500 text-white px-3.5 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-sm shadow-blue-600/30"
             >
               <Plus className="w-4 h-4" />
-              <span>+ Thêm Vật Tư Mới</span>
+              <span>+ Thêm Mới</span>
             </button>
           ) : (
             <button
@@ -343,7 +389,7 @@ export const MaterialCatalogueView: React.FC<MaterialCatalogueViewProps> = ({
               title="Nhân viên có quyền lập đề xuất nhập vật tư"
             >
               <ArrowDownRight className="w-4 h-4" />
-              <span>+ Đề Xuất Nhập Thêm</span>
+              <span>+ Đề Xuất Nhập</span>
             </button>
           )}
         </div>
@@ -515,320 +561,520 @@ export const MaterialCatalogueView: React.FC<MaterialCatalogueViewProps> = ({
         </div>
       </div>
 
-      {/* Materials Table with Top Horizontal Scrollbar & Sticky Header */}
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-sm flex flex-col">
-        {/* Top Horizontal Scrollbar Helper & Quick Controls */}
-        <div className="bg-slate-850/90 px-4 py-2 border-b border-slate-800 flex flex-wrap items-center justify-between gap-3 text-xs">
-          <div className="flex items-center gap-2 text-slate-300 font-medium">
-            <MoveHorizontal className="w-4 h-4 text-blue-400" />
-            <span>Thanh trượt ngang nhanh:</span>
-            <div className="flex items-center gap-1">
-              <button
-                type="button"
-                onClick={() => handleScrollToPercent(0)}
-                className="p-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white"
-                title="Về đầu dòng (Trái)"
-              >
-                <ChevronsLeft className="w-3.5 h-3.5" />
-              </button>
-              <button
-                type="button"
-                onClick={() => handleScrollByAmount(-250)}
-                className="p-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white"
-                title="Cuộn sang trái"
-              >
-                <ChevronLeft className="w-3.5 h-3.5" />
-              </button>
-              <button
-                type="button"
-                onClick={() => handleScrollByAmount(250)}
-                className="p-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white"
-                title="Cuộn sang phải"
-              >
-                <ChevronRight className="w-3.5 h-3.5" />
-              </button>
-              <button
-                type="button"
-                onClick={() => handleScrollToPercent(100)}
-                className="p-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white"
-                title="Đến cuối dòng (Phải)"
-              >
-                <ChevronsRight className="w-3.5 h-3.5" />
-              </button>
-            </div>
-          </div>
+      {/* View Switcher: Table View or Grid Gallery View */}
+      {viewMode === 'GRID' ? (
+        /* Visual Cards Grid Gallery */
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+            {filteredMaterials.length === 0 ? (
+              <div className="col-span-full py-16 text-center text-slate-400 bg-slate-900 border border-slate-800 rounded-2xl">
+                <Package className="w-10 h-10 text-slate-600 mx-auto mb-2 opacity-50" />
+                <p className="font-semibold text-slate-300">Không tìm thấy vật tư nào phù hợp.</p>
+                <p className="text-xs text-slate-500 mt-1">Hãy thử xóa từ khóa tìm kiếm hoặc chọn tất cả danh mục.</p>
+              </div>
+            ) : (
+              filteredMaterials.map((mat) => {
+                const dossier = getMaterialVisualDossier(mat);
+                return (
+                  <div
+                    key={mat.id}
+                    className="bg-slate-900 border border-slate-800 hover:border-slate-700 rounded-2xl overflow-hidden flex flex-col justify-between transition-all hover:shadow-xl group"
+                  >
+                    {/* Card Top: Image & Overlay Badges */}
+                    <div>
+                      <div
+                        className="relative w-full aspect-4/3 bg-slate-950 overflow-hidden cursor-pointer flex items-center justify-center"
+                        onClick={() => setSelectedImageModalMaterial(mat)}
+                      >
+                        <img
+                          src={mat.image || dossier.imageUrl}
+                          alt={mat.name}
+                          referrerPolicy="no-referrer"
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                          onError={(e) => {
+                            (e.currentTarget as HTMLElement).style.display = 'none';
+                          }}
+                        />
+                        <div className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-slate-950/20 to-transparent pointer-events-none" />
 
-          {/* Quick Slider & Top Scrollbar */}
-          <div className="flex items-center gap-3 flex-1 max-w-md">
-            <input
-              type="range"
-              min="0"
-              max="100"
-              value={Math.round(scrollProgress)}
-              onChange={(e) => handleScrollToPercent(Number(e.target.value))}
-              className="w-full accent-blue-500 cursor-pointer h-1.5 bg-slate-700 rounded-lg"
-              title="Kéo thanh trượt ngang"
-            />
-            <span className="text-[11px] text-slate-400 font-mono w-10 text-right">
-              {Math.round(scrollProgress)}%
-            </span>
-          </div>
-
-          <div className="text-[11px] text-slate-400">
-            Hiển thị <strong className="text-white">{filteredMaterials.length}</strong> / {materials.length} vật tư
-          </div>
-        </div>
-
-        {/* Top Direct Drag Scrollbar */}
-        <div
-          ref={topScrollRef}
-          onScroll={handleTopScroll}
-          className="overflow-x-auto overflow-y-hidden bg-slate-900 border-b border-slate-700/80 h-3.5 custom-top-scrollbar cursor-pointer shadow-inner"
-          title="Kéo thanh trượt ngang này để xem tất cả các cột dữ liệu"
-        >
-          <div style={{ width: `${Math.max(tableScrollWidth, 1200)}px` }} className="h-1"></div>
-        </div>
-
-        {/* Scrollable Container with Sticky Table Header */}
-        <div
-          ref={tableContainerRef}
-          onScroll={handleTableScroll}
-          className="overflow-x-auto overflow-y-auto max-h-[calc(100vh-270px)] min-h-[380px] relative shadow-inner"
-        >
-          <table className="w-full text-left text-xs text-slate-300 min-w-[1100px] border-separate border-spacing-0">
-            <thead className="sticky top-0 z-30 bg-slate-900 shadow-md">
-              <tr className="border-b border-slate-700">
-                <th className="sticky top-0 z-30 bg-slate-900 py-3.5 px-4 font-semibold text-slate-200 uppercase tracking-wider border-b border-slate-700">
-                  Mã Vật Tư
-                </th>
-                <th className="sticky top-0 z-30 bg-slate-900 py-3.5 px-4 min-w-[220px] font-semibold text-slate-200 uppercase tracking-wider border-b border-slate-700">
-                  Tên & Quy Cách Vật Tư
-                </th>
-                <th className="sticky top-0 z-30 bg-slate-900 py-3.5 px-3 font-semibold text-slate-200 uppercase tracking-wider border-b border-slate-700">
-                  Nhóm / Vị Trí
-                </th>
-                <th className="sticky top-0 z-30 bg-slate-900 py-3.5 px-3 text-center font-semibold text-slate-200 uppercase tracking-wider border-b border-slate-700">
-                  ĐVT
-                </th>
-                <th className="sticky top-0 z-30 bg-slate-900 py-3.5 px-3 text-right font-semibold text-slate-200 uppercase tracking-wider border-b border-slate-700">
-                  Tồn Đầu
-                </th>
-                <th className="sticky top-0 z-30 bg-slate-900 py-3.5 px-3 text-right text-blue-400 font-semibold uppercase tracking-wider border-b border-slate-700">
-                  Đã Nhập
-                </th>
-                <th className="sticky top-0 z-30 bg-slate-900 py-3.5 px-3 text-right text-amber-400 font-semibold uppercase tracking-wider border-b border-slate-700">
-                  Đã Xuất
-                </th>
-                <th className="sticky top-0 z-30 bg-slate-800 py-3.5 px-3 text-right font-bold text-white uppercase tracking-wider border-b border-slate-700 shadow-sm">
-                  Tồn Hiện Tại
-                </th>
-                <th className="sticky top-0 z-30 bg-slate-900 py-3.5 px-3 text-right font-semibold text-slate-200 uppercase tracking-wider border-b border-slate-700">
-                  Đơn Giá
-                </th>
-                <th className="sticky top-0 z-30 bg-slate-900 py-3.5 px-4 text-right font-semibold text-emerald-400 uppercase tracking-wider border-b border-slate-700">
-                  Tổng Giá Trị
-                </th>
-                <th className="sticky top-0 z-30 bg-slate-900 py-3.5 px-3 text-center font-semibold text-slate-200 uppercase tracking-wider border-b border-slate-700">
-                  Trạng Thái
-                </th>
-                <th className="sticky top-0 z-30 bg-slate-900 py-3.5 px-4 text-right font-semibold text-slate-200 uppercase tracking-wider border-b border-slate-700">
-                  Thao Tác
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-800 font-normal">
-              {filteredMaterials.length === 0 ? (
-                <tr>
-                  <td colSpan={12} className="py-12 text-center text-slate-400">
-                    <Package className="w-8 h-8 text-slate-600 mx-auto mb-2 opacity-50" />
-                    Không tìm thấy vật tư nào phù hợp với điều kiện tìm kiếm.
-                  </td>
-                </tr>
-              ) : (
-                filteredMaterials.map((mat) => {
-                  const isLow = mat.stockStatus === 'LOW_STOCK' || mat.stockStatus === 'OUT_OF_STOCK';
-                  return (
-                    <tr
-                      key={mat.id}
-                      className="hover:bg-slate-800/60 transition-colors group"
-                    >
-                      {/* Material Code */}
-                      <td className="py-3 px-4 font-mono font-bold">
-                        <span className="material-code-badge inline-block font-mono font-bold px-2.5 py-0.5 rounded-md text-[11px] bg-blue-950/90 border border-blue-700/80 text-cyan-300 shadow-sm tracking-wide">
-                          {mat.code}
-                        </span>
-                      </td>
-
-                      {/* Name & Specification */}
-                      <td className="py-3 px-4">
-                        <div className="material-table-name font-semibold text-white text-xs">{mat.name}</div>
-                        <div className="text-[11px] text-slate-400 truncate max-w-xs mt-0.5" title={mat.specification}>
-                          {mat.specification}
+                        {/* Top Badges */}
+                        <div className="absolute top-2.5 left-2.5 flex items-center gap-1.5">
+                          <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold border backdrop-blur-md ${dossier.badgeColor}`}>
+                            {dossier.brand}
+                          </span>
+                          <span className="px-2 py-0.5 rounded-md text-[10px] bg-slate-900/80 border border-slate-700 text-slate-300 font-mono">
+                            {mat.unit}
+                          </span>
                         </div>
-                      </td>
 
-                      {/* Category & Location */}
-                      <td className="py-3 px-3">
-                        <div className="material-table-category text-slate-300 text-[11px] font-medium">{mat.category}</div>
-                        <div className="text-[10px] text-slate-400 flex items-center gap-1 mt-0.5">
-                          <span className="w-1.5 h-1.5 rounded-full bg-slate-500"></span>
-                          {mat.location}
+                        {/* Zoom Hint on Hover */}
+                        <div className="absolute top-2.5 right-2.5 p-1.5 rounded-lg bg-slate-900/80 text-white opacity-0 group-hover:opacity-100 transition-opacity">
+                          <ZoomIn className="w-3.5 h-3.5" />
                         </div>
-                      </td>
 
-                      {/* Unit */}
-                      <td className="py-3 px-3 text-center font-medium text-slate-300">
-                        {mat.unit}
-                      </td>
-
-                      {/* Initial Stock */}
-                      <td className="py-3 px-3 text-right font-mono text-slate-400">
-                        {formatNumber(mat.initialStock)}
-                      </td>
-
-                      {/* Total In */}
-                      <td className="py-3 px-3 text-right font-mono text-blue-400 font-semibold">
-                        +{formatNumber(mat.totalImported)}
-                      </td>
-
-                      {/* Total Out */}
-                      <td className="py-3 px-3 text-right font-mono text-amber-400 font-semibold">
-                        -{formatNumber(mat.totalExported)}
-                      </td>
-
-                      {/* Current Calculated Stock */}
-                      <td className="py-3 px-3 text-right font-mono font-bold text-sm bg-slate-800/40 table-cell-stock">
-                        <span
-                          className={
-                            mat.currentStock <= 0
-                              ? 'text-rose-400 font-black'
-                              : mat.currentStock <= mat.minStock
-                              ? 'text-amber-400 font-black'
-                              : 'text-white font-black'
-                          }
-                        >
-                          {formatNumber(mat.currentStock)}
-                        </span>
-                        {mat.pendingExport > 0 && (
-                          <div className="text-[10px] text-amber-400 font-sans font-medium">
-                            (Chờ xuất: {mat.pendingExport})
-                          </div>
-                        )}
-                      </td>
-
-                      {/* Unit Price */}
-                      <td className="py-3 px-3 text-right font-mono text-slate-400 text-[11px]">
-                        {formatVND(mat.unitPrice)}
-                      </td>
-
-                      {/* Total Value */}
-                      <td className="py-3 px-4 text-right font-mono font-semibold text-emerald-400">
-                        {formatVND(mat.totalValue)}
-                      </td>
-
-                      {/* Status Badge */}
-                      <td className="py-3 px-3 text-center">
-                        {mat.stockStatus === 'OUT_OF_STOCK' && (
-                          <span className="status-badge-out-of-stock inline-flex items-center gap-1 text-[10px] bg-rose-500/20 text-rose-300 border border-rose-500/30 px-2 py-0.5 rounded-full font-bold">
-                            <AlertCircle className="w-3 h-3" /> Hết hàng
+                        {/* Bottom Info on Image */}
+                        <div className="absolute bottom-2.5 left-2.5 right-2.5 flex items-center justify-between text-xs">
+                          <span className="font-mono font-bold px-2 py-0.5 rounded-md text-[11px] bg-blue-950/90 border border-blue-700/80 text-cyan-300 shadow-sm">
+                            {mat.code}
                           </span>
-                        )}
-                        {mat.stockStatus === 'LOW_STOCK' && (
-                          <span className="status-badge-low-stock inline-flex items-center gap-1 text-[10px] bg-amber-500/20 text-amber-300 border border-amber-500/30 px-2 py-0.5 rounded-full font-bold">
-                            <AlertTriangle className="w-3 h-3" /> Cảnh báo min
+                          <span className="text-[11px] font-mono font-semibold text-emerald-400">
+                            {formatVND(mat.unitPrice)}
                           </span>
-                        )}
-                        {mat.stockStatus === 'OVER_STOCK' && (
-                          <span className="status-badge-over-stock inline-flex items-center gap-1 text-[10px] bg-purple-500/20 text-purple-300 border border-purple-500/30 px-2 py-0.5 rounded-full font-bold">
-                            Tồn vượt max
-                          </span>
-                        )}
-                        {mat.stockStatus === 'OPTIMAL' && (
-                          <span className="status-badge-optimal inline-flex items-center gap-1 text-[10px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-2 py-0.5 rounded-full font-bold">
-                            <CheckCircle2 className="w-3 h-3" /> An toàn
-                          </span>
-                        )}
-                      </td>
+                        </div>
+                      </div>
 
-                      {/* Actions */}
-                      <td className="py-3 px-4 text-right">
-                        <div className="flex items-center justify-end gap-1.5">
-                          <button
-                            id={`btn-stock-card-${mat.code}`}
-                            onClick={() => onOpenStockCard(mat.code)}
-                            className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-blue-400 hover:text-blue-300 transition-colors"
-                            title="Xem Sổ Thẻ Kho chi tiết"
+                      {/* Card Content */}
+                      <div className="p-4 space-y-2.5">
+                        <div>
+                          <h3
+                            className="font-semibold text-slate-100 text-xs line-clamp-2 cursor-pointer hover:text-blue-400 transition-colors"
+                            onClick={() => setSelectedImageModalMaterial(mat)}
+                            title={mat.name}
                           >
-                            <FileSpreadsheet className="w-3.5 h-3.5" />
-                          </button>
-
-                          <button
-                            id={`btn-quick-export-${mat.code}`}
-                            onClick={() => onOpenCreateTransaction('EXPORT', mat.code)}
-                            className="p-1.5 rounded-lg bg-slate-800 hover:bg-amber-900/40 text-amber-400 hover:text-amber-300 transition-colors"
-                            title="Tạo đề xuất xuất vật tư này"
-                          >
-                            <ArrowUpRight className="w-3.5 h-3.5" />
-                          </button>
-
-                          {currentUser.role === 'ADMIN' && (
-                            <>
-                              <button
-                                id={`btn-edit-mat-${mat.id}`}
-                                onClick={() => handleOpenEdit(mat)}
-                                className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-colors"
-                                title="Chỉnh sửa định mức & thông tin"
-                              >
-                                <Edit2 className="w-3.5 h-3.5" />
-                              </button>
-                              <button
-                                id={`btn-delete-mat-${mat.id}`}
-                                onClick={() => {
-                                  if (
-                                    confirm(
-                                      `Bạn có chắc muốn xóa vật tư "${mat.code} - ${mat.name}"?`
-                                    )
-                                  ) {
-                                    onDeleteMaterial(mat.id);
-                                  }
-                                }}
-                                className="p-1.5 rounded-lg bg-slate-800 hover:bg-rose-900/50 text-slate-400 hover:text-rose-300 transition-colors"
-                                title="Xóa vật tư"
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
-                            </>
+                            {mat.name}
+                          </h3>
+                          {mat.specification && (
+                            <p className="text-[11px] text-slate-400 line-clamp-1 mt-0.5" title={mat.specification}>
+                              {mat.specification}
+                            </p>
                           )}
                         </div>
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
 
-        {/* Printable Footer with Corporate Signatures */}
-        <div className="hidden print:block mt-8 pt-4 text-slate-800 text-xs">
-          <div className="flex justify-between items-start">
-            <div className="text-center w-64">
-              <div className="font-bold uppercase text-[11px]">NGƯỜI LẬP BÁO CÁO</div>
-              <div className="italic text-[10px] text-slate-600 mb-14">(Ký và ghi rõ họ tên)</div>
-              <div className="font-semibold text-slate-900">{currentUser.fullName}</div>
+                        <div className="flex items-center justify-between text-[11px] text-slate-400 pt-1 border-t border-slate-800/80">
+                          <span className="truncate max-w-[130px]">{mat.category}</span>
+                          <span className="truncate max-w-[100px] text-slate-400 font-mono text-[10px]">
+                            {mat.location}
+                          </span>
+                        </div>
+
+                        {/* Stock Metric Gauge */}
+                        <div className="bg-slate-850 p-2.5 rounded-xl border border-slate-800 flex items-center justify-between">
+                          <div>
+                            <div className="text-[10px] text-slate-400 uppercase">Tồn Kho Hiện Tại</div>
+                            <div className={`text-base font-black font-mono mt-0.5 ${mat.currentStock <= 0 ? 'text-rose-400' : mat.currentStock <= mat.minStock ? 'text-amber-400' : 'text-emerald-400'}`}>
+                              {formatNumber(mat.currentStock)} <span className="text-xs font-normal text-slate-300">{mat.unit}</span>
+                            </div>
+                          </div>
+
+                          <div className="text-right">
+                            {mat.stockStatus === 'OUT_OF_STOCK' && (
+                              <span className="inline-flex items-center gap-1 text-[10px] bg-rose-500/20 text-rose-300 border border-rose-500/30 px-2 py-0.5 rounded-full font-bold">
+                                <AlertCircle className="w-3 h-3" /> Hết hàng
+                              </span>
+                            )}
+                            {mat.stockStatus === 'LOW_STOCK' && (
+                              <span className="inline-flex items-center gap-1 text-[10px] bg-amber-500/20 text-amber-300 border border-amber-500/30 px-2 py-0.5 rounded-full font-bold">
+                                <AlertTriangle className="w-3 h-3" /> Cảnh báo
+                              </span>
+                            )}
+                            {mat.stockStatus === 'OVER_STOCK' && (
+                              <span className="inline-flex items-center gap-1 text-[10px] bg-purple-500/20 text-purple-300 border border-purple-500/30 px-2 py-0.5 rounded-full font-bold">
+                                Vượt max
+                              </span>
+                            )}
+                            {mat.stockStatus === 'OPTIMAL' && (
+                              <span className="inline-flex items-center gap-1 text-[10px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-2 py-0.5 rounded-full font-bold">
+                                <CheckCircle2 className="w-3 h-3" /> An toàn
+                              </span>
+                            )}
+                            <div className="text-[10px] text-slate-400 mt-1">Min: {mat.minStock}</div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Card Footer Actions */}
+                    <div className="p-3 bg-slate-850 border-t border-slate-800 flex items-center justify-between gap-1.5 text-xs">
+                      <button
+                        onClick={() => setSelectedImageModalMaterial(mat)}
+                        className="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white flex items-center gap-1 font-medium transition-colors text-[11px]"
+                        title="Xem ảnh chi tiết & hồ sơ kỹ thuật"
+                      >
+                        <Eye className="w-3.5 h-3.5 text-blue-400" />
+                        <span>Hồ Sơ Ảnh</span>
+                      </button>
+
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => onOpenStockCard(mat.code)}
+                          className="p-1.5 rounded-lg bg-slate-800 hover:bg-blue-900/40 text-blue-400 transition-colors"
+                          title="Xem Sổ Thẻ Kho chi tiết"
+                        >
+                          <FileSpreadsheet className="w-3.5 h-3.5" />
+                        </button>
+
+                        <button
+                          onClick={() => onOpenCreateTransaction('EXPORT', mat.code)}
+                          className="p-1.5 rounded-lg bg-slate-800 hover:bg-amber-900/40 text-amber-400 transition-colors"
+                          title="Tạo đề xuất xuất vật tư này"
+                        >
+                          <ArrowUpRight className="w-3.5 h-3.5" />
+                        </button>
+
+                        {currentUser.role === 'ADMIN' && (
+                          <button
+                            onClick={() => handleOpenEdit(mat)}
+                            className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-colors"
+                            title="Chỉnh sửa thông tin"
+                          >
+                            <Edit2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </div>
+      ) : (
+        /* Materials Table with Top Horizontal Scrollbar & Sticky Header */
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-sm flex flex-col">
+          {/* Top Horizontal Scrollbar Helper & Quick Controls */}
+          <div className="bg-slate-850/90 px-4 py-2 border-b border-slate-800 flex flex-wrap items-center justify-between gap-3 text-xs">
+            <div className="flex items-center gap-2 text-slate-300 font-medium">
+              <MoveHorizontal className="w-4 h-4 text-blue-400" />
+              <span>Thanh trượt ngang nhanh:</span>
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => handleScrollToPercent(0)}
+                  className="p-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white"
+                  title="Về đầu dòng (Trái)"
+                >
+                  <ChevronsLeft className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleScrollByAmount(-250)}
+                  className="p-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white"
+                  title="Cuộn sang trái"
+                >
+                  <ChevronLeft className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleScrollByAmount(250)}
+                  className="p-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white"
+                  title="Cuộn sang phải"
+                >
+                  <ChevronRight className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleScrollToPercent(100)}
+                  className="p-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white"
+                  title="Đến cuối dòng (Phải)"
+                >
+                  <ChevronsRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
             </div>
 
-            <div className="text-center w-64">
-              <div className="italic text-[10px] text-slate-600 mb-1">
-                Đà Nẵng, ngày {new Date().getDate()} tháng {new Date().getMonth() + 1} năm {new Date().getFullYear()}
+            {/* Quick Slider & Top Scrollbar */}
+            <div className="flex items-center gap-3 flex-1 max-w-md">
+              <input
+                type="range"
+                min="0"
+                max="100"
+                value={Math.round(scrollProgress)}
+                onChange={(e) => handleScrollToPercent(Number(e.target.value))}
+                className="w-full accent-blue-500 cursor-pointer h-1.5 bg-slate-700 rounded-lg"
+                title="Kéo thanh trượt ngang"
+              />
+              <span className="text-[11px] text-slate-400 font-mono w-10 text-right">
+                {Math.round(scrollProgress)}%
+              </span>
+            </div>
+
+            <div className="text-[11px] text-slate-400">
+              Hiển thị <strong className="text-white">{filteredMaterials.length}</strong> / {materials.length} vật tư
+            </div>
+          </div>
+
+          {/* Top Direct Drag Scrollbar */}
+          <div
+            ref={topScrollRef}
+            onScroll={handleTopScroll}
+            className="overflow-x-auto overflow-y-hidden bg-slate-900 border-b border-slate-700/80 h-3.5 custom-top-scrollbar cursor-pointer shadow-inner"
+            title="Kéo thanh trượt ngang này để xem tất cả các cột dữ liệu"
+          >
+            <div style={{ width: `${Math.max(tableScrollWidth, 1200)}px` }} className="h-1"></div>
+          </div>
+
+          {/* Scrollable Container with Sticky Table Header */}
+          <div
+            ref={tableContainerRef}
+            onScroll={handleTableScroll}
+            className="overflow-x-auto overflow-y-auto max-h-[calc(100vh-270px)] min-h-[380px] relative shadow-inner"
+          >
+            <table className="w-full text-left text-xs text-slate-300 min-w-[1100px] border-separate border-spacing-0">
+              <thead className="sticky top-0 z-30 bg-slate-900 shadow-md">
+                <tr className="border-b border-slate-700">
+                  <th className="sticky top-0 z-30 bg-slate-900 py-3.5 px-3 text-center font-semibold text-slate-200 uppercase tracking-wider border-b border-slate-700">
+                    Ảnh / Chuẩn
+                  </th>
+                  <th className="sticky top-0 z-30 bg-slate-900 py-3.5 px-4 font-semibold text-slate-200 uppercase tracking-wider border-b border-slate-700">
+                    Mã Vật Tư
+                  </th>
+                  <th className="sticky top-0 z-30 bg-slate-900 py-3.5 px-4 min-w-[220px] font-semibold text-slate-200 uppercase tracking-wider border-b border-slate-700">
+                    Tên & Quy Cách Vật Tư
+                  </th>
+                  <th className="sticky top-0 z-30 bg-slate-900 py-3.5 px-3 font-semibold text-slate-200 uppercase tracking-wider border-b border-slate-700">
+                    Nhóm / Vị Trí
+                  </th>
+                  <th className="sticky top-0 z-30 bg-slate-900 py-3.5 px-3 text-center font-semibold text-slate-200 uppercase tracking-wider border-b border-slate-700">
+                    ĐVT
+                  </th>
+                  <th className="sticky top-0 z-30 bg-slate-900 py-3.5 px-3 text-right font-semibold text-slate-200 uppercase tracking-wider border-b border-slate-700">
+                    Tồn Đầu
+                  </th>
+                  <th className="sticky top-0 z-30 bg-slate-900 py-3.5 px-3 text-right text-blue-400 font-semibold uppercase tracking-wider border-b border-slate-700">
+                    Đã Nhập
+                  </th>
+                  <th className="sticky top-0 z-30 bg-slate-900 py-3.5 px-3 text-right text-amber-400 font-semibold uppercase tracking-wider border-b border-slate-700">
+                    Đã Xuất
+                  </th>
+                  <th className="sticky top-0 z-30 bg-slate-800 py-3.5 px-3 text-right font-bold text-white uppercase tracking-wider border-b border-slate-700 shadow-sm">
+                    Tồn Hiện Tại
+                  </th>
+                  <th className="sticky top-0 z-30 bg-slate-900 py-3.5 px-3 text-right font-semibold text-slate-200 uppercase tracking-wider border-b border-slate-700">
+                    Đơn Giá
+                  </th>
+                  <th className="sticky top-0 z-30 bg-slate-900 py-3.5 px-4 text-right font-semibold text-emerald-400 uppercase tracking-wider border-b border-slate-700">
+                    Tổng Giá Trị
+                  </th>
+                  <th className="sticky top-0 z-30 bg-slate-900 py-3.5 px-3 text-center font-semibold text-slate-200 uppercase tracking-wider border-b border-slate-700">
+                    Trạng Thái
+                  </th>
+                  <th className="sticky top-0 z-30 bg-slate-900 py-3.5 px-4 text-right font-semibold text-slate-200 uppercase tracking-wider border-b border-slate-700">
+                    Thao Tác
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-800 font-normal">
+                {filteredMaterials.length === 0 ? (
+                  <tr>
+                    <td colSpan={13} className="py-12 text-center text-slate-400">
+                      <Package className="w-8 h-8 text-slate-600 mx-auto mb-2 opacity-50" />
+                      Không tìm thấy vật tư nào phù hợp với điều kiện tìm kiếm.
+                    </td>
+                  </tr>
+                ) : (
+                  filteredMaterials.map((mat) => {
+                    const dossier = getMaterialVisualDossier(mat);
+                    const isLow = mat.stockStatus === 'LOW_STOCK' || mat.stockStatus === 'OUT_OF_STOCK';
+                    return (
+                      <tr
+                        key={mat.id}
+                        className="hover:bg-slate-800/60 transition-colors group"
+                      >
+                        {/* Material Image Thumbnail */}
+                        <td className="py-2.5 px-3 text-center">
+                          <div
+                            onClick={() => setSelectedImageModalMaterial(mat)}
+                            className="relative w-11 h-11 mx-auto rounded-lg overflow-hidden border border-slate-700 bg-slate-950 cursor-pointer group/thumb hover:border-blue-500 transition-all shadow-sm flex items-center justify-center"
+                            title="Nhấp xem ảnh chuẩn & hồ sơ kỹ thuật"
+                          >
+                            <img
+                              src={mat.image || dossier.imageUrl}
+                              alt={mat.name}
+                              referrerPolicy="no-referrer"
+                              className="w-full h-full object-cover group-hover/thumb:scale-110 transition-transform duration-200"
+                              onError={(e) => {
+                                (e.currentTarget as HTMLElement).style.display = 'none';
+                              }}
+                            />
+                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/thumb:opacity-100 flex items-center justify-center transition-opacity">
+                              <ZoomIn className="w-3.5 h-3.5 text-white drop-shadow" />
+                            </div>
+                          </div>
+                        </td>
+
+                        {/* Material Code */}
+                        <td className="py-3 px-4 font-mono font-bold">
+                          <span className="material-code-badge inline-block font-mono font-bold px-2.5 py-0.5 rounded-md text-[11px] bg-blue-950/90 border border-blue-700/80 text-cyan-300 shadow-sm tracking-wide">
+                            {mat.code}
+                          </span>
+                        </td>
+
+                        {/* Name & Specification */}
+                        <td className="py-3 px-4">
+                          <div
+                            className="material-table-name font-semibold text-white text-xs hover:text-blue-400 cursor-pointer transition-colors"
+                            onClick={() => setSelectedImageModalMaterial(mat)}
+                          >
+                            {mat.name}
+                          </div>
+                          <div className="text-[11px] text-slate-400 truncate max-w-xs mt-0.5" title={mat.specification}>
+                            {mat.specification}
+                          </div>
+                        </td>
+
+                        {/* Category & Location */}
+                        <td className="py-3 px-3">
+                          <div className="material-table-category text-slate-300 text-[11px] font-medium">{mat.category}</div>
+                          <div className="text-[10px] text-slate-400 flex items-center gap-1 mt-0.5">
+                            <span className="w-1.5 h-1.5 rounded-full bg-slate-500"></span>
+                            {mat.location}
+                          </div>
+                        </td>
+
+                        {/* Unit */}
+                        <td className="py-3 px-3 text-center font-medium text-slate-300">
+                          {mat.unit}
+                        </td>
+
+                        {/* Initial Stock */}
+                        <td className="py-3 px-3 text-right font-mono text-slate-400">
+                          {formatNumber(mat.initialStock)}
+                        </td>
+
+                        {/* Total In */}
+                        <td className="py-3 px-3 text-right font-mono text-blue-400 font-semibold">
+                          +{formatNumber(mat.totalImported)}
+                        </td>
+
+                        {/* Total Out */}
+                        <td className="py-3 px-3 text-right font-mono text-amber-400 font-semibold">
+                          -{formatNumber(mat.totalExported)}
+                        </td>
+
+                        {/* Current Calculated Stock */}
+                        <td className="py-3 px-3 text-right font-mono font-bold text-sm bg-slate-800/40 table-cell-stock">
+                          <span
+                            className={
+                              mat.currentStock <= 0
+                                ? 'text-rose-400 font-black'
+                                : mat.currentStock <= mat.minStock
+                                ? 'text-amber-400 font-black'
+                                : 'text-white font-black'
+                            }
+                          >
+                            {formatNumber(mat.currentStock)}
+                          </span>
+                          {mat.pendingExport > 0 && (
+                            <div className="text-[10px] text-amber-400 font-sans font-medium">
+                              (Chờ xuất: {mat.pendingExport})
+                            </div>
+                          )}
+                        </td>
+
+                        {/* Unit Price */}
+                        <td className="py-3 px-3 text-right font-mono text-slate-400 text-[11px]">
+                          {formatVND(mat.unitPrice)}
+                        </td>
+
+                        {/* Total Value */}
+                        <td className="py-3 px-4 text-right font-mono font-semibold text-emerald-400">
+                          {formatVND(mat.totalValue)}
+                        </td>
+
+                        {/* Status Badge */}
+                        <td className="py-3 px-3 text-center">
+                          {mat.stockStatus === 'OUT_OF_STOCK' && (
+                            <span className="status-badge-out-of-stock inline-flex items-center gap-1 text-[10px] bg-rose-500/20 text-rose-300 border border-rose-500/30 px-2 py-0.5 rounded-full font-bold">
+                              <AlertCircle className="w-3 h-3" /> Hết hàng
+                            </span>
+                          )}
+                          {mat.stockStatus === 'LOW_STOCK' && (
+                            <span className="status-badge-low-stock inline-flex items-center gap-1 text-[10px] bg-amber-500/20 text-amber-300 border border-amber-500/30 px-2 py-0.5 rounded-full font-bold">
+                              <AlertTriangle className="w-3 h-3" /> Cảnh báo min
+                            </span>
+                          )}
+                          {mat.stockStatus === 'OVER_STOCK' && (
+                            <span className="status-badge-over-stock inline-flex items-center gap-1 text-[10px] bg-purple-500/20 text-purple-300 border border-purple-500/30 px-2 py-0.5 rounded-full font-bold">
+                              Tồn vượt max
+                            </span>
+                          )}
+                          {mat.stockStatus === 'OPTIMAL' && (
+                            <span className="status-badge-optimal inline-flex items-center gap-1 text-[10px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-2 py-0.5 rounded-full font-bold">
+                              <CheckCircle2 className="w-3 h-3" /> An toàn
+                            </span>
+                          )}
+                        </td>
+
+                        {/* Actions */}
+                        <td className="py-3 px-4 text-right">
+                          <div className="flex items-center justify-end gap-1.5">
+                            <button
+                              id={`btn-stock-card-${mat.code}`}
+                              onClick={() => onOpenStockCard(mat.code)}
+                              className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-blue-400 hover:text-blue-300 transition-colors"
+                              title="Xem Sổ Thẻ Kho chi tiết"
+                            >
+                              <FileSpreadsheet className="w-3.5 h-3.5" />
+                            </button>
+
+                            <button
+                              id={`btn-quick-export-${mat.code}`}
+                              onClick={() => onOpenCreateTransaction('EXPORT', mat.code)}
+                              className="p-1.5 rounded-lg bg-slate-800 hover:bg-amber-900/40 text-amber-400 hover:text-amber-300 transition-colors"
+                              title="Tạo đề xuất xuất vật tư này"
+                            >
+                              <ArrowUpRight className="w-3.5 h-3.5" />
+                            </button>
+
+                            {currentUser.role === 'ADMIN' && (
+                              <>
+                                <button
+                                  id={`btn-edit-mat-${mat.id}`}
+                                  onClick={() => handleOpenEdit(mat)}
+                                  className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-colors"
+                                  title="Chỉnh sửa định mức & thông tin"
+                                >
+                                  <Edit2 className="w-3.5 h-3.5" />
+                                </button>
+                                <button
+                                  id={`btn-delete-mat-${mat.id}`}
+                                  onClick={() => {
+                                    if (
+                                      confirm(
+                                        `Bạn có chắc muốn xóa vật tư "${mat.code} - ${mat.name}"?`
+                                      )
+                                    ) {
+                                      onDeleteMaterial(mat.id);
+                                    }
+                                  }}
+                                  className="p-1.5 rounded-lg bg-slate-800 hover:bg-rose-900/50 text-slate-400 hover:text-rose-300 transition-colors"
+                                  title="Xóa vật tư"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Printable Footer with Corporate Signatures */}
+          <div className="hidden print:block mt-8 pt-4 text-slate-800 text-xs">
+            <div className="flex justify-between items-start">
+              <div className="text-center w-64">
+                <div className="font-bold uppercase text-[11px]">NGƯỜI LẬP BÁO CÁO</div>
+                <div className="italic text-[10px] text-slate-600 mb-14">(Ký và ghi rõ họ tên)</div>
+                <div className="font-semibold text-slate-900">{currentUser.fullName}</div>
               </div>
-              <div className="font-bold uppercase text-[11px]">ĐỘI TRƯỞNG / THỦ KHO</div>
-              <div className="italic text-[10px] text-slate-600 mb-14">(Ký, đóng dấu và ghi rõ họ tên)</div>
-              <div className="font-semibold text-slate-900">Ban Quản Lý Kho ĐNCT</div>
+
+              <div className="text-center w-64">
+                <div className="italic text-[10px] text-slate-600 mb-1">
+                  Đà Nẵng, ngày {new Date().getDate()} tháng {new Date().getMonth() + 1} năm {new Date().getFullYear()}
+                </div>
+                <div className="font-bold uppercase text-[11px]">ĐỘI TRƯỞNG / THỦ KHO</div>
+                <div className="italic text-[10px] text-slate-600 mb-14">(Ký, đóng dấu và ghi rõ họ tên)</div>
+                <div className="font-semibold text-slate-900">Ban Quản Lý Kho ĐNCT</div>
+              </div>
             </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* Modal: Add or Edit Material */}
       {isModalOpen && (
@@ -1053,6 +1299,51 @@ export const MaterialCatalogueView: React.FC<MaterialCatalogueViewProps> = ({
                 </div>
               </div>
 
+              {/* Image URL & Official Reference */}
+              <div>
+                <label className="block text-slate-300 font-medium mb-1">
+                  Đường Dẫn Hình Ảnh Vật Tư (URL / Liên Kết Ảnh)
+                </label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="url"
+                    value={formData.image}
+                    onChange={(e) => setFormData({ ...formData, image: e.target.value })}
+                    placeholder="https://... hoặc để trống để hệ thống tự động tải ảnh chính hãng theo mã & tên"
+                    className="flex-1 bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2 text-white focus:outline-none focus:border-blue-500 font-mono text-xs"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const autoUrl = resolveMaterialImageUrl({
+                        code: formData.code,
+                        name: formData.name,
+                        category: formData.category,
+                        specification: formData.specification,
+                      });
+                      setFormData({ ...formData, image: autoUrl });
+                    }}
+                    className="px-3 py-2 bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 border border-blue-500/30 rounded-xl text-xs font-semibold whitespace-nowrap transition-colors"
+                    title="Tự động nhận diện ảnh chính hãng"
+                  >
+                    Tự Động Điền Ảnh
+                  </button>
+                </div>
+                {formData.image && (
+                  <div className="mt-2 flex items-center gap-3 p-2 bg-slate-950/60 rounded-xl border border-slate-800">
+                    <img
+                      src={formData.image}
+                      alt="Xem trước"
+                      referrerPolicy="no-referrer"
+                      className="w-12 h-12 rounded-lg object-cover bg-slate-900 border border-slate-700"
+                    />
+                    <div className="text-[11px] text-slate-400">
+                      <span className="text-emerald-400 font-semibold">Xem trước ảnh:</span> Đã nạp thành công liên kết ảnh.
+                    </div>
+                  </div>
+                )}
+              </div>
+
               {/* Notes */}
               <div>
                 <label className="block text-slate-300 font-medium mb-1">Ghi Chú Kỹ Thuật / Lưu Ý Kho</label>
@@ -1085,6 +1376,26 @@ export const MaterialCatalogueView: React.FC<MaterialCatalogueViewProps> = ({
             </form>
           </div>
         </div>
+      )}
+
+      {/* Material Technical Image Lightbox & Dossier Modal */}
+      {selectedImageModalMaterial && (
+        <MaterialImageModal
+          material={selectedImageModalMaterial}
+          isOpen={true}
+          onClose={() => setSelectedImageModalMaterial(null)}
+          onUpdateImage={(materialId, newImageUrl) => {
+            const targetMat = materials.find((m) => m.id === materialId) || selectedImageModalMaterial;
+            onSaveMaterial({
+              ...targetMat,
+              image: newImageUrl,
+            });
+            setSelectedImageModalMaterial((prev) =>
+              prev ? { ...prev, image: newImageUrl } : null
+            );
+          }}
+          onOpenStockCard={onOpenStockCard}
+        />
       )}
     </div>
   );

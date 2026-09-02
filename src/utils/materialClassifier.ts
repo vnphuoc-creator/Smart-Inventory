@@ -24,9 +24,9 @@ export function standardizeUnit(rawUnit: string): string {
   if (!rawUnit) return 'Cái';
   const u = rawUnit.trim().toLowerCase();
   if (u.includes('mét') || u.includes('met') || u === 'm' || u === 'm.') return 'Mét';
-  if (u.includes('cái') || u.includes('cai') || u === 'ea' || u === 'pc' || u === 'pcs') return 'Cái';
+  if (u.includes('cái') || u.includes('cai') || u === 'ea' || u === 'pc' || u === 'pcs' || u === 'chiếc' || u === 'chiec') return 'Cái';
   if (u.includes('bộ') || u.includes('bo') || u === 'set') return 'Bộ';
-  if (u.includes('cây') || u.includes('cay')) return 'Cây';
+  if (u.includes('cây') || u.includes('cay') || u.includes('thanh')) return 'Cây';
   if (u.includes('cuộn') || u.includes('cuon') || u === 'roll') return 'Cuộn';
   if (u.includes('hộp') || u.includes('hop') || u === 'box') return 'Hộp';
   if (u.includes('thùng') || u.includes('thung') || u === 'ctn') return 'Thùng';
@@ -34,12 +34,16 @@ export function standardizeUnit(rawUnit: string): string {
   if (u.includes('chai')) return 'Chai';
   if (u.includes('can')) return 'Can';
   if (u.includes('bao') || u.includes('bag')) return 'Bao';
-  if (u.includes('kg') || u.includes('kilo')) return 'Kg';
+  if (u.includes('kg') || u.includes('kilo') || u === 'kilogram') return 'Kg';
   if (u.includes('lít') || u.includes('lit') || u === 'l') return 'Lít';
   if (u.includes('tấm') || u.includes('tam')) return 'Tấm';
-  if (u.includes('sợi') || u.includes('soi')) return 'Sợi';
-  if (u.includes('đôi') || u.includes('cặp')) return 'Đôi';
+  if (u.includes('sợi') || u.includes('soi') || u.includes('dây')) return 'Sợi';
+  if (u.includes('đôi') || u.includes('cặp') || u.includes('cap')) return 'Đôi';
   if (u.includes('gói') || u.includes('bịch')) return 'Gói';
+  if (u.includes('ống') || u.includes('ong')) return 'Ống';
+  if (u.includes('viên') || u.includes('vien') || u.includes('hạt')) return 'Viên';
+  if (u.includes('quả') || u.includes('qua')) return 'Quả';
+  if (u.includes('lon')) return 'Lon';
   
   // Return title case of rawUnit
   return rawUnit.charAt(0).toUpperCase() + rawUnit.slice(1);
@@ -90,11 +94,18 @@ export function classifyMaterialCategory(name: string, spec: string = ''): strin
     combined.includes('ống upvc') ||
     combined.includes('ống pvc') ||
     combined.includes('ống hdpe') ||
-    combined.includes('ống thép mạ kẽm') ||
-    combined.includes('ống mềm') ||
     combined.includes('ống nước') ||
+    combined.includes('ống thép') ||
+    combined.includes('ống mềm') ||
+    combined.includes('ống ghen ruột gà') === false && combined.includes('ống') ||
+    combined.includes('hdpe') ||
+    combined.includes('ppr') ||
+    combined.includes('upvc') ||
+    combined.includes('pvc') ||
     combined.includes('tiền phong') ||
     combined.includes('bình minh') ||
+    combined.includes('van khóa') ||
+    combined.includes('van khoá') ||
     combined.includes('van bướm') ||
     combined.includes('van bi') ||
     combined.includes('van cổng') ||
@@ -103,25 +114,44 @@ export function classifyMaterialCategory(name: string, spec: string = ''): strin
     combined.includes('van giảm áp') ||
     combined.includes('van an toàn') ||
     combined.includes('van xả khí') ||
+    combined.includes('van xả') ||
+    combined.includes('van góc') ||
+    combined.includes('van chặn') ||
     combined.includes('khớp nối mềm') ||
     combined.includes('rọ bơm') ||
     combined.includes('lọc y') ||
+    combined.includes('y lọc') ||
     combined.includes('đồng hồ nước') ||
     combined.includes('đồng hồ đo lưu lượng') ||
     combined.includes('co lơ') ||
     combined.includes('co 90') ||
     combined.includes('co 45') ||
+    combined.includes('co ren') ||
+    combined.includes('co hàn') ||
     combined.includes('tê thu') ||
     combined.includes('tê đều') ||
+    combined.includes('tê ren') ||
+    combined.includes('tê hàn') ||
     combined.includes('măng sông') ||
+    combined.includes('mang song') ||
     combined.includes('cút hàn') ||
+    combined.includes('cút') ||
     combined.includes('rắc co') ||
     combined.includes('đai khởi thủy') ||
+    combined.includes('đai ôm ống') ||
+    combined.includes('bịt ') ||
     combined.includes('bịt xả') ||
+    combined.includes('nút bịt') ||
+    combined.includes('đầu bịt') ||
     combined.includes('băng tan') ||
     combined.includes('cao su non') ||
     combined.includes('keo dán ống') ||
-    combined.includes('mặt bích')
+    combined.includes('mặt bích') ||
+    combined.includes('gioăng cao su') ||
+    combined.includes('nối ren') ||
+    combined.includes('nối thẳng') ||
+    combined.includes('côn thu') ||
+    combined.includes('côn giảm')
   ) {
     return 'Vật tư Đường ống & Phụ kiện cấp thoát nước';
   }
