@@ -966,6 +966,7 @@ export function App() {
               materials={materials}
               calculatedStocks={calculatedStocks}
               transactions={transactions}
+              proposals={proposals}
               initialMaterialCode={preselectedMaterialCode}
             />
           )}

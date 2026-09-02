@@ -16,6 +16,8 @@ import {
   Building2,
   Clock,
   Filter,
+  Eye,
+  RotateCcw,
 } from 'lucide-react';
 import {
   LineChart,
@@ -30,6 +32,7 @@ import {
   Material,
   CalculatedMaterialStock,
   InventoryTransaction,
+  PurchaseProposal,
   StockCardEntry,
 } from '../types';
 import {
@@ -42,7 +45,7 @@ import {
   exportToOfficialExcel,
   DetailedStockReportItem,
 } from '../utils/excelExporter';
-import { MATERIAL_CATEGORIES } from '../data/seedData';
+import { ALL_MATERIAL_CATEGORIES } from '../data/materialsData';
 import { AHTLogo } from './AHTLogo';
 import { SearchableMaterialSelect } from './SearchableMaterialSelect';
 
@@ -50,6 +53,7 @@ interface StockLedgerViewProps {
   materials: Material[];
   calculatedStocks: CalculatedMaterialStock[];
   transactions: InventoryTransaction[];
+  proposals?: PurchaseProposal[];
   initialMaterialCode?: string;
 }
 
@@ -57,6 +61,7 @@ export const StockLedgerView: React.FC<StockLedgerViewProps> = ({
   materials,
   calculatedStocks,
   transactions,
+  proposals = [],
   initialMaterialCode,
 }) => {
   const [subTab, setSubTab] = useState<'REPORT' | 'CARD'>('REPORT');
@@ -65,16 +70,29 @@ export const StockLedgerView: React.FC<StockLedgerViewProps> = ({
   );
 
   // Date Range Filters for Report
-  const [datePreset, setDatePreset] = useState<'TODAY' | 'WEEK' | 'MONTH' | 'AUG2026' | 'YEAR' | 'CUSTOM'>('YEAR');
-  const [startDate, setStartDate] = useState('2026-01-01');
+  const [datePreset, setDatePreset] = useState<'ALL' | 'TODAY' | 'WEEK' | 'MONTH' | 'AUG2026' | 'YEAR' | 'CUSTOM'>('ALL');
+  const [startDate, setStartDate] = useState('2024-01-01');
   const [endDate, setEndDate] = useState('2026-12-31');
-  const [warehouseName, setWarehouseName] = useState('DOIDNCT: Đội Điện nước công trình-DOIDNCT');
+  const [warehouseName, setWarehouseName] = useState('ALL');
   const [selectedProposalNumber, setSelectedProposalNumber] = useState<string>('ALL');
   const [onlyMovement, setOnlyMovement] = useState<boolean>(false);
   const [reportCategory, setReportCategory] = useState('ALL');
   const [searchFilter, setSearchFilter] = useState('');
 
-  // Extract all proposal numbers from transactions
+  // Extract unique materials to ensure no duplicates
+  const uniqueMaterials = useMemo(() => {
+    const map = new Map<string, Material>();
+    materials.forEach((m) => {
+      if (!m || !m.code) return;
+      const c = m.code.trim();
+      if (!map.has(c)) {
+        map.set(c, { ...m, code: c });
+      }
+    });
+    return Array.from(map.values());
+  }, [materials]);
+
+  // Extract all proposal numbers from transactions & proposals
   const availableProposalNumbers = useMemo(() => {
     const set = new Set<string>();
     transactions.forEach((t) => {
@@ -82,8 +100,13 @@ export const StockLedgerView: React.FC<StockLedgerViewProps> = ({
         set.add(t.proposalNumber.trim());
       }
     });
+    proposals.forEach((p) => {
+      if (p.proposalNumber && p.proposalNumber.trim()) {
+        set.add(p.proposalNumber.trim());
+      }
+    });
     return Array.from(set).sort();
-  }, [transactions]);
+  }, [transactions, proposals]);
 
   // Update if initial code changes
   React.useEffect(() => {
@@ -93,17 +116,19 @@ export const StockLedgerView: React.FC<StockLedgerViewProps> = ({
   }, [initialMaterialCode]);
 
   // Handle Preset Date selection
-  const handleSelectPreset = (preset: 'TODAY' | 'WEEK' | 'MONTH' | 'AUG2026' | 'YEAR') => {
+  const handleSelectPreset = (preset: 'ALL' | 'TODAY' | 'WEEK' | 'MONTH' | 'AUG2026' | 'YEAR') => {
     setDatePreset(preset);
     const now = new Date();
     const pad = (n: number) => n.toString().padStart(2, '0');
     const todayStr = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
 
-    if (preset === 'TODAY') {
+    if (preset === 'ALL') {
+      setStartDate('2024-01-01');
+      setEndDate('2026-12-31');
+    } else if (preset === 'TODAY') {
       setStartDate(todayStr);
       setEndDate(todayStr);
     } else if (preset === 'WEEK') {
-      // Current week Monday to Sunday
       const day = now.getDay();
       const diff = now.getDate() - day + (day === 0 ? -6 : 1);
       const mon = new Date(now.setDate(diff));
@@ -111,7 +136,6 @@ export const StockLedgerView: React.FC<StockLedgerViewProps> = ({
       setStartDate(`${mon.getFullYear()}-${pad(mon.getMonth() + 1)}-${pad(mon.getDate())}`);
       setEndDate(`${sun.getFullYear()}-${pad(sun.getMonth() + 1)}-${pad(sun.getDate())}`);
     } else if (preset === 'MONTH') {
-      // First to last day of current month
       const y = now.getFullYear();
       const m = now.getMonth();
       const first = new Date(y, m, 1);
@@ -127,16 +151,30 @@ export const StockLedgerView: React.FC<StockLedgerViewProps> = ({
     }
   };
 
-  // Calculate detailed Report Data according to active Date Range & Proposal Number
+  // Reset all filters
+  const handleResetFilters = () => {
+    setDatePreset('ALL');
+    setStartDate('2024-01-01');
+    setEndDate('2026-12-31');
+    setWarehouseName('ALL');
+    setSelectedProposalNumber('ALL');
+    setReportCategory('ALL');
+    setSearchFilter('');
+    setOnlyMovement(false);
+  };
+
+  // Calculate detailed Report Data according to active Date Range, Proposal Number & Warehouse
   const fullReportData = useMemo(() => {
     return calculateDateRangeReportData(
-      materials,
+      uniqueMaterials,
       transactions,
       startDate,
       endDate,
-      selectedProposalNumber
+      selectedProposalNumber,
+      warehouseName,
+      proposals
     );
-  }, [materials, transactions, startDate, endDate, selectedProposalNumber]);
+  }, [uniqueMaterials, transactions, startDate, endDate, selectedProposalNumber, warehouseName, proposals]);
 
   // Count items with movement in current filtered range
   const movementCount = useMemo(() => {
@@ -146,7 +184,7 @@ export const StockLedgerView: React.FC<StockLedgerViewProps> = ({
   // Filter report data by category, search, and onlyMovement toggle
   const filteredReportData = useMemo(() => {
     return fullReportData.filter((item) => {
-      if (onlyMovement && item.importQty === 0 && item.exportQty === 0) {
+      if (onlyMovement && item.importQty === 0 && item.exportQty === 0 && item.openingQty === 0 && item.closingQty === 0) {
         return false;
       }
       if (reportCategory !== 'ALL' && item.category !== reportCategory) return false;
@@ -154,7 +192,8 @@ export const StockLedgerView: React.FC<StockLedgerViewProps> = ({
         const q = searchFilter.toLowerCase().trim();
         const matchCode = item.code.toLowerCase().includes(q);
         const matchName = item.name.toLowerCase().includes(q);
-        if (!matchCode && !matchName) return false;
+        const matchCat = item.category?.toLowerCase().includes(q);
+        if (!matchCode && !matchName && !matchCat) return false;
       }
       return true;
     });
@@ -187,20 +226,26 @@ export const StockLedgerView: React.FC<StockLedgerViewProps> = ({
     );
   }, [filteredReportData]);
 
+  // Jump to Stock Card for a material
+  const handleOpenMaterialCard = (code: string) => {
+    setSelectedMaterialCode(code);
+    setSubTab('CARD');
+  };
+
   // Active Material details for Stock Card tab
   const activeMaterial = useMemo(() => {
     return (
       calculatedStocks.find((m) => m.code === selectedMaterialCode) ||
-      materials.find((m) => m.code === selectedMaterialCode) ||
-      materials[0]
+      uniqueMaterials.find((m) => m.code === selectedMaterialCode) ||
+      uniqueMaterials[0]
     );
-  }, [calculatedStocks, materials, selectedMaterialCode]);
+  }, [calculatedStocks, uniqueMaterials, selectedMaterialCode]);
 
   // Stock Card entries for selected material
   const stockCardEntries: StockCardEntry[] = useMemo(() => {
     if (!selectedMaterialCode) return [];
-    return generateStockCard(selectedMaterialCode, materials, transactions);
-  }, [selectedMaterialCode, materials, transactions]);
+    return generateStockCard(selectedMaterialCode, uniqueMaterials, transactions);
+  }, [selectedMaterialCode, uniqueMaterials, transactions]);
 
   // Chart data for stock card balance
   const balanceChartData = useMemo(() => {
@@ -214,6 +259,7 @@ export const StockLedgerView: React.FC<StockLedgerViewProps> = ({
 
   // Format dates for display (DD/MM/YYYY)
   const formatDisplayDate = (dStr: string) => {
+    if (!dStr) return '';
     const parts = dStr.split('-');
     return parts.length === 3 ? `${parts[2]}/${parts[1]}/${parts[0]}` : dStr;
   };
@@ -242,6 +288,9 @@ export const StockLedgerView: React.FC<StockLedgerViewProps> = ({
           <h1 className="text-xl font-bold text-white tracking-tight">
             Tổng Hợp Nhập - Xuất - Tồn & Sổ Thẻ Kho
           </h1>
+          <p className="text-xs text-slate-400 mt-0.5">
+            Báo cáo đối soát kho chuẩn biểu mẫu AHT, thẻ kho điện tử và diễn biến tồn kho
+          </p>
         </div>
 
         {/* Sub-tab pills */}
@@ -272,7 +321,7 @@ export const StockLedgerView: React.FC<StockLedgerViewProps> = ({
       {/* ========================================================================= */}
       {subTab === 'REPORT' && (
         <div className="space-y-6">
-          {/* Controls: Date Range (Tuần/Tháng/Năm/Tùy chọn), Kho hàng, Export button */}
+          {/* Controls: Date Range, Presets, Kho hàng, Proposal, Category, Search */}
           <div className="no-print bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-5 space-y-4 shadow-sm">
             <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
               {/* Preset buttons & Filters */}
@@ -280,6 +329,17 @@ export const StockLedgerView: React.FC<StockLedgerViewProps> = ({
                 <span className="text-xs font-semibold text-slate-400 mr-1 flex items-center gap-1">
                   <Calendar className="w-3.5 h-3.5 text-blue-400" /> Kỳ báo cáo:
                 </span>
+                <button
+                  type="button"
+                  onClick={() => handleSelectPreset('ALL')}
+                  className={`px-3 py-1 rounded-lg text-xs font-semibold transition-colors ${
+                    datePreset === 'ALL'
+                      ? 'bg-blue-600 text-white shadow-sm'
+                      : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                  }`}
+                >
+                  Tất cả thời gian
+                </button>
                 <button
                   type="button"
                   onClick={() => handleSelectPreset('AUG2026')}
@@ -290,6 +350,17 @@ export const StockLedgerView: React.FC<StockLedgerViewProps> = ({
                   }`}
                 >
                   Tháng 8/2026
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleSelectPreset('MONTH')}
+                  className={`px-3 py-1 rounded-lg text-xs font-medium transition-colors ${
+                    datePreset === 'MONTH'
+                      ? 'bg-blue-600 text-white shadow-sm'
+                      : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                  }`}
+                >
+                  Tháng này
                 </button>
                 <button
                   type="button"
@@ -341,8 +412,8 @@ export const StockLedgerView: React.FC<StockLedgerViewProps> = ({
               </div>
             </div>
 
-            {/* Custom Date Pickers, Proposal Number & Category filters */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 pt-3 border-t border-slate-800">
+            {/* Custom Date Pickers, Proposal Number, Warehouse, Category & Search filters */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3 pt-3 border-t border-slate-800">
               {/* Start Date */}
               <div>
                 <label className="block text-[11px] font-medium text-slate-400 mb-1">
@@ -402,11 +473,31 @@ export const StockLedgerView: React.FC<StockLedgerViewProps> = ({
                   onChange={(e) => setWarehouseName(e.target.value)}
                   className="w-full bg-slate-800 border border-slate-700 text-white rounded-xl px-3 py-1.5 text-xs focus:outline-none focus:border-blue-500"
                 >
+                  <option value="ALL">-- Tất cả kho AHT --</option>
                   <option value="DOIDNCT: Đội Điện nước công trình-DOIDNCT">
                     DOIDNCT: Đội Điện nước công trình
                   </option>
-                  <option value="Kho Tổng AHT">Kho Tổng AHT</option>
+                  <option value="Kho Tổng">Kho Tổng AHT</option>
                   <option value="Kho Dự Phòng Kỹ Thuật">Kho Dự Phòng Kỹ Thuật</option>
+                </select>
+              </div>
+
+              {/* Category selector */}
+              <div>
+                <label className="block text-[11px] font-medium text-slate-400 mb-1">
+                  Nhóm danh mục
+                </label>
+                <select
+                  value={reportCategory}
+                  onChange={(e) => setReportCategory(e.target.value)}
+                  className="w-full bg-slate-800 border border-slate-700 text-cyan-300 font-medium rounded-xl px-3 py-1.5 text-xs focus:outline-none focus:border-blue-500"
+                >
+                  <option value="ALL">-- Tất cả nhóm vật tư --</option>
+                  {ALL_MATERIAL_CATEGORIES.map((cat) => (
+                    <option key={cat} value={cat}>
+                      {cat}
+                    </option>
+                  ))}
                 </select>
               </div>
 
@@ -421,14 +512,14 @@ export const StockLedgerView: React.FC<StockLedgerViewProps> = ({
                     type="text"
                     value={searchFilter}
                     onChange={(e) => setSearchFilter(e.target.value)}
-                    placeholder="Mã số hoặc tên mặt hàng..."
+                    placeholder="Mã số hoặc tên..."
                     className="w-full bg-slate-800 border border-slate-700 text-white rounded-xl pl-8 pr-3 py-1.5 text-xs focus:outline-none focus:border-blue-500 placeholder:text-slate-500"
                   />
                 </div>
               </div>
             </div>
 
-            {/* Quick Movement Filter Tabs */}
+            {/* Quick Movement Filter Tabs & Reset */}
             <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-slate-800/80 text-xs">
               <div className="flex items-center gap-2">
                 <button
@@ -458,20 +549,32 @@ export const StockLedgerView: React.FC<StockLedgerViewProps> = ({
                 </button>
               </div>
 
-              {selectedProposalNumber !== 'ALL' && (
-                <div className="flex items-center gap-1.5 bg-amber-950/40 border border-amber-800/60 px-2.5 py-1 rounded-lg text-amber-300 text-xs">
-                  <span>Đang lọc theo tờ trình:</span>
-                  <strong className="text-white">{selectedProposalNumber}</strong>
+              <div className="flex items-center gap-2">
+                {(selectedProposalNumber !== 'ALL' || reportCategory !== 'ALL' || searchFilter || onlyMovement || datePreset !== 'ALL') && (
                   <button
                     type="button"
-                    onClick={() => setSelectedProposalNumber('ALL')}
-                    className="ml-1 text-slate-400 hover:text-white"
-                    title="Xóa lọc tờ trình"
+                    onClick={handleResetFilters}
+                    className="flex items-center gap-1 px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs transition-colors"
                   >
-                    ×
+                    <RotateCcw className="w-3.5 h-3.5" /> Đặt lại bộ lọc
                   </button>
-                </div>
-              )}
+                )}
+
+                {selectedProposalNumber !== 'ALL' && (
+                  <div className="flex items-center gap-1.5 bg-amber-950/40 border border-amber-800/60 px-2.5 py-1 rounded-lg text-amber-300 text-xs">
+                    <span>Tờ trình:</span>
+                    <strong className="text-white">{selectedProposalNumber}</strong>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedProposalNumber('ALL')}
+                      className="ml-1 text-slate-400 hover:text-white"
+                      title="Xóa lọc tờ trình"
+                    >
+                      ×
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
@@ -502,11 +605,19 @@ export const StockLedgerView: React.FC<StockLedgerViewProps> = ({
                 </p>
                 <div className="flex flex-wrap items-center justify-center gap-3 text-xs text-slate-300 mt-1.5">
                   <p>
-                    Kho hàng: <span className="text-amber-400 font-bold">{warehouseName}</span>
+                    Kho hàng:{' '}
+                    <span className="text-amber-400 font-bold">
+                      {warehouseName === 'ALL' ? 'Tất cả các kho AHT' : warehouseName}
+                    </span>
                   </p>
                   {selectedProposalNumber !== 'ALL' && (
                     <p className="text-blue-400 font-bold bg-blue-950/60 px-2 py-0.5 rounded border border-blue-800/50">
                       Tờ trình: {selectedProposalNumber}
+                    </p>
+                  )}
+                  {reportCategory !== 'ALL' && (
+                    <p className="text-cyan-400 font-bold bg-cyan-950/60 px-2 py-0.5 rounded border border-cyan-800/50">
+                      Nhóm: {reportCategory}
                     </p>
                   )}
                 </div>
@@ -545,6 +656,9 @@ export const StockLedgerView: React.FC<StockLedgerViewProps> = ({
                     </th>
                     <th rowSpan={2} className="px-3 py-2.5 w-28">
                       Ngày nhập cuối
+                    </th>
+                    <th rowSpan={2} className="px-2 py-2.5 w-16 no-print text-center">
+                      Thẻ kho
                     </th>
                   </tr>
 
@@ -605,13 +719,14 @@ export const StockLedgerView: React.FC<StockLedgerViewProps> = ({
                       {formatVND(reportTotals.closingValue)}
                     </td>
                     <td className="px-3 py-2 text-center text-slate-400">-</td>
+                    <td className="px-2 py-2 text-center text-slate-400 no-print">-</td>
                   </tr>
                 </thead>
 
                 <tbody className="divide-y divide-slate-800 font-mono text-xs">
                   {filteredReportData.length === 0 ? (
                     <tr>
-                      <td colSpan={13} className="px-4 py-8 text-center text-slate-500 font-sans">
+                      <td colSpan={14} className="px-4 py-8 text-center text-slate-500 font-sans">
                         Không có dữ liệu vật tư phù hợp với bộ lọc.
                       </td>
                     </tr>
@@ -619,7 +734,7 @@ export const StockLedgerView: React.FC<StockLedgerViewProps> = ({
                     filteredReportData.map((item, idx) => (
                       <tr
                         key={item.code}
-                        className={`hover:bg-slate-800/60 transition-colors ${
+                        className={`hover:bg-slate-800/60 transition-colors group ${
                           idx % 2 === 0 ? 'bg-slate-900' : 'bg-slate-900/40'
                         }`}
                       >
@@ -629,11 +744,24 @@ export const StockLedgerView: React.FC<StockLedgerViewProps> = ({
                         </td>
                         {/* Mã số */}
                         <td className="px-3 py-2 border-r border-slate-800 font-bold text-blue-400 whitespace-nowrap">
-                          {item.code}
+                          <button
+                            type="button"
+                            onClick={() => handleOpenMaterialCard(item.code)}
+                            className="hover:underline hover:text-blue-300 text-left font-mono"
+                            title="Xem Thẻ Kho mặt hàng này"
+                          >
+                            {item.code}
+                          </button>
                         </td>
                         {/* Mặt hàng */}
                         <td className="px-3 py-2 border-r border-slate-800 font-sans text-slate-200 max-w-xs truncate">
-                          {item.name}
+                          <span
+                            onClick={() => handleOpenMaterialCard(item.code)}
+                            className="cursor-pointer hover:text-blue-300"
+                            title={item.name}
+                          >
+                            {item.name}
+                          </span>
                         </td>
                         {/* Đvt */}
                         <td className="px-2 py-2 border-r border-slate-800 font-sans text-slate-400 text-center">
@@ -670,6 +798,17 @@ export const StockLedgerView: React.FC<StockLedgerViewProps> = ({
                         {/* Ngày nhập cuối */}
                         <td className="px-3 py-2 text-center text-slate-400 whitespace-nowrap">
                           {item.lastImportDate}
+                        </td>
+                        {/* Quick View Button */}
+                        <td className="px-2 py-2 text-center no-print">
+                          <button
+                            type="button"
+                            onClick={() => handleOpenMaterialCard(item.code)}
+                            className="p-1 rounded bg-slate-800 text-slate-400 hover:text-blue-300 hover:bg-slate-700 transition-colors"
+                            title="Mở Thẻ Kho"
+                          >
+                            <Eye className="w-3.5 h-3.5" />
+                          </button>
                         </td>
                       </tr>
                     ))
@@ -708,7 +847,7 @@ export const StockLedgerView: React.FC<StockLedgerViewProps> = ({
             {/* Table bottom pagination / export summary footer */}
             <div className="no-print p-3 bg-slate-950 border-t border-slate-800 flex flex-col sm:flex-row items-center justify-between text-xs text-slate-400 gap-2">
               <div>
-                Hiển thị <strong>{filteredReportData.length}</strong> / {materials.length} mặt hàng
+                Hiển thị <strong>{filteredReportData.length}</strong> / {uniqueMaterials.length} mặt hàng
                 trong kỳ từ <strong>{formatDisplayDate(startDate)}</strong> đến{' '}
                 <strong>{formatDisplayDate(endDate)}</strong>
               </div>
@@ -748,7 +887,7 @@ export const StockLedgerView: React.FC<StockLedgerViewProps> = ({
                 </label>
                 <SearchableMaterialSelect
                   value={selectedMaterialCode}
-                  materials={materials}
+                  materials={uniqueMaterials}
                   calculatedStocks={calculatedStocks}
                   onChange={(code) => setSelectedMaterialCode(code)}
                   placeholder="Gõ mã DN_* hoặc tên vật tư để tra cứu thẻ kho..."

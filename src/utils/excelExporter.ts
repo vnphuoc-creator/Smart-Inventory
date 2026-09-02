@@ -1,5 +1,6 @@
 import * as XLSX from 'xlsx';
-import { Material, InventoryTransaction } from '../types';
+import { Material, InventoryTransaction, PurchaseProposal } from '../types';
+import { isProposalMatch } from './inventoryEngine';
 
 export interface ReportDateRange {
   startDate: string; // YYYY-MM-DD
@@ -29,18 +30,131 @@ export function calculateDateRangeReportData(
   transactions: InventoryTransaction[],
   startDate: string,
   endDate: string,
-  proposalNumber?: string
+  proposalNumber?: string,
+  warehouse?: string,
+  proposals?: PurchaseProposal[]
 ): DetailedStockReportItem[] {
+  // 1. Deduplicate materials by code
+  const uniqueMaterialsMap = new Map<string, Material>();
+  materials.forEach((m) => {
+    if (!m || !m.code) return;
+    const cleanCode = m.code.trim();
+    if (!uniqueMaterialsMap.has(cleanCode)) {
+      uniqueMaterialsMap.set(cleanCode, { ...m, code: cleanCode });
+    } else {
+      const existing = uniqueMaterialsMap.get(cleanCode)!;
+      uniqueMaterialsMap.set(cleanCode, {
+        ...existing,
+        ...m,
+        code: cleanCode,
+        initialStock: m.initialStock ?? existing.initialStock,
+        unitPrice: m.unitPrice || existing.unitPrice,
+      });
+    }
+  });
+
+  // 2. Filter approved transactions
   let approvedTx = transactions.filter((t) => t.status === 'APPROVED');
 
-  if (proposalNumber && proposalNumber !== 'ALL') {
-    approvedTx = approvedTx.filter((t) => t.proposalNumber === proposalNumber);
+  const isSpecificProposal = Boolean(proposalNumber && proposalNumber !== 'ALL');
+  if (isSpecificProposal) {
+    approvedTx = approvedTx.filter((t) => isProposalMatch(t.proposalNumber, proposalNumber));
   }
 
-  return materials.map((mat) => {
-    let openingQty = mat.initialStock;
+  // Filter by warehouse if a specific warehouse is selected
+  if (warehouse && warehouse !== 'ALL' && warehouse !== 'Tất cả kho' && !warehouse.startsWith('ALL')) {
+    approvedTx = approvedTx.filter((t) => {
+      if (!t.warehouse) return true;
+      const wLower = warehouse.toLowerCase().trim();
+      const twLower = t.warehouse.toLowerCase().trim();
+      if (twLower.includes(wLower) || wLower.includes(twLower)) return true;
+      if (wLower.includes('doidnct') && (twLower.includes('điện nước') || twLower.includes('doidnct'))) return true;
+      if (wLower.includes('tổng') && twLower.includes('tổng')) return true;
+      if (wLower.includes('dự phòng') && twLower.includes('dự phòng')) return true;
+      return false;
+    });
+  }
 
-    // Adjust opening stock by transactions before startDate
+  // 3. Determine target materials list
+  let targetMaterials: Material[] = Array.from(uniqueMaterialsMap.values());
+
+  if (isSpecificProposal) {
+    const proposalCodes = new Set<string>();
+    const proposalMaterialsMap = new Map<string, Material>();
+
+    // A. Gather from transactions associated with this proposal
+    transactions.forEach((tx) => {
+      if (isProposalMatch(tx.proposalNumber, proposalNumber)) {
+        tx.items.forEach((item) => {
+          if (item.materialCode) {
+            const c = item.materialCode.trim();
+            proposalCodes.add(c);
+            if (!proposalMaterialsMap.has(c)) {
+              const matched = uniqueMaterialsMap.get(c);
+              if (matched) {
+                proposalMaterialsMap.set(c, matched);
+              } else {
+                proposalMaterialsMap.set(c, {
+                  id: `prop-mat-${c}`,
+                  code: c,
+                  name: item.materialName || c,
+                  category: 'Vật tư phụ & Công cụ dụng cụ',
+                  unit: item.unit || 'Cái',
+                  specification: 'Vật tư theo tờ trình',
+                  location: 'Kho Tổng AHT',
+                  initialStock: 0,
+                  minStock: 0,
+                  maxStock: 1000,
+                  unitPrice: item.unitPrice || 0,
+                });
+              }
+            }
+          }
+        });
+      }
+    });
+
+    // B. Gather from purchase proposals if available
+    proposals?.forEach((p) => {
+      if (isProposalMatch(p.proposalNumber, proposalNumber)) {
+        p.items.forEach((item) => {
+          if (item.materialCode) {
+            const c = item.materialCode.trim();
+            proposalCodes.add(c);
+            if (!proposalMaterialsMap.has(c)) {
+              const matched = uniqueMaterialsMap.get(c);
+              if (matched) {
+                proposalMaterialsMap.set(c, matched);
+              } else {
+                proposalMaterialsMap.set(c, {
+                  id: `prop-mat-${c}`,
+                  code: c,
+                  name: item.materialName || c,
+                  category: 'Vật tư phụ & Công cụ dụng cụ',
+                  unit: item.unit || 'Cái',
+                  specification: 'Vật tư theo tờ trình',
+                  location: 'Kho Tổng AHT',
+                  initialStock: 0,
+                  minStock: 0,
+                  maxStock: 1000,
+                  unitPrice: item.unitPrice || 0,
+                });
+              }
+            }
+          }
+        });
+      }
+    });
+
+    // Target materials for this proposal
+    targetMaterials = Array.from(proposalMaterialsMap.values());
+  }
+
+  return targetMaterials.map((mat) => {
+    // When filtering by a specific proposal, opening stock is strictly based on that proposal's prior transactions
+    let openingQty = isSpecificProposal ? 0 : (mat.initialStock || 0);
+
+    // Adjust opening stock by approved transactions before startDate
     approvedTx.forEach((tx) => {
       if (tx.date < startDate) {
         tx.items.forEach((item) => {
@@ -66,7 +180,7 @@ export function calculateDateRangeReportData(
       if (tx.date >= startDate && tx.date <= endDate) {
         tx.items.forEach((item) => {
           if (item.materialCode === mat.code) {
-            const price = item.unitPrice > 0 ? item.unitPrice : mat.unitPrice;
+            const price = item.unitPrice > 0 ? item.unitPrice : (mat.unitPrice || 0);
             if (tx.type === 'IMPORT') {
               importQty += item.quantity;
               importValue += item.quantity * price;
@@ -82,7 +196,7 @@ export function calculateDateRangeReportData(
       }
     });
 
-    // If no import in current period, find the overall latest import date
+    // If no import in current period, find the latest import date overall in scope
     if (!lastImportDate) {
       approvedTx.forEach((tx) => {
         if (tx.type === 'IMPORT') {
@@ -97,9 +211,10 @@ export function calculateDateRangeReportData(
       });
     }
 
-    const openingValue = openingQty * mat.unitPrice;
+    const currentPrice = mat.unitPrice || 0;
+    const openingValue = openingQty * currentPrice;
     const closingQty = openingQty + importQty - exportQty;
-    const closingValue = closingQty * mat.unitPrice;
+    const closingValue = Math.max(0, closingQty) * currentPrice;
 
     // Format last import date as DD/MM/YYYY if present
     let formattedLastDate = '-';
@@ -117,7 +232,7 @@ export function calculateDateRangeReportData(
       name: mat.name,
       unit: mat.unit,
       category: mat.category,
-      unitPrice: mat.unitPrice,
+      unitPrice: currentPrice,
       openingQty,
       openingValue,
       importQty,
@@ -196,7 +311,7 @@ export function exportToOfficialExcel(
     '',
     '',
     '',
-    `Kho hàng: ${warehouseName}${proposalNumber && proposalNumber !== 'ALL' ? ` | Tờ trình: ${proposalNumber}` : ''}`,
+    `Kho hàng: ${warehouseName === 'ALL' ? 'Tất cả các kho AHT' : warehouseName}${proposalNumber && proposalNumber !== 'ALL' ? ` | Tờ trình: ${proposalNumber}` : ''}`,
   ]);
   // Row 7 (Index 6): Blank
   aoa.push([]);

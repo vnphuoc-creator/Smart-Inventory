@@ -47,7 +47,7 @@ export function normalizeProposalNumber(num?: string | null): string {
  * Checks if two proposal numbers match, using flexible rules:
  * 1. Exact case-insensitive match
  * 2. Normalized match (removing accents, dashes, slashes, 'Đ' vs 'D')
- * 3. Primary numeric prefix match (e.g. number "22" matching if both contain "22" and "pkt" or "dnct")
+ * 3. Primary numeric code matching (e.g. "27" in "27-DNCT/PKT", "27-ĐN/CT/PKT", "627/TTr-AHT")
  */
 export function isProposalMatch(a?: string | null, b?: string | null): boolean {
   if (!a || !b) return false;
@@ -57,15 +57,22 @@ export function isProposalMatch(a?: string | null, b?: string | null): boolean {
 
   const normA = normalizeProposalNumber(a);
   const normB = normalizeProposalNumber(b);
-  if (normA && normB) {
-    if (normA === normB) return true;
-    if (normA.includes(normB) || normB.includes(normA)) return true;
+  if (!normA || !normB) return false;
+  if (normA === normB) return true;
+
+  // Extract primary digits (e.g., '27' from '27-DNCT/PKT' or '22' from '22-ĐNCT')
+  const numA = (strA.match(/\b\d+\b/) || strA.match(/\d+/))?.[0]?.replace(/^0+/, '') || '';
+  const numB = (strB.match(/\b\d+\b/) || strB.match(/\d+/))?.[0]?.replace(/^0+/, '') || '';
+
+  if (numA && numB && numA === numB) {
+    return true;
   }
 
-  // Check digit-based match (e.g. "22" in "22-DNCT/PKT")
-  const digitsA = strA.match(/\d+/g)?.join('') || '';
-  const digitsB = strB.match(/\d+/g)?.join('') || '';
-  if (digitsA && digitsB && digitsA === digitsB) {
+  if (normA.includes(normB) || normB.includes(normA)) {
+    // Avoid false positives if numbers are different (e.g. 2 vs 22)
+    if (numA && numB && numA !== numB) {
+      return false;
+    }
     return true;
   }
 
