@@ -574,111 +574,81 @@ export const MaterialCatalogueView: React.FC<MaterialCatalogueViewProps> = ({
               </div>
             ) : (
               filteredMaterials.map((mat) => {
-                const dossier = getMaterialVisualDossier(mat);
+                const isLow = mat.stockStatus === 'LOW_STOCK' || mat.stockStatus === 'OUT_OF_STOCK';
                 return (
                   <div
                     key={mat.id}
                     className="bg-slate-900 border border-slate-800 hover:border-slate-700 rounded-2xl overflow-hidden flex flex-col justify-between transition-all hover:shadow-xl group"
                   >
-                    {/* Card Top: Image & Overlay Badges */}
-                    <div>
-                      <div
-                        className="relative w-full aspect-4/3 bg-slate-950 overflow-hidden cursor-pointer flex items-center justify-center"
-                        onClick={() => setSelectedImageModalMaterial(mat)}
-                      >
-                        <img
-                          src={mat.image || dossier.imageUrl}
-                          alt={mat.name}
-                          referrerPolicy="no-referrer"
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                          onError={(e) => {
-                            (e.currentTarget as HTMLElement).style.display = 'none';
-                          }}
-                        />
-                        <div className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-slate-950/20 to-transparent pointer-events-none" />
+                    {/* Card Top: Code & Badge */}
+                    <div className="p-4 bg-slate-950/60 border-b border-slate-800/80">
+                      <div className="flex items-center justify-between gap-2 mb-2">
+                        <span className="font-mono font-bold px-2.5 py-1 rounded-lg text-xs bg-blue-950/90 border border-blue-700/80 text-cyan-300 shadow-sm">
+                          {mat.code}
+                        </span>
+                        <span className="px-2 py-0.5 rounded text-[10px] bg-slate-800 border border-slate-700 text-slate-300 font-mono font-medium">
+                          {mat.unit}
+                        </span>
+                      </div>
+                      <div className="text-[11px] font-mono font-semibold text-emerald-400">
+                        {formatVND(mat.unitPrice)} <span className="text-[10px] font-normal text-slate-400">/ {mat.unit}</span>
+                      </div>
+                    </div>
 
-                        {/* Top Badges */}
-                        <div className="absolute top-2.5 left-2.5 flex items-center gap-1.5">
-                          <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold border backdrop-blur-md ${dossier.badgeColor}`}>
-                            {dossier.brand}
-                          </span>
-                          <span className="px-2 py-0.5 rounded-md text-[10px] bg-slate-900/80 border border-slate-700 text-slate-300 font-mono">
-                            {mat.unit}
-                          </span>
-                        </div>
-
-                        {/* Zoom Hint on Hover */}
-                        <div className="absolute top-2.5 right-2.5 p-1.5 rounded-lg bg-slate-900/80 text-white opacity-0 group-hover:opacity-100 transition-opacity">
-                          <ZoomIn className="w-3.5 h-3.5" />
-                        </div>
-
-                        {/* Bottom Info on Image */}
-                        <div className="absolute bottom-2.5 left-2.5 right-2.5 flex items-center justify-between text-xs">
-                          <span className="font-mono font-bold px-2 py-0.5 rounded-md text-[11px] bg-blue-950/90 border border-blue-700/80 text-cyan-300 shadow-sm">
-                            {mat.code}
-                          </span>
-                          <span className="text-[11px] font-mono font-semibold text-emerald-400">
-                            {formatVND(mat.unitPrice)}
-                          </span>
-                        </div>
+                    {/* Card Content */}
+                    <div className="p-4 space-y-2.5 flex-1 flex flex-col justify-between">
+                      <div>
+                        <h3
+                          className="font-semibold text-slate-100 text-xs line-clamp-2 cursor-pointer hover:text-blue-400 transition-colors"
+                          onClick={() => setSelectedImageModalMaterial(mat)}
+                          title={mat.name}
+                        >
+                          {mat.name}
+                        </h3>
+                        {mat.specification && (
+                          <p className="text-[11px] text-slate-400 line-clamp-2 mt-1" title={mat.specification}>
+                            {mat.specification}
+                          </p>
+                        )}
                       </div>
 
-                      {/* Card Content */}
-                      <div className="p-4 space-y-2.5">
+                      <div className="flex items-center justify-between text-[11px] text-slate-400 pt-2 border-t border-slate-800/80">
+                        <span className="truncate max-w-[130px] font-medium text-slate-300">{mat.category}</span>
+                        <span className="truncate max-w-[100px] text-slate-400 font-mono text-[10px]">
+                          {mat.location}
+                        </span>
+                      </div>
+
+                      {/* Stock Metric Gauge */}
+                      <div className="bg-slate-850 p-2.5 rounded-xl border border-slate-800 flex items-center justify-between mt-2">
                         <div>
-                          <h3
-                            className="font-semibold text-slate-100 text-xs line-clamp-2 cursor-pointer hover:text-blue-400 transition-colors"
-                            onClick={() => setSelectedImageModalMaterial(mat)}
-                            title={mat.name}
-                          >
-                            {mat.name}
-                          </h3>
-                          {mat.specification && (
-                            <p className="text-[11px] text-slate-400 line-clamp-1 mt-0.5" title={mat.specification}>
-                              {mat.specification}
-                            </p>
+                          <div className="text-[10px] text-slate-400 uppercase font-semibold">Tồn Kho Hiện Tại</div>
+                          <div className={`text-base font-black font-mono mt-0.5 ${mat.currentStock <= 0 ? 'text-rose-400' : mat.currentStock <= mat.minStock ? 'text-amber-400' : 'text-emerald-400'}`}>
+                            {formatNumber(mat.currentStock)} <span className="text-xs font-normal text-slate-300">{mat.unit}</span>
+                          </div>
+                        </div>
+
+                        <div className="text-right">
+                          {mat.stockStatus === 'OUT_OF_STOCK' && (
+                            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-950/80 text-rose-300 border border-rose-800">
+                              Hết hàng
+                            </span>
                           )}
-                        </div>
-
-                        <div className="flex items-center justify-between text-[11px] text-slate-400 pt-1 border-t border-slate-800/80">
-                          <span className="truncate max-w-[130px]">{mat.category}</span>
-                          <span className="truncate max-w-[100px] text-slate-400 font-mono text-[10px]">
-                            {mat.location}
-                          </span>
-                        </div>
-
-                        {/* Stock Metric Gauge */}
-                        <div className="bg-slate-850 p-2.5 rounded-xl border border-slate-800 flex items-center justify-between">
-                          <div>
-                            <div className="text-[10px] text-slate-400 uppercase">Tồn Kho Hiện Tại</div>
-                            <div className={`text-base font-black font-mono mt-0.5 ${mat.currentStock <= 0 ? 'text-rose-400' : mat.currentStock <= mat.minStock ? 'text-amber-400' : 'text-emerald-400'}`}>
-                              {formatNumber(mat.currentStock)} <span className="text-xs font-normal text-slate-300">{mat.unit}</span>
-                            </div>
-                          </div>
-
-                          <div className="text-right">
-                            {mat.stockStatus === 'OUT_OF_STOCK' && (
-                              <span className="inline-flex items-center gap-1 text-[10px] bg-rose-500/20 text-rose-300 border border-rose-500/30 px-2 py-0.5 rounded-full font-bold">
-                                <AlertCircle className="w-3 h-3" /> Hết hàng
-                              </span>
-                            )}
-                            {mat.stockStatus === 'LOW_STOCK' && (
-                              <span className="inline-flex items-center gap-1 text-[10px] bg-amber-500/20 text-amber-300 border border-amber-500/30 px-2 py-0.5 rounded-full font-bold">
-                                <AlertTriangle className="w-3 h-3" /> Cảnh báo
-                              </span>
-                            )}
-                            {mat.stockStatus === 'OVER_STOCK' && (
-                              <span className="inline-flex items-center gap-1 text-[10px] bg-purple-500/20 text-purple-300 border border-purple-500/30 px-2 py-0.5 rounded-full font-bold">
-                                Vượt max
-                              </span>
-                            )}
-                            {mat.stockStatus === 'OPTIMAL' && (
-                              <span className="inline-flex items-center gap-1 text-[10px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-2 py-0.5 rounded-full font-bold">
-                                <CheckCircle2 className="w-3 h-3" /> An toàn
-                              </span>
-                            )}
-                            <div className="text-[10px] text-slate-400 mt-1">Min: {mat.minStock}</div>
-                          </div>
+                          {mat.stockStatus === 'LOW_STOCK' && (
+                            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-950/80 text-amber-300 border border-amber-800">
+                              Sắp hết
+                            </span>
+                          )}
+                          {mat.stockStatus === 'OVER_STOCK' && (
+                            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-purple-950/80 text-purple-300 border border-purple-800">
+                              Vượt max
+                            </span>
+                          )}
+                          {(!mat.stockStatus || mat.stockStatus === 'OPTIMAL') && (
+                            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-950/80 text-emerald-300 border border-emerald-800">
+                              Đủ tồn
+                            </span>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -688,10 +658,10 @@ export const MaterialCatalogueView: React.FC<MaterialCatalogueViewProps> = ({
                       <button
                         onClick={() => setSelectedImageModalMaterial(mat)}
                         className="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white flex items-center gap-1 font-medium transition-colors text-[11px]"
-                        title="Xem ảnh chi tiết & hồ sơ kỹ thuật"
+                        title="Xem chi tiết & hồ sơ kỹ thuật"
                       >
                         <Eye className="w-3.5 h-3.5 text-blue-400" />
-                        <span>Hồ Sơ Ảnh</span>
+                        <span>Hồ Sơ Vật Tư</span>
                       </button>
 
                       <div className="flex items-center gap-1">
@@ -812,8 +782,8 @@ export const MaterialCatalogueView: React.FC<MaterialCatalogueViewProps> = ({
             <table className="w-full text-left text-xs text-slate-300 min-w-[1100px] border-separate border-spacing-0">
               <thead className="sticky top-0 z-30 bg-slate-900 shadow-md">
                 <tr className="border-b border-slate-700">
-                  <th className="sticky top-0 z-30 bg-slate-900 py-3.5 px-3 text-center font-semibold text-slate-200 uppercase tracking-wider border-b border-slate-700">
-                    Ảnh / Chuẩn
+                  <th className="sticky top-0 z-30 bg-slate-900 py-3.5 px-3 text-center font-semibold text-slate-200 uppercase tracking-wider border-b border-slate-700 w-12">
+                    STT
                   </th>
                   <th className="sticky top-0 z-30 bg-slate-900 py-3.5 px-4 font-semibold text-slate-200 uppercase tracking-wider border-b border-slate-700">
                     Mã Vật Tư
@@ -862,34 +832,16 @@ export const MaterialCatalogueView: React.FC<MaterialCatalogueViewProps> = ({
                     </td>
                   </tr>
                 ) : (
-                  filteredMaterials.map((mat) => {
-                    const dossier = getMaterialVisualDossier(mat);
+                  filteredMaterials.map((mat, index) => {
                     const isLow = mat.stockStatus === 'LOW_STOCK' || mat.stockStatus === 'OUT_OF_STOCK';
                     return (
                       <tr
                         key={mat.id}
                         className="hover:bg-slate-800/60 transition-colors group"
                       >
-                        {/* Material Image Thumbnail */}
-                        <td className="py-2.5 px-3 text-center">
-                          <div
-                            onClick={() => setSelectedImageModalMaterial(mat)}
-                            className="relative w-11 h-11 mx-auto rounded-lg overflow-hidden border border-slate-700 bg-slate-950 cursor-pointer group/thumb hover:border-blue-500 transition-all shadow-sm flex items-center justify-center"
-                            title="Nhấp xem ảnh chuẩn & hồ sơ kỹ thuật"
-                          >
-                            <img
-                              src={mat.image || dossier.imageUrl}
-                              alt={mat.name}
-                              referrerPolicy="no-referrer"
-                              className="w-full h-full object-cover group-hover/thumb:scale-110 transition-transform duration-200"
-                              onError={(e) => {
-                                (e.currentTarget as HTMLElement).style.display = 'none';
-                              }}
-                            />
-                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/thumb:opacity-100 flex items-center justify-center transition-opacity">
-                              <ZoomIn className="w-3.5 h-3.5 text-white drop-shadow" />
-                            </div>
-                          </div>
+                        {/* STT */}
+                        <td className="py-3 px-3 text-center font-mono font-medium text-slate-400 text-xs">
+                          {index + 1}
                         </td>
 
                         {/* Material Code */}
@@ -1299,51 +1251,6 @@ export const MaterialCatalogueView: React.FC<MaterialCatalogueViewProps> = ({
                 </div>
               </div>
 
-              {/* Image URL & Official Reference */}
-              <div>
-                <label className="block text-slate-300 font-medium mb-1">
-                  Đường Dẫn Hình Ảnh Vật Tư (URL / Liên Kết Ảnh)
-                </label>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="url"
-                    value={formData.image}
-                    onChange={(e) => setFormData({ ...formData, image: e.target.value })}
-                    placeholder="https://... hoặc để trống để hệ thống tự động tải ảnh chính hãng theo mã & tên"
-                    className="flex-1 bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2 text-white focus:outline-none focus:border-blue-500 font-mono text-xs"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const autoUrl = resolveMaterialImageUrl({
-                        code: formData.code,
-                        name: formData.name,
-                        category: formData.category,
-                        specification: formData.specification,
-                      });
-                      setFormData({ ...formData, image: autoUrl });
-                    }}
-                    className="px-3 py-2 bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 border border-blue-500/30 rounded-xl text-xs font-semibold whitespace-nowrap transition-colors"
-                    title="Tự động nhận diện ảnh chính hãng"
-                  >
-                    Tự Động Điền Ảnh
-                  </button>
-                </div>
-                {formData.image && (
-                  <div className="mt-2 flex items-center gap-3 p-2 bg-slate-950/60 rounded-xl border border-slate-800">
-                    <img
-                      src={formData.image}
-                      alt="Xem trước"
-                      referrerPolicy="no-referrer"
-                      className="w-12 h-12 rounded-lg object-cover bg-slate-900 border border-slate-700"
-                    />
-                    <div className="text-[11px] text-slate-400">
-                      <span className="text-emerald-400 font-semibold">Xem trước ảnh:</span> Đã nạp thành công liên kết ảnh.
-                    </div>
-                  </div>
-                )}
-              </div>
-
               {/* Notes */}
               <div>
                 <label className="block text-slate-300 font-medium mb-1">Ghi Chú Kỹ Thuật / Lưu Ý Kho</label>
@@ -1378,22 +1285,12 @@ export const MaterialCatalogueView: React.FC<MaterialCatalogueViewProps> = ({
         </div>
       )}
 
-      {/* Material Technical Image Lightbox & Dossier Modal */}
+      {/* Material Technical Detail & Dossier Modal */}
       {selectedImageModalMaterial && (
         <MaterialImageModal
           material={selectedImageModalMaterial}
           isOpen={true}
           onClose={() => setSelectedImageModalMaterial(null)}
-          onUpdateImage={(materialId, newImageUrl) => {
-            const targetMat = materials.find((m) => m.id === materialId) || selectedImageModalMaterial;
-            onSaveMaterial({
-              ...targetMat,
-              image: newImageUrl,
-            });
-            setSelectedImageModalMaterial((prev) =>
-              prev ? { ...prev, image: newImageUrl } : null
-            );
-          }}
           onOpenStockCard={onOpenStockCard}
         />
       )}

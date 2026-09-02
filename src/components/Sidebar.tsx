@@ -67,7 +67,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
     year: 'numeric',
   });
 
-  const isMasterAdmin = currentUser.email?.toLowerCase().trim() === 'vn.phuoc235@gmail.com';
+  const isMasterAdmin =
+    currentUser.email?.toLowerCase().trim() === 'vn.phuoc235@gmail.com' ||
+    currentUser.username?.toLowerCase().trim() === 'vn.phuoc235';
 
   const operationalNav = [
     {
@@ -120,27 +122,32 @@ export const Sidebar: React.FC<SidebarProps> = ({
           },
         ]
       : []),
-    // ADMIN ONLY: Phân Quyền Người Dùng
-    ...(currentUser.role === 'ADMIN' || isMasterAdmin
+    // MASTER ADMIN ONLY (vn.phuoc235@gmail.com): Phân Quyền Người Dùng
+    ...(isMasterAdmin
       ? [
           {
             id: 'users',
             label: 'Phân Quyền Người Dùng',
             sublabel: 'Quản lý tài khoản',
             icon: ShieldCheck,
-            badge: 'Admin',
+            badge: 'Master',
             badgeColor: 'bg-blue-600 text-white font-bold border border-blue-400/30',
           },
         ]
       : []),
-    {
-      id: 'settings',
-      label: 'Cài Đặt Hệ Thống',
-      sublabel: 'Logo, ĐVT & Import',
-      icon: Settings,
-      badge: 'Admin',
-      badgeColor: 'bg-emerald-600 text-white font-bold border border-emerald-400/30',
-    },
+    // MASTER ADMIN ONLY (vn.phuoc235@gmail.com): Cài Đặt Hệ Thống
+    ...(isMasterAdmin
+      ? [
+          {
+            id: 'settings',
+            label: 'Cài Đặt Hệ Thống',
+            sublabel: 'Logo, ĐVT & Import',
+            icon: Settings,
+            badge: 'Master',
+            badgeColor: 'bg-emerald-600 text-white font-bold border border-emerald-400/30',
+          },
+        ]
+      : []),
   ];
 
   const userInitials = currentUser.fullName

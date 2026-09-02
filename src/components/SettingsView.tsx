@@ -436,6 +436,20 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     window.dispatchEvent(new Event('storage'));
   };
 
+  if (!isMasterAdmin) {
+    return (
+      <div className="bg-slate-900 border border-red-500/30 rounded-2xl p-8 text-center max-w-lg mx-auto my-12">
+        <div className="w-16 h-16 rounded-full bg-red-500/10 text-red-400 flex items-center justify-center mx-auto mb-4 border border-red-500/20">
+          <ShieldAlert className="w-8 h-8" />
+        </div>
+        <h3 className="text-xl font-bold text-white mb-2">Quyền Truy Cập Bị Giới Hạn</h3>
+        <p className="text-slate-400 text-sm mb-6 leading-relaxed">
+          Mục Cài Đặt Hệ Thống chỉ dành riêng cho tài khoản Quản trị viên cấp cao <strong className="text-amber-300">vn.phuoc235@gmail.com</strong>. Quyền truy cập của tài khoản này đã bị khóa.
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6 pb-12">
       {/* Header */}
