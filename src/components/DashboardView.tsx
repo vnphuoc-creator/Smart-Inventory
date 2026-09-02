@@ -37,6 +37,7 @@ import {
   User,
 } from '../types';
 import { formatVND, formatNumber } from '../utils/inventoryEngine';
+import { SeagullMascotWelcome } from './SeagullMascotWelcome';
 
 interface DashboardViewProps {
   currentUser: User;
@@ -114,32 +115,19 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
   return (
     <div className="space-y-6 pb-12">
-      {/* Role permission info banner */}
-      <div className="dashboard-greeting-banner bg-gradient-to-r from-slate-900 via-slate-850 to-slate-900 border border-slate-700/80 rounded-2xl p-4 sm:p-5 shadow-md transition-all">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div className="flex items-start sm:items-center gap-3.5">
-            <div
-              className={`w-12 h-12 rounded-xl ${
-                currentUser.avatarColor || 'bg-blue-600'
-              } text-white flex items-center justify-center font-black text-sm shadow-md ring-2 ring-white/10 shrink-0`}
-            >
-              {currentUser.fullName
-                .split(' ')
-                .map((n) => n[0])
-                .slice(-2)
-                .join('')}
-            </div>
-            <div>
-              <h1 className="dashboard-greeting-title text-base sm:text-xl font-bold text-white tracking-wide">
-                Xin chào, {currentUser.fullName}
-              </h1>
-              <p className="dashboard-greeting-subtitle text-xs sm:text-sm text-slate-300 font-medium mt-0.5">
-                Hệ thống Quản lý Vật tư Kho Đội Điện Nước Công Trình (DOIDNCT) &bull; Cảng HKQT Đà Nẵng
-              </p>
-            </div>
-          </div>
+      {/* Role permission info & Seagull Welcome banner */}
+      <div className="dashboard-greeting-banner relative overflow-hidden bg-gradient-to-r from-slate-900 via-slate-850 to-slate-900 border border-slate-700/80 rounded-2xl p-4 sm:p-5 shadow-lg transition-all">
+        {/* Subtle airport runway / glow background effect */}
+        <div className="absolute top-0 right-0 w-96 h-full bg-gradient-to-l from-blue-600/10 via-cyan-500/5 to-transparent pointer-events-none" />
 
-          <div className="flex items-center gap-2 shrink-0">
+        <div className="relative flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <SeagullMascotWelcome
+            userName={currentUser.fullName}
+            userRole={currentUser.role}
+            className="flex-1"
+          />
+
+          <div className="flex items-center gap-2 shrink-0 self-start md:self-center">
             <span className="dashboard-greeting-role-badge inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-blue-950/80 border border-blue-500/40 text-xs font-bold text-cyan-300 shadow-sm">
               <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
               {currentUser.role === 'ADMIN' ? 'Quản trị viên kho (Admin)' : 'Nhân viên kỹ thuật (Staff)'}

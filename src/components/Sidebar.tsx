@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { User } from '../types';
 import { AHTLogo } from './AHTLogo';
+import seagullWelcoming from '../assets/images/danang_seagull_welcoming_1788356485133.jpg';
 
 interface SidebarProps {
   currentUser: User;
@@ -391,8 +392,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
         <div className="p-3 border-t border-slate-800/80 bg-[#060c1e] shrink-0">
           <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-2.5">
             <div className="flex items-center gap-2.5">
-              <div className="w-9 h-9 rounded-xl bg-blue-600 text-white font-bold text-xs flex items-center justify-center shrink-0 shadow-md">
-                {userInitials}
+              <div className="relative w-9 h-9 rounded-xl overflow-hidden border border-cyan-400/60 shrink-0 shadow-md bg-slate-950 group">
+                <img
+                  src={seagullWelcoming}
+                  alt="Hải Âu AHT"
+                  className="w-full h-full object-cover group-hover:scale-110 transition-transform"
+                  referrerPolicy="no-referrer"
+                />
+                <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-emerald-400 border border-slate-900 rounded-full" />
               </div>
               <div className="truncate min-w-0">
                 <div className="text-xs font-bold text-white truncate">

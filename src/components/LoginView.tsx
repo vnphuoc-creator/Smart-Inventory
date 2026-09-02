@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { User } from '../types';
 import { AHTLogo } from './AHTLogo';
+import seagullWelcoming from '../assets/images/danang_seagull_welcoming_1788356485133.jpg';
 
 interface LoginViewProps {
   users: User[];
@@ -112,16 +113,26 @@ export const LoginView: React.FC<LoginViewProps> = ({ users, onLogin }) => {
       <div className="absolute bottom-10 right-10 w-72 h-72 bg-indigo-600/10 rounded-full blur-3xl pointer-events-none" />
 
       <div className="sm:mx-auto sm:w-full sm:max-w-md relative z-10">
-        {/* Branding header */}
+        {/* Branding header & Seagull Welcome */}
         <div className="text-center mb-6">
-          <div className="inline-flex items-center justify-center p-3 bg-slate-900/90 border border-slate-800 rounded-2xl shadow-xl mb-4">
-            <AHTLogo className="h-10 w-auto" />
+          <div className="inline-flex items-center gap-3 p-2 bg-slate-900/90 border border-slate-800 rounded-2xl shadow-xl mb-3">
+            <AHTLogo className="h-9 w-auto" />
+            <div className="w-px h-6 bg-slate-700" />
+            <div className="relative w-9 h-9 rounded-xl overflow-hidden border border-cyan-400/60 bg-slate-950 shadow">
+              <img
+                src={seagullWelcoming}
+                alt="Hải Âu AHT"
+                className="w-full h-full object-cover animate-seagull-wave"
+                referrerPolicy="no-referrer"
+              />
+            </div>
           </div>
-          <h1 className="text-2xl font-black tracking-tight text-white sm:text-3xl">
-            Quản Lý Kho Thông Minh
+
+          <h1 className="text-2xl font-black tracking-tight text-white sm:text-3xl flex items-center justify-center gap-2">
+            <span>Quản Lý Kho Thông Minh</span>
           </h1>
-          <p className="mt-1.5 text-sm text-slate-400">
-            Hệ thống Quản lý Vật tư Xuất - Nhập - Tồn
+          <p className="mt-1.5 text-xs sm:text-sm text-cyan-300 font-medium flex items-center justify-center gap-1.5">
+            <span>Kho Đội Điện Nước Công Trình &bull; Cảng HKQT Đà Nẵng</span>
           </p>
         </div>
 

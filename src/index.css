@@ -1264,3 +1264,89 @@
   -webkit-backdrop-filter: none !important;
 }
 
+/* ========================================================================= */
+/* DA NANG AIRPORT SEAGULL MASCOT ANIMATIONS (CHIM HẢI ÂU AHT)               */
+/* ========================================================================= */
+@keyframes seagullFloat {
+  0%, 100% {
+    transform: translateY(0px) rotate(0deg);
+  }
+  50% {
+    transform: translateY(-6px) rotate(1.5deg);
+  }
+}
+
+@keyframes seagullWave {
+  0%, 100% {
+    transform: rotate(0deg) scale(1);
+  }
+  20% {
+    transform: rotate(6deg) scale(1.04) translateY(-2px);
+  }
+  40% {
+    transform: rotate(-4deg) scale(1.02);
+  }
+  60% {
+    transform: rotate(5deg) scale(1.03);
+  }
+  80% {
+    transform: rotate(-2deg) scale(1);
+  }
+}
+
+@keyframes seagullBounce {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.06) translateY(-4px);
+  }
+}
+
+@keyframes seagullSpinJump {
+  0% {
+    transform: scale(1) rotate(0deg);
+  }
+  40% {
+    transform: scale(1.25) translateY(-14px) rotate(15deg);
+  }
+  70% {
+    transform: scale(1.15) translateY(-6px) rotate(-10deg);
+  }
+  100% {
+    transform: scale(1) rotate(0deg);
+  }
+}
+
+@keyframes seagullGlowPulse {
+  0%, 100% {
+    opacity: 0.35;
+    transform: scale(0.95);
+  }
+  50% {
+    opacity: 0.75;
+    transform: scale(1.1);
+  }
+}
+
+.animate-seagull-float {
+  animation: seagullFloat 3.2s ease-in-out infinite;
+}
+
+.animate-seagull-wave {
+  animation: seagullWave 2.6s ease-in-out infinite;
+}
+
+.animate-seagull-bounce {
+  animation: seagullBounce 2s ease-in-out infinite;
+}
+
+.animate-seagull-spin-jump {
+  animation: seagullSpinJump 0.8s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.animate-seagull-glow {
+  animation: seagullGlowPulse 2.8s ease-in-out infinite;
+}
+
+

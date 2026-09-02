@@ -21,6 +21,7 @@ import {
   EyeOff,
 } from 'lucide-react';
 import { User } from '../types';
+import seagullWelcoming from '../assets/images/danang_seagull_welcoming_1788356485133.jpg';
 
 interface UserManagementViewProps {
   currentUser: User;
@@ -440,19 +441,24 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({
               <div>
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex items-center gap-3">
-                    <div
-                      className={`w-10 h-10 rounded-xl ${
-                        user.avatarColor || 'bg-blue-600'
-                      } text-white flex items-center justify-center font-bold text-xs shadow-md shrink-0`}
-                    >
-                      {user.fullName
-                        .split(' ')
-                        .map((n) => n[0])
-                        .slice(-2)
-                        .join('')}
+                    <div className="relative w-10 h-10 rounded-xl overflow-hidden border border-cyan-400/60 shadow-md shrink-0 bg-slate-950">
+                      <img
+                        src={seagullWelcoming}
+                        alt="Hải Âu AHT"
+                        className="w-full h-full object-cover hover:scale-110 transition-transform"
+                        referrerPolicy="no-referrer"
+                      />
+                      <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-emerald-400 border border-slate-900 rounded-full" />
                     </div>
                     <div>
-                      <h4 className="text-xs font-bold text-white">{user.fullName}</h4>
+                      <h4 className="text-xs font-bold text-white flex items-center gap-1">
+                        <span>{user.fullName}</span>
+                        {isCurrent && (
+                          <span className="text-[9px] bg-blue-500/20 text-blue-300 px-1 rounded border border-blue-500/30">
+                            Bạn
+                          </span>
+                        )}
+                      </h4>
                       <p className="text-[11px] text-slate-400 font-mono truncate max-w-[170px]">
                         {user.email}
                       </p>

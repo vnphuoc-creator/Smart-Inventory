@@ -14,6 +14,8 @@ import {
   Calendar,
 } from 'lucide-react';
 import { User } from '../types';
+import { SeagullMascotWelcome } from './SeagullMascotWelcome';
+import seagullWelcoming from '../assets/images/danang_seagull_welcoming_1788356485133.jpg';
 
 interface NavbarProps {
   currentUser: User;
@@ -196,8 +198,14 @@ export const Navbar: React.FC<NavbarProps> = ({
                 onClick={() => setShowUserDropdown(!showUserDropdown)}
                 className="flex items-center gap-2 bg-blue-950/50 hover:bg-blue-900/60 border border-blue-600/40 px-3 py-1.5 rounded-xl text-xs transition-all shadow-sm group"
               >
-                <div className="w-6 h-6 rounded-lg bg-blue-600 text-white font-bold flex items-center justify-center text-[10px] shadow">
-                  {userInitials}
+                <div className="relative w-6 h-6 rounded-lg overflow-hidden border border-cyan-400/50 shadow shrink-0">
+                  <img
+                    src={seagullWelcoming}
+                    alt="Hải Âu AHT"
+                    className="w-full h-full object-cover group-hover:scale-110 transition-transform"
+                    referrerPolicy="no-referrer"
+                  />
+                  <span className="absolute -bottom-0.5 -right-0.5 w-2 h-2 bg-emerald-400 rounded-full border border-slate-900" />
                 </div>
                 <div className="text-left hidden sm:block max-w-[160px] truncate">
                   <span className="font-semibold text-slate-100 text-xs truncate">
@@ -212,12 +220,18 @@ export const Navbar: React.FC<NavbarProps> = ({
                 <div className="absolute right-0 mt-2 w-72 bg-slate-900 border border-slate-700 rounded-2xl p-3 shadow-2xl z-50 animate-in fade-in zoom-in-95">
                   <div className="p-3 bg-slate-800/90 rounded-xl border border-slate-700 mb-2">
                     <div className="flex items-center gap-2.5">
-                      <div className="w-9 h-9 rounded-xl bg-blue-600 text-white font-bold flex items-center justify-center text-xs shrink-0">
-                        {userInitials}
+                      <div className="relative w-10 h-10 rounded-xl overflow-hidden border-2 border-cyan-400/60 shadow-md shrink-0 bg-slate-950">
+                        <img
+                          src={seagullWelcoming}
+                          alt="Hải Âu AHT"
+                          className="w-full h-full object-cover animate-seagull-wave"
+                          referrerPolicy="no-referrer"
+                        />
                       </div>
                       <div className="truncate min-w-0">
-                        <div className="text-xs font-bold text-white truncate">
-                          {currentUser.fullName}
+                        <div className="text-xs font-bold text-white truncate flex items-center gap-1.5">
+                          <span>{currentUser.fullName}</span>
+                          <span className="text-[10px] text-cyan-300 font-normal">✈️</span>
                         </div>
                         <div className="text-[11px] text-slate-400 truncate font-mono">
                           {currentUser.email}
