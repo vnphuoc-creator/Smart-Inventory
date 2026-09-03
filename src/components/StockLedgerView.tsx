@@ -639,8 +639,8 @@ export const StockLedgerView: React.FC<StockLedgerViewProps> = ({
           <div className="printable-area bg-slate-900 border border-slate-700/80 rounded-2xl shadow-xl overflow-hidden">
             {/* Spreadsheet Official Top Header */}
             <div className="p-6 bg-slate-950/80 border-b border-slate-800">
-              <div className="flex items-center justify-between gap-4">
-                <div className="flex items-center gap-3">
+              <div className="print-header-row flex items-center justify-between gap-4">
+                <div className="print-header-left flex items-center gap-3">
                   <AHTLogo className="h-10 w-auto" showPlane={false} allowUpload={false} />
                   <div>
                     <div className="text-xs sm:text-sm font-bold tracking-wide text-slate-200 uppercase leading-tight">
@@ -648,7 +648,7 @@ export const StockLedgerView: React.FC<StockLedgerViewProps> = ({
                     </div>
                   </div>
                 </div>
-                <div className="text-right hidden sm:block">
+                <div className="print-header-right text-right">
                   <div className="text-xs font-semibold text-slate-400">Mẫu số: 01-VT</div>
                 </div>
               </div>
@@ -821,11 +821,11 @@ export const StockLedgerView: React.FC<StockLedgerViewProps> = ({
                         }`}
                       >
                         {/* STT */}
-                        <td className="px-2.5 py-2 border-r border-slate-800 text-slate-400 text-center font-mono">
+                        <td className="col-center px-2.5 py-2 border-r border-slate-800 text-slate-400 text-center font-mono">
                           {idx + 1}
                         </td>
                         {/* Mã số */}
-                        <td className="px-3 py-2 border-r border-slate-800 font-bold text-blue-400 whitespace-nowrap">
+                        <td className="col-center px-3 py-2 border-r border-slate-800 font-bold text-blue-400 whitespace-nowrap">
                           <button
                             type="button"
                             onClick={() => handleOpenMaterialCard(item.code)}
@@ -836,7 +836,7 @@ export const StockLedgerView: React.FC<StockLedgerViewProps> = ({
                           </button>
                         </td>
                         {/* Mặt hàng */}
-                        <td className="px-3 py-2 border-r border-slate-800 font-sans text-slate-200 max-w-xs truncate">
+                        <td className="col-item-name px-3 py-2 border-r border-slate-800 font-sans text-slate-200">
                           <span
                             onClick={() => handleOpenMaterialCard(item.code)}
                             className="cursor-pointer hover:text-blue-300"
@@ -846,39 +846,39 @@ export const StockLedgerView: React.FC<StockLedgerViewProps> = ({
                           </span>
                         </td>
                         {/* Đvt */}
-                        <td className="px-2 py-2 border-r border-slate-800 font-sans text-slate-400 text-center">
+                        <td className="col-center px-2 py-2 border-r border-slate-800 font-sans text-slate-400 text-center">
                           {item.unit}
                         </td>
                         {/* Đầu kỳ */}
-                        <td className="px-2.5 py-2 border-r border-slate-800 text-right text-slate-300">
+                        <td className="col-numeric px-2.5 py-2 border-r border-slate-800 text-right text-slate-300">
                           {formatNumber(item.openingQty)}
                         </td>
-                        <td className="px-2.5 py-2 border-r border-slate-800 text-right text-slate-400">
+                        <td className="col-numeric px-2.5 py-2 border-r border-slate-800 text-right text-slate-400">
                           {formatVND(item.openingValue)}
                         </td>
                         {/* Nhập */}
-                        <td className="px-2.5 py-2 border-r border-slate-800 text-right text-blue-300 font-semibold">
+                        <td className="col-numeric px-2.5 py-2 border-r border-slate-800 text-right text-blue-300 font-semibold">
                           {item.importQty > 0 ? formatNumber(item.importQty) : '-'}
                         </td>
-                        <td className="px-2.5 py-2 border-r border-slate-800 text-right text-blue-400/80">
+                        <td className="col-numeric px-2.5 py-2 border-r border-slate-800 text-right text-blue-400/80">
                           {item.importValue > 0 ? formatVND(item.importValue) : '-'}
                         </td>
                         {/* Xuất */}
-                        <td className="px-2.5 py-2 border-r border-slate-800 text-right text-amber-300 font-semibold">
+                        <td className="col-numeric px-2.5 py-2 border-r border-slate-800 text-right text-amber-300 font-semibold">
                           {item.exportQty > 0 ? formatNumber(item.exportQty) : '-'}
                         </td>
-                        <td className="px-2.5 py-2 border-r border-slate-800 text-right text-amber-400/80">
+                        <td className="col-numeric px-2.5 py-2 border-r border-slate-800 text-right text-amber-400/80">
                           {item.exportValue > 0 ? formatVND(item.exportValue) : '-'}
                         </td>
                         {/* Cuối kỳ */}
-                        <td className="px-2.5 py-2 border-r border-slate-800 text-right text-emerald-300 font-bold">
+                        <td className="col-numeric px-2.5 py-2 border-r border-slate-800 text-right text-emerald-300 font-bold">
                           {formatNumber(item.closingQty)}
                         </td>
-                        <td className="px-2.5 py-2 border-r border-slate-800 text-right text-emerald-400">
+                        <td className="col-numeric px-2.5 py-2 border-r border-slate-800 text-right text-emerald-400">
                           {formatVND(item.closingValue)}
                         </td>
                         {/* Ngày nhập cuối */}
-                        <td className="px-3 py-2 text-center text-slate-400 whitespace-nowrap">
+                        <td className="col-center px-3 py-2 text-center text-slate-400 whitespace-nowrap">
                           {item.lastImportDate}
                         </td>
                         {/* Quick View Button */}

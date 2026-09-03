@@ -1,4 +1,5 @@
 import { Material } from '../types';
+import { isNonMaterialOrCategoryRow, filterValidMaterialItems } from './materialValidation';
 
 export interface ExtractedProposalItem {
   materialCode: string;
@@ -422,8 +423,8 @@ export function parseDocxHtml(
             });
           }
 
-          // Skip if row is administrative or section title
-          if (isAdministrativeText(rawName)) {
+          // Skip if row is administrative or section title / non-material cost center
+          if (isAdministrativeText(rawName) || isNonMaterialOrCategoryRow({ name: rawName, code: rawCode, unit: rawUnit })) {
             continue;
           }
 
@@ -431,8 +432,10 @@ export function parseDocxHtml(
           const isSectionHeader =
             /^(I|II|III|IV|V|VI|VII|VIII|IX|X)[\.\s\:\-]/i.test(rawName) ||
             /^(hệ thống|hạng mục|phân hệ|giai đoạn|khu vực)/i.test(rawName);
-          if (isSectionHeader && !rawCode && !rawQtyStr) {
-            continue;
+          if (isSectionHeader || !rawUnit) {
+            if (isNonMaterialOrCategoryRow({ name: rawName, code: rawCode, unit: rawUnit })) {
+              continue;
+            }
           }
 
           // If code is in another cell (e.g. if code column had DN_*)
@@ -442,6 +445,11 @@ export function parseDocxHtml(
               const m = foundCodeCell.match(/(?:DN|CD)_[A-Za-z0-9_]+/i);
               if (m) rawCode = m[0].toUpperCase();
             }
+          }
+
+          // Re-check after code extraction
+          if (isNonMaterialOrCategoryRow({ name: rawName, code: rawCode, unit: rawUnit })) {
+            continue;
           }
 
           // Deduce unit
@@ -500,7 +508,7 @@ export function parseDocxHtml(
             }
           }
 
-          if (rawName && rawName.length >= 2) {
+          if (rawName && rawName.length >= 2 && !isNonMaterialOrCategoryRow({ name: rawName, code: rawCode, unit: rawUnit })) {
             // Match with standard catalog
             const matchedMat = findBestMaterialMatch(rawName, rawCode, materials);
             const assignedCode = rawCode
@@ -513,14 +521,16 @@ export function parseDocxHtml(
             // Prioritize the actual extracted price from the proposal; fallback to catalog standard price
             const assignedPrice = price > 0 ? price : (matchedMat ? matchedMat.unitPrice : 0);
 
-            detectedItems.push({
-              materialCode: assignedCode,
-              materialName: assignedName,
-              quantity: qty,
-              unit: assignedUnit,
-              unitPrice: assignedPrice,
-              notes: rawNote || `Trích xuất từ Tờ trình ${detectedPropNum || ''}`,
-            });
+            if (!isNonMaterialOrCategoryRow({ name: assignedName, code: assignedCode, unit: assignedUnit })) {
+              detectedItems.push({
+                materialCode: assignedCode,
+                materialName: assignedName,
+                quantity: qty,
+                unit: assignedUnit,
+                unitPrice: assignedPrice,
+                notes: rawNote || `Trích xuất từ Tờ trình ${detectedPropNum || ''}`,
+              });
+            }
           }
         }
 
@@ -577,6 +587,6 @@ export function parseDocxHtml(
       detectedReason ||
       (detectedPropNum ? `Bổ sung vật tư theo Tờ trình ${detectedPropNum}` : ''),
     date: detectedDate,
-    items: detectedItems,
+    items: filterValidMaterialItems(detectedItems),
   };
 }

@@ -99,21 +99,22 @@ export function isWarehouseMatch(txWarehouse?: string | null, selectedWarehouse?
 }
 
 /**
- * Format currency VNĐ
+ * Format currency VNĐ with non-breaking spaces to avoid wrapping in tables/print
  */
 export function formatVND(amount: number): string {
-  return new Intl.NumberFormat('vi-VN', {
+  const str = new Intl.NumberFormat('vi-VN', {
     style: 'currency',
     currency: 'VND',
     maximumFractionDigits: 0,
   }).format(amount || 0);
+  return str.replace(/\s+/g, '\u00A0');
 }
 
 /**
- * Format number with comma
+ * Format number with comma and non-breaking spaces
  */
 export function formatNumber(num: number): string {
-  return new Intl.NumberFormat('vi-VN').format(num || 0);
+  return new Intl.NumberFormat('vi-VN').format(num || 0).replace(/\s+/g, '\u00A0');
 }
 
 /**

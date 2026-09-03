@@ -70,24 +70,26 @@ export const AHTLogo: React.FC<AHTLogoProps> = ({
 
   return (
     <>
-      <div className={`relative group flex items-center select-none ${className}`}>
+      <div className={`relative group flex items-center select-none shrink-0 aht-logo-wrapper ${className}`} style={{ maxWidth: '140px', maxHeight: '42px' }}>
         {/* Render Custom Uploaded Logo or Default AHT Brand Logo */}
         {customLogo ? (
-          <div className="flex items-center justify-center max-w-[200px] overflow-hidden">
+          <div className="flex items-center justify-center max-w-[130px] max-h-[38px] overflow-hidden shrink-0">
             <img
               src={customLogo}
               alt="Logo đơn vị"
-              className="max-h-8 max-w-full object-contain"
+              className="max-h-8 max-w-[120px] object-contain shrink-0"
+              style={{ maxHeight: '36px', maxWidth: '120px' }}
               onError={() => setPreviewError(true)}
             />
           </div>
         ) : (
-          <div className="flex items-center justify-center">
+          <div className="flex items-center justify-center shrink-0" style={{ width: '110px', height: '36px' }}>
             <svg
               viewBox="0 0 130 46"
               fill="none"
               xmlns="http://www.w3.org/2000/svg"
-              className="h-6 w-auto drop-shadow-xs"
+              className="h-6 w-auto drop-shadow-xs shrink-0"
+              style={{ width: '105px', height: '34px', maxWidth: '110px', maxHeight: '36px' }}
             >
               {/* Letter 'A' (Stylized Lambda shape) */}
               <path

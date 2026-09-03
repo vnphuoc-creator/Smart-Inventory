@@ -32,6 +32,7 @@ import {
   generateNextMaterialCode,
   standardizeUnit,
 } from '../utils/materialClassifier';
+import { isNonMaterialOrCategoryRow } from '../utils/materialValidation';
 import { formatNumber, formatVND } from '../utils/inventoryEngine';
 
 interface SmartMaterialImportSectionProps {
@@ -198,10 +199,12 @@ export const SmartMaterialImportSection: React.FC<SmartMaterialImportSectionProp
 
     rawList.forEach((raw, idx) => {
       const name = (raw.name || '').trim();
+      const code = (raw.code || '').trim();
+      const unit = standardizeUnit(raw.unit || '');
       if (!name || name.length < 2) return;
+      if (isNonMaterialOrCategoryRow({ name, code, unit })) return;
 
       const spec = (raw.specification || '').trim();
-      const unit = standardizeUnit(raw.unit || '');
 
       // 1. Auto Category Classification if not explicitly provided or invalid
       let category = raw.category?.trim() || '';
@@ -639,8 +642,9 @@ export const SmartMaterialImportSection: React.FC<SmartMaterialImportSectionProp
         }
       }
 
-      // Skip header repetitions or empty lines
+      // Skip header repetitions, empty lines or non-material category headers
       if (!rawName || rawName.length < 2 || isProbableSTTValue(rawName)) continue;
+      if (isNonMaterialOrCategoryRow({ name: rawName, code: rawCode, unit: rawUnit })) continue;
       const lowerName = rawName.toLowerCase();
       if (
         lowerName === 'tên sản phẩm' ||

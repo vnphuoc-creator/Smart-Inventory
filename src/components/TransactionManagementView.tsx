@@ -45,6 +45,7 @@ import {
 } from '../types';
 import { formatVND, formatNumber, formatDisplayDate, isProposalMatch, normalizeProposalNumber } from '../utils/inventoryEngine';
 import { parseDocxHtml } from '../utils/docxProposalParser';
+import { isNonMaterialOrCategoryRow, filterValidMaterialItems } from '../utils/materialValidation';
 import { AHTLogo } from './AHTLogo';
 import { ProposalReconciliationView } from './ProposalReconciliationView';
 import { SearchableMaterialSelect } from './SearchableMaterialSelect';
@@ -566,19 +567,22 @@ export const TransactionManagementView: React.FC<TransactionManagementViewProps>
           if (data.reason) detectedReason = data.reason;
           if (Array.isArray(data.items) && data.items.length > 0) {
             // Only override if server found valid items
-            detectedItems = data.items.map((it: any) => {
-              const matchedMat =
-                materials.find((m) => m.code === it.materialCode) ||
-                materials.find((m) => m.name.toLowerCase() === (it.materialName || '').toLowerCase().trim()) ||
-                materials.find((m) => m.name.toLowerCase().includes((it.materialName || '').toLowerCase().trim()));
+            detectedItems = data.items
+              .filter((it: any) => !isNonMaterialOrCategoryRow({ name: it.materialName, code: it.materialCode, unit: it.unit }))
+              .map((it: any) => {
+                const matchedMat =
+                  materials.find((m) => m.code === it.materialCode) ||
+                  materials.find((m) => m.name.toLowerCase() === (it.materialName || '').toLowerCase().trim()) ||
+                  materials.find((m) => m.name.toLowerCase().includes((it.materialName || '').toLowerCase().trim()));
 
-              return {
-                materialCode: matchedMat ? matchedMat.code : it.materialCode || `DN_VT_${detectedItems.length + 1}`,
-                quantity: Math.max(1, Number(it.quantity) || 1),
-                unitPrice: Number(it.unitPrice) || (matchedMat ? matchedMat.unitPrice : 0),
-                notes: it.notes || `Tự động quét từ Tờ trình ${data.proposalNumber || ''}`,
-              };
-            });
+                return {
+                  materialCode: matchedMat ? matchedMat.code : it.materialCode || `DN_VT_${detectedItems.length + 1}`,
+                  quantity: Math.max(1, Number(it.quantity) || 1),
+                  unitPrice: Number(it.unitPrice) || (matchedMat ? matchedMat.unitPrice : 0),
+                  notes: it.notes || `Tự động quét từ Tờ trình ${data.proposalNumber || ''}`,
+                };
+              })
+              .filter((it: any) => !isNonMaterialOrCategoryRow({ code: it.materialCode }));
           }
         }
       } catch {

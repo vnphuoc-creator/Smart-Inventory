@@ -14,6 +14,7 @@ import {
 import * as XLSX from 'xlsx';
 import { Material } from '../types';
 import { formatNumber, formatVND } from '../utils/inventoryEngine';
+import { isNonMaterialOrCategoryRow } from '../utils/materialValidation';
 
 interface ExcelStockImportModalProps {
   isOpen: boolean;
@@ -343,7 +344,7 @@ export const ExcelStockImportModal: React.FC<ExcelStockImportModalProps> = ({
           ) &&
           (!rawCode || (!rawCode.startsWith('DN_') && !rawCode.startsWith('CD_')));
 
-        if (isCategoryHeader || isKnownCategoryName) continue;
+        if (isCategoryHeader || isKnownCategoryName || isNonMaterialOrCategoryRow({ name: rawName, code: rawCode, unit: rawUnit })) continue;
 
         // Must have either a valid Code OR a valid Name with a valid Unit
         const hasValidCode = rawCode && rawCode.trim().length >= 3 && !/^\d+$/.test(rawCode.trim());

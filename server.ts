@@ -390,6 +390,94 @@ Hãy đưa ra báo cáo phân tích chuyên sâu định dạng Markdown gồm:
   });
 });
 
+// Helper to reject non-material category headers, cost centers (CP*), and administrative lines
+function isInvalidOrCategoryHeader(it: any): boolean {
+  const name = String(it.materialName || it.name || '').trim();
+  const code = String(it.materialCode || it.code || '').trim();
+  const unit = String(it.unit || '').trim();
+
+  if (name.length < 2 && code.length < 2) return true;
+
+  const norm = name
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/đ/g, 'd')
+    .replace(/Đ/g, 'd')
+    .toLowerCase()
+    .trim();
+
+  const normCode = code.toLowerCase().trim();
+
+  // 1. Cost center code CP101-*, CP102-*, CP*
+  if (/^cp\d{2,4}[-_]/i.test(normCode)) return true;
+
+  // 2. Expense / operation category names
+  const invalidKeywords = [
+    'van hanh he thong',
+    'van hanh',
+    'chi phi cong cu dung cu',
+    'chi phi cong cu',
+    'chi phi dung cu',
+    'chi phi mua sam',
+    'chi phi sua chua',
+    'chi phi nhan cong',
+    'chi phi quan ly',
+    'chi phi thiet bi',
+    'chi phi phat sinh',
+    'chi phi khac',
+    'chi phi',
+    'hang muc cong viec',
+    'hang muc',
+    'phan he',
+    'giai doan',
+    'tong cong',
+    'tong so',
+    'bang chu',
+    'du toan',
+    'kinh phi',
+    'so to trinh',
+    'to trinh so',
+    'nguoi lap',
+    'truong phong',
+    'pho truong phong',
+    'giam doc',
+    'thu kho',
+    'can cu',
+    'kinh gui',
+    'he thong chieu sang',
+    'he thong ha the',
+    'he thong trung the',
+    'he thong thiet bi ve sinh',
+    'he thong cap thoat nuoc',
+  ];
+
+  for (const kw of invalidKeywords) {
+    if (norm === kw || norm.startsWith(kw + ' ') || norm.startsWith(kw + ':') || norm.startsWith(kw + '-')) {
+      return true;
+    }
+    if (normCode === kw || normCode.startsWith(kw + ' ') || normCode.startsWith(kw + '_')) {
+      return true;
+    }
+  }
+
+  // Roman numeral headers e.g. "I. ...", "II. ..."
+  if (/^(i|ii|iii|iv|v|vi|vii|viii|ix|x)[\.\s\:\-]/i.test(name)) {
+    if (/van hanh|he thong|chi phi|dung cu|thiet bi|hang muc|cong cu/i.test(norm)) {
+      return true;
+    }
+    if (!code.toUpperCase().startsWith('DN_') && (!unit || unit === '-' || norm.length < 15)) {
+      return true;
+    }
+  }
+
+  // Check code keywords
+  if (normCode.includes('van_hanh') || normCode.includes('chi_phi') || normCode.includes('he_thong')) {
+    return true;
+  }
+
+  return false;
+}
+
 // AI Proposal Scanner & Document OCR Auto-Fill Endpoint
 app.post("/api/ai/scan-proposal", async (req, res) => {
   const { fileData, fileName, fileText, docHtml, availableMaterials } = req.body;
@@ -476,12 +564,8 @@ Trả về định dạng JSON duy nhất:
       const outputText = response.text || "{}";
       const parsed = JSON.parse(outputText);
       if (parsed && parsed.items && Array.isArray(parsed.items) && parsed.items.length > 0) {
-        // Filter out any accidental metadata items
-        parsed.items = parsed.items.filter((it: any) => {
-          const name = (it.materialName || '').toLowerCase().trim();
-          const isMeta = /^(số tờ|bản in|phó trưởng|trưởng phòng|ngày yêu|thuộc ca|chi phí|phạm vi|ngày giao|số tiền|kính gửi|căn cứ|tổng cộng|người lập|kế toán|giám đốc)/i.test(name);
-          return name.length >= 2 && !isMeta;
-        });
+        // Filter out any non-material headers, cost centers (CP*), or category rows
+        parsed.items = parsed.items.filter((it: any) => !isInvalidOrCategoryHeader(it));
         if (parsed.items.length > 0) {
           return res.json(parsed);
         }
@@ -602,9 +686,10 @@ YÊU CẦU ĐẦU RA JSON CHUẨN:
       const outputText = response.text || "{}";
       const parsed = JSON.parse(outputText);
       if (parsed && parsed.items && Array.isArray(parsed.items) && parsed.items.length > 0) {
+        const validItems = parsed.items.filter((it: any) => !isInvalidOrCategoryHeader(it));
         return res.json({
           success: true,
-          items: parsed.items,
+          items: validItems,
           source: "gemini_ai",
         });
       }
@@ -618,7 +703,9 @@ YÊU CẦU ĐẦU RA JSON CHUẨN:
   if (rawRows && Array.isArray(rawRows)) {
     rawRows.forEach((r: any) => {
       const name = String(r.name || r.ten || r.tenVatTu || r.description || "").trim();
-      if (!name || name.length < 2) return;
+      const code = String(r.code || r.ma || "").trim();
+      const unit = String(r.unit || r.dvt || "").trim();
+      if (!name || name.length < 2 || isInvalidOrCategoryHeader({ name, code, unit })) return;
 
       // Smart category classification based on name
       let category = validCategories[0];
