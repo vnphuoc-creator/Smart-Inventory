@@ -32,7 +32,7 @@ import {
   CanvasMode,
   DEFAULT_THEME_CONFIG,
 } from './types';
-import { calculateAllMaterialStocks, formatVND } from './utils/inventoryEngine';
+import { calculateAllMaterialStocks, formatVND, isProposalMatch } from './utils/inventoryEngine';
 import { safeStorage } from './utils/safeStorage';
 import {
   subscribeToUsers,
@@ -40,6 +40,11 @@ import {
   subscribeToProposals,
   subscribeToTransactions,
   subscribeToLogs,
+  subscribeToSystemSettings,
+  saveSystemSettingsToCloud,
+  refreshAllFromCloud,
+  subscribeToBroadcast,
+  broadcastLocalChange,
   saveUserToCloud,
   deleteUserFromCloud,
   saveMaterialToCloud,
@@ -172,7 +177,7 @@ export function App() {
     safeStorage.setItem('smart_proposals_v5', JSON.stringify(proposals));
   }, [proposals]);
 
-  // Firebase Realtime Subscription for Proposals
+  // Firebase Realtime Subscription for Proposals (No auto-fallback to initial data to prevent deleted proposals from reappearing)
   useEffect(() => {
     const unsubscribe = subscribeToProposals((cloudProposals) => {
       if (cloudProposals) {
@@ -249,6 +254,90 @@ export function App() {
   const [preselectedMaterialCode, setPreselectedMaterialCode] = useState<string | undefined>(undefined);
   const [transactionTypePreset, setTransactionTypePreset] = useState<'IMPORT' | 'EXPORT'>('EXPORT');
   const [transactionStatusFilterPreset, setTransactionStatusFilterPreset] = useState<string | undefined>(undefined);
+
+  // Cross-device and multi-browser real-time synchronization state
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [syncStatus, setSyncStatus] = useState<'synced' | 'syncing' | 'offline'>('synced');
+  const [lastSyncedTime, setLastSyncedTime] = useState<Date>(new Date());
+
+  // Manual & automatic refresh function directly from Cloud Server
+  const handleManualRefresh = async () => {
+    setIsRefreshing(true);
+    setSyncStatus('syncing');
+    try {
+      const data = await refreshAllFromCloud();
+      if (data.users && data.users.length > 0) setUsers(data.users);
+      if (data.materials && data.materials.length > 0) setMaterials(data.materials);
+      if (data.proposals) setProposals(data.proposals);
+      if (data.transactions) setTransactions(data.transactions);
+      if (data.settings) {
+        if (data.settings.themeConfig) setThemeConfig(data.settings.themeConfig);
+      }
+      setLastSyncedTime(new Date());
+      setSyncStatus('synced');
+      showToast('Đã đồng bộ toàn bộ dữ liệu thời gian thực từ Cloud!');
+    } catch (e) {
+      console.warn('Manual refresh failed, keeping active cache:', e);
+      setSyncStatus('offline');
+      showToast('Không thể kết nối Cloud, đang dùng dữ liệu lưu tạm.', 'info');
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
+  // Real-time Cloud System Settings subscription (theme, company, logo, units)
+  useEffect(() => {
+    const unsubSettings = subscribeToSystemSettings((cfg) => {
+      if (cfg.themeConfig) {
+        setThemeConfig(cfg.themeConfig);
+        safeStorage.setItem('smart_ui_theme_config_v2', JSON.stringify(cfg.themeConfig));
+      }
+      if (cfg.companyName) safeStorage.setItem('cfg_company_name', cfg.companyName);
+      if (cfg.departmentName) safeStorage.setItem('cfg_department_name', cfg.departmentName);
+      if (cfg.circularStandard) safeStorage.setItem('cfg_circular', cfg.circularStandard);
+      if (cfg.customUnits) safeStorage.setItem('cfg_custom_units', JSON.stringify(cfg.customUnits));
+      if (cfg.customLogo !== undefined) {
+        if (cfg.customLogo) safeStorage.setItem('smart_custom_logo', cfg.customLogo);
+        else safeStorage.removeItem('smart_custom_logo');
+        window.dispatchEvent(new Event('storage'));
+      }
+    });
+
+    const unsubBroadcast = subscribeToBroadcast(() => {
+      setLastSyncedTime(new Date());
+    });
+
+    return () => {
+      unsubSettings();
+      unsubBroadcast();
+    };
+  }, []);
+
+  // Multi-device visibility and connectivity handler (e.g. mobile lock screen, tab switching)
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        handleManualRefresh();
+      }
+    };
+    const handleOnline = () => {
+      setSyncStatus('synced');
+      handleManualRefresh();
+    };
+    const handleOffline = () => {
+      setSyncStatus('offline');
+    };
+
+    document.addEventListener('visibilitychange', handleVisibility);
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibility);
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
 
   // Advanced UI Theme Configuration State
   const [themeConfig, setThemeConfig] = useState<UIThemeConfig>(() => {
@@ -348,12 +437,14 @@ export function App() {
     safeStorage.setItem('smart_ui_theme_config_v2', JSON.stringify(newConfig));
     const isLight = newConfig.canvasMode === 'light-modern' || newConfig.canvasMode === 'danang-ibms';
     safeStorage.setItem('smart_theme_mode', isLight ? 'light' : 'dark');
+    saveSystemSettingsToCloud({ themeConfig: newConfig });
   };
 
   const handleResetThemeConfig = () => {
     setThemeConfig(DEFAULT_THEME_CONFIG);
     safeStorage.removeItem('smart_ui_theme_config_v2');
     safeStorage.setItem('smart_theme_mode', 'dark');
+    saveSystemSettingsToCloud({ themeConfig: DEFAULT_THEME_CONFIG });
   };
 
   const handleToggleTheme = () => {
@@ -429,7 +520,9 @@ export function App() {
   // Handler: Update or Add Proposal
   const handleUpdateProposal = (updatedProposal: PurchaseProposal) => {
     setProposals((prev) => {
-      const idx = prev.findIndex((p) => p.id === updatedProposal.id || p.proposalNumber === updatedProposal.proposalNumber);
+      const idx = prev.findIndex(
+        (p) => p.id === updatedProposal.id || isProposalMatch(p.proposalNumber, updatedProposal.proposalNumber)
+      );
       if (idx >= 0) {
         const next = [...prev];
         next[idx] = updatedProposal;
@@ -451,7 +544,17 @@ export function App() {
   };
 
   const handleCreateProposal = (newProposal: PurchaseProposal) => {
-    setProposals((prev) => [newProposal, ...prev]);
+    setProposals((prev) => {
+      const idx = prev.findIndex(
+        (p) => p.id === newProposal.id || isProposalMatch(p.proposalNumber, newProposal.proposalNumber)
+      );
+      if (idx >= 0) {
+        const next = [...prev];
+        next[idx] = newProposal;
+        return next;
+      }
+      return [newProposal, ...prev];
+    });
     saveProposalToCloud(newProposal);
 
     logActivity(
@@ -497,7 +600,10 @@ export function App() {
   // Handler: Add or Update Material
   const handleSaveMaterial = (materialToSave: Material) => {
     setMaterials((prev) => {
-      const idx = prev.findIndex((m) => m.id === materialToSave.id);
+      const targetCode = (materialToSave.code || '').trim().toUpperCase();
+      const idx = prev.findIndex(
+        (m) => m.id === materialToSave.id || (targetCode && (m.code || '').trim().toUpperCase() === targetCode)
+      );
       if (idx >= 0) {
         const next = [...prev];
         next[idx] = materialToSave;
@@ -522,7 +628,10 @@ export function App() {
   // Handler: Update / Edit Transaction (Admin)
   const handleUpdateTransaction = (updatedTx: InventoryTransaction) => {
     setTransactions((prev) => {
-      const idx = prev.findIndex((t) => t.id === updatedTx.id);
+      const targetCode = (updatedTx.code || '').trim().toUpperCase();
+      const idx = prev.findIndex(
+        (t) => t.id === updatedTx.id || (targetCode && (t.code || '').trim().toUpperCase() === targetCode)
+      );
       if (idx >= 0) {
         const next = [...prev];
         next[idx] = updatedTx;
@@ -566,7 +675,18 @@ export function App() {
 
   // Handler: Create Transaction
   const handleCreateTransaction = (tx: InventoryTransaction) => {
-    setTransactions((prev) => [tx, ...prev]);
+    setTransactions((prev) => {
+      const targetCode = (tx.code || '').trim().toUpperCase();
+      const idx = prev.findIndex(
+        (t) => t.id === tx.id || (targetCode && (t.code || '').trim().toUpperCase() === targetCode)
+      );
+      if (idx >= 0) {
+        const next = [...prev];
+        next[idx] = tx;
+        return next;
+      }
+      return [tx, ...prev];
+    });
     saveTransactionToCloud(tx);
 
     logActivity(
@@ -1060,12 +1180,12 @@ export function App() {
                 onClearAllTransactionsAndProposals={handleClearAllTransactionsAndProposals}
                 onUpdateMaterials={(newMats) => {
                   setMaterials(newMats);
-                  newMats.forEach((m) => saveMaterialToCloud(m));
-                  showToast(`Đã cập nhật danh mục gồm ${newMats.length} vật tư.`);
+                  seedMaterials(newMats);
+                  showToast(`Đã cập nhật và đồng bộ ${newMats.length} vật tư lên Cloud.`);
                 }}
                 onUpdateUsers={(newUsers) => {
                   setUsers(newUsers);
-                  newUsers.forEach((u) => saveUserToCloud(u));
+                  seedUsers(newUsers);
                   showToast(`Đã cập nhật danh sách người dùng và đồng bộ lên Cloud.`);
                 }}
               />

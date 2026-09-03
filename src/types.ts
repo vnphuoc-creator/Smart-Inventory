@@ -84,6 +84,7 @@ export interface PurchaseProposal {
   items: ProposalItem[];
   notes?: string;
   createdAt: string;
+  updatedAt?: string;
 }
 
 export interface InventoryTransaction {
@@ -117,6 +118,7 @@ export interface InventoryTransaction {
   approvalDate?: string;
   approvalNote?: string;
   createdAt: string;
+  updatedAt?: string;
 }
 
 export interface CalculatedMaterialStock extends Material {

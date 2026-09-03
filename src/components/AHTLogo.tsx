@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Camera, Upload, Trash2, X, RefreshCw, Check } from 'lucide-react';
 import { safeStorage } from '../utils/safeStorage';
+import { subscribeToSystemSettings, saveSystemSettingsToCloud } from '../services/firebaseSync';
 
 interface AHTLogoProps {
   className?: string;
@@ -23,13 +24,29 @@ export const AHTLogo: React.FC<AHTLogoProps> = ({
   const [previewError, setPreviewError] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Sync custom logo across tabs/renders
+  // Sync custom logo across tabs and cloud
   useEffect(() => {
     const handleStorage = () => {
       setCustomLogo(safeStorage.getItem('smart_custom_logo'));
     };
     window.addEventListener('storage', handleStorage);
-    return () => window.removeEventListener('storage', handleStorage);
+
+    // Listen to real-time cloud settings
+    const unsubscribeCloud = subscribeToSystemSettings((settings) => {
+      if (settings.customLogo !== undefined) {
+        setCustomLogo(settings.customLogo || null);
+        if (settings.customLogo) {
+          safeStorage.setItem('smart_custom_logo', settings.customLogo);
+        } else {
+          safeStorage.removeItem('smart_custom_logo');
+        }
+      }
+    });
+
+    return () => {
+      window.removeEventListener('storage', handleStorage);
+      unsubscribeCloud();
+    };
   }, []);
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -48,6 +65,8 @@ export const AHTLogo: React.FC<AHTLogoProps> = ({
       if (base64) {
         safeStorage.setItem('smart_custom_logo', base64);
         setCustomLogo(base64);
+        saveSystemSettingsToCloud({ customLogo: base64 });
+        window.dispatchEvent(new Event('storage'));
         setIsModalOpen(false);
       }
     };
@@ -56,8 +75,11 @@ export const AHTLogo: React.FC<AHTLogoProps> = ({
 
   const handleSaveUrl = () => {
     if (!urlInput.trim()) return;
-    safeStorage.setItem('smart_custom_logo', urlInput.trim());
-    setCustomLogo(urlInput.trim());
+    const url = urlInput.trim();
+    safeStorage.setItem('smart_custom_logo', url);
+    setCustomLogo(url);
+    saveSystemSettingsToCloud({ customLogo: url });
+    window.dispatchEvent(new Event('storage'));
     setUrlInput('');
     setIsModalOpen(false);
   };
@@ -65,6 +87,8 @@ export const AHTLogo: React.FC<AHTLogoProps> = ({
   const handleResetToDefault = () => {
     safeStorage.removeItem('smart_custom_logo');
     setCustomLogo(null);
+    saveSystemSettingsToCloud({ customLogo: null });
+    window.dispatchEvent(new Event('storage'));
     setIsModalOpen(false);
   };
 

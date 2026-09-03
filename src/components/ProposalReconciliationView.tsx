@@ -56,6 +56,7 @@ import {
 } from '../types';
 import { formatVND, formatNumber, formatDisplayDate, isProposalMatch, normalizeProposalNumber } from '../utils/inventoryEngine';
 import { SearchableMaterialSelect } from './SearchableMaterialSelect';
+import { AHTLogo } from './AHTLogo';
 
 interface ProposalReconciliationViewProps {
   currentUser: User;
@@ -1581,7 +1582,7 @@ export const ProposalReconciliationView: React.FC<ProposalReconciliationViewProp
             onClick={(e) => e.stopPropagation()}
           >
             {/* Modal Header */}
-            <div className="p-3.5 sm:p-4 border-b border-slate-800 flex items-center justify-between bg-slate-850 flex-wrap gap-2">
+            <div className="no-print p-3.5 sm:p-4 border-b border-slate-800 flex items-center justify-between bg-slate-850 flex-wrap gap-2">
               <div className="flex items-center gap-2.5 min-w-0">
                 <div className="w-8 h-8 rounded-lg bg-blue-600/20 text-blue-400 flex items-center justify-center shrink-0">
                   {viewingAttachment.name.endsWith('.docx') || viewingAttachment.name.endsWith('.doc') ? (
@@ -1780,7 +1781,7 @@ export const ProposalReconciliationView: React.FC<ProposalReconciliationViewProp
                       className="w-full max-w-4xl transition-transform origin-top mx-auto"
                       style={{ transform: `scale(${attachmentZoom / 100})` }}
                     >
-                      <div className="bg-white text-slate-900 rounded-xl shadow-2xl p-6 sm:p-12 border border-slate-200 min-h-[600px] leading-relaxed">
+                      <div className="printable-area proposal-print-document bg-white text-slate-900 rounded-xl shadow-2xl p-6 sm:p-12 border border-slate-200 min-h-[600px] leading-relaxed">
                         {isDocxParsing ? (
                           <div className="flex flex-col items-center justify-center py-20 text-slate-600 gap-3">
                             <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
@@ -1790,7 +1791,7 @@ export const ProposalReconciliationView: React.FC<ProposalReconciliationViewProp
                           /* Render Parsed Word Document HTML */
                           <div>
                             {/* Document top badge */}
-                            <div className="mb-6 pb-4 border-b border-slate-200 flex items-center justify-between text-xs text-slate-500">
+                            <div className="no-print mb-6 pb-4 border-b border-slate-200 flex items-center justify-between text-xs text-slate-500">
                               <span className="font-mono font-semibold text-blue-700 bg-blue-50 px-2.5 py-1 rounded border border-blue-200">
                                 📄 {viewingAttachment.name}
                               </span>
@@ -1809,8 +1810,9 @@ export const ProposalReconciliationView: React.FC<ProposalReconciliationViewProp
                             {/* Header Section */}
                             <div className="grid grid-cols-2 gap-4 pb-4 border-b-2 border-slate-900 text-xs">
                               <div className="text-left font-bold uppercase tracking-tight">
-                                <p className="text-slate-800">CÔNG TY CỔ PHẦN CÔNG TRÌNH</p>
-                                <p className="text-blue-900 font-extrabold">{viewingAttachment.proposal?.department || 'ĐỘI ĐIỆN NƯỚC CÔNG TRÌNH'}</p>
+                                <AHTLogo className="h-9 w-auto mb-2" showPlane={false} allowUpload={false} />
+                                <p className="text-slate-800 text-[11px] leading-tight font-bold">CÔNG TY CỔ PHẦN ĐẦU TƯ KHAI THÁC<br/>NHÀ GA QUỐC TẾ ĐÀ NẴNG</p>
+                                <p className="text-blue-900 font-extrabold mt-1">{viewingAttachment.proposal?.department || 'ĐỘI ĐIỆN NƯỚC CÔNG TRÌNH'}</p>
                                 <p className="font-normal font-mono text-slate-600 mt-1">
                                   Số: <strong className="text-slate-900">{viewingAttachment.proposal?.proposalNumber || '22-DNCT/PKT'}</strong>
                                 </p>

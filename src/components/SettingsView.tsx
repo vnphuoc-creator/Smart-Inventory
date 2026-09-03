@@ -1,5 +1,6 @@
-import React, { useState, useRef, useMemo } from 'react';
+import React, { useState, useRef, useMemo, useEffect } from 'react';
 import { safeStorage } from '../utils/safeStorage';
+import { subscribeToSystemSettings, saveSystemSettingsToCloud } from '../services/firebaseSync';
 import {
   Settings,
   Building2,
@@ -159,6 +160,37 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   const [customLogoUrl, setCustomLogoUrl] = useState<string | null>(() => {
     return safeStorage.getItem('smart_custom_logo');
   });
+
+  // Real-time synchronization for system settings across all devices
+  useEffect(() => {
+    const unsub = subscribeToSystemSettings((cfg) => {
+      if (cfg.companyName) {
+        setCompanyName(cfg.companyName);
+        safeStorage.setItem('cfg_company_name', cfg.companyName);
+      }
+      if (cfg.departmentName) {
+        setDepartmentName(cfg.departmentName);
+        safeStorage.setItem('cfg_department_name', cfg.departmentName);
+      }
+      if (cfg.circularStandard) {
+        setCircularStandard(cfg.circularStandard);
+        safeStorage.setItem('cfg_circular', cfg.circularStandard);
+      }
+      if (Array.isArray(cfg.customUnits) && cfg.customUnits.length > 0) {
+        setUnits(cfg.customUnits);
+        safeStorage.setItem('cfg_custom_units', JSON.stringify(cfg.customUnits));
+      }
+      if (cfg.customLogo !== undefined) {
+        setCustomLogoUrl(cfg.customLogo || null);
+        if (cfg.customLogo) {
+          safeStorage.setItem('smart_custom_logo', cfg.customLogo);
+        } else {
+          safeStorage.removeItem('smart_custom_logo');
+        }
+      }
+    });
+    return () => unsub();
+  }, []);
 
   // --- EXCEL IMPORT MODAL STATE ---
   const [isExcelModalOpen, setIsExcelModalOpen] = useState(false);
@@ -359,10 +391,11 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     }
     setUnits(newUnits);
     safeStorage.setItem('cfg_custom_units', JSON.stringify(newUnits));
+    saveSystemSettingsToCloud({ customUnits: newUnits });
     setShowAddUnitModal(false);
     setEditingUnitIndex(null);
     setUnitInputValue('');
-    setUnitToast('Đã lưu danh mục đơn vị tính thành công!');
+    setUnitToast('Đã lưu và đồng bộ danh mục đơn vị tính lên Cloud thành công!');
     setTimeout(() => setUnitToast(null), 3000);
   };
 
@@ -372,7 +405,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       const newUnits = units.filter((_, i) => i !== idx);
       setUnits(newUnits);
       safeStorage.setItem('cfg_custom_units', JSON.stringify(newUnits));
-      setUnitToast(`Đã xóa đơn vị tính "${toDel}".`);
+      saveSystemSettingsToCloud({ customUnits: newUnits });
+      setUnitToast(`Đã xóa đơn vị tính "${toDel}" và đồng bộ lên Cloud.`);
       setTimeout(() => setUnitToast(null), 3000);
     }
   };
@@ -413,6 +447,11 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     safeStorage.setItem('cfg_company_name', companyName);
     safeStorage.setItem('cfg_department_name', departmentName);
     safeStorage.setItem('cfg_circular', circularStandard);
+    saveSystemSettingsToCloud({
+      companyName,
+      departmentName,
+      circularStandard,
+    });
     setCompanySaveSuccess(true);
     setTimeout(() => setCompanySaveSuccess(false), 3000);
   };
@@ -426,6 +465,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       const dataUrl = uploadEvent.target?.result as string;
       setCustomLogoUrl(dataUrl);
       safeStorage.setItem('smart_custom_logo', dataUrl);
+      saveSystemSettingsToCloud({ customLogo: dataUrl });
       window.dispatchEvent(new Event('storage'));
     };
     reader.readAsDataURL(file);
@@ -434,6 +474,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   const handleResetLogo = () => {
     setCustomLogoUrl(null);
     safeStorage.removeItem('smart_custom_logo');
+    saveSystemSettingsToCloud({ customLogo: null });
     window.dispatchEvent(new Event('storage'));
   };
 

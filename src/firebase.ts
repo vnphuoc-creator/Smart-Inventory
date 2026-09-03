@@ -1,5 +1,10 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
-import { getFirestore, initializeFirestore } from 'firebase/firestore';
+import {
+  getFirestore,
+  initializeFirestore,
+  persistentLocalCache,
+  persistentMultipleTabManager
+} from 'firebase/firestore';
 import firebaseConfig from '../firebase-applet-config.json';
 
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
@@ -13,11 +18,24 @@ let firestoreInstance;
 try {
   firestoreInstance = initializeFirestore(
     app,
-    { ignoreUndefinedProperties: true },
+    {
+      ignoreUndefinedProperties: true,
+      localCache: persistentLocalCache({
+        tabManager: persistentMultipleTabManager(),
+      }),
+    },
     customDbId
   );
 } catch {
-  firestoreInstance = customDbId ? getFirestore(app, customDbId) : getFirestore(app);
+  try {
+    firestoreInstance = initializeFirestore(
+      app,
+      { ignoreUndefinedProperties: true },
+      customDbId
+    );
+  } catch {
+    firestoreInstance = customDbId ? getFirestore(app, customDbId) : getFirestore(app);
+  }
 }
 
 export const db = firestoreInstance;
