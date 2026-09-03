@@ -57,6 +57,8 @@ import {
 import { formatVND, formatNumber, formatDisplayDate, isProposalMatch, normalizeProposalNumber } from '../utils/inventoryEngine';
 import { SearchableMaterialSelect } from './SearchableMaterialSelect';
 import { AHTLogo } from './AHTLogo';
+import { getLocalDeletedProposals } from '../services/firebaseSync';
+import { printCleanDocument } from '../utils/printHelper';
 
 interface ProposalReconciliationViewProps {
   currentUser: User;
@@ -268,9 +270,21 @@ export const ProposalReconciliationView: React.FC<ProposalReconciliationViewProp
     }
   };
 
-  // Effective proposals ensuring any proposal referenced in transactions is available
+  // Effective proposals ensuring deleted proposals are strictly excluded and never synthesized
   const effectiveProposals = useMemo(() => {
-    const list = proposals.map((p) => {
+    const localDeleted = getLocalDeletedProposals();
+    const activeProposals = proposals.filter((p) => {
+      const raw = (p.proposalNumber || '').toLowerCase().trim();
+      const norm = normalizeProposalNumber(raw);
+      const id = (p.id || '').toLowerCase().trim();
+      return (
+        !localDeleted.has(raw) &&
+        (!norm || !localDeleted.has(norm.toLowerCase())) &&
+        !localDeleted.has(id)
+      );
+    });
+
+    return activeProposals.map((p) => {
       const relTxs = transactions.filter((tx) => isProposalMatch(tx.proposalNumber, p.proposalNumber));
       const foundHtml =
         p.attachmentHtml ||
@@ -345,44 +359,6 @@ export const ProposalReconciliationView: React.FC<ProposalReconciliationViewProp
         items: enrichedItems,
       };
     });
-    
-    // Discover any proposals referenced in transactions that are not in list
-    transactions.forEach((tx) => {
-      if (tx.proposalNumber && tx.proposalNumber.trim()) {
-        const exists = list.some((p) => isProposalMatch(p.proposalNumber, tx.proposalNumber));
-        if (!exists) {
-          list.push({
-            id: `prop-auto-${tx.id}`,
-            proposalNumber: tx.proposalNumber.trim(),
-            title: tx.title || `Tờ trình ${tx.proposalNumber.trim()}`,
-            date: tx.date || new Date().toISOString().split('T')[0],
-            creatorName: tx.creatorName || 'Hệ thống',
-            creatorEmail: tx.creatorEmail || '',
-            department: 'Đội Điện Nước Công Trình',
-            status: 'PARTIALLY_IMPORTED',
-            attachmentName: tx.proposalAttachmentName || tx.attachmentName,
-            attachmentUrl: tx.proposalAttachmentUrl || tx.attachmentUrl,
-            attachmentHtml: tx.proposalAttachmentHtml || tx.attachmentHtml,
-            attachmentType: tx.proposalAttachmentType || tx.attachmentType || 'document',
-            notes: `Tự động liên kết theo phiếu giao dịch ${tx.code}`,
-            createdAt: tx.createdAt || new Date().toISOString(),
-            items: tx.items.map((it) => {
-              const mat = materials.find((m) => m.code === it.materialCode);
-              return {
-                materialCode: it.materialCode,
-                materialName: (mat?.name && mat.name.trim() !== 'Vật tư') ? mat.name : it.materialName,
-                specification: mat?.specification || '',
-                unit: mat?.unit || it.unit || 'Cái',
-                requestedQuantity: it.quantity,
-                unitPrice: it.unitPrice,
-              };
-            }),
-          });
-        }
-      }
-    });
-
-    return list;
   }, [proposals, transactions, materials]);
 
   // Calculate reconciliation for all proposals
@@ -873,7 +849,8 @@ export const ProposalReconciliationView: React.FC<ProposalReconciliationViewProp
 
   return (
     <div className="space-y-6">
-      {/* Header Banner */}
+      <div className="no-print space-y-6">
+        {/* Header Banner */}
       <div className="bg-gradient-to-r from-slate-900 via-slate-850 to-slate-900 border border-blue-500/30 rounded-2xl p-5 shadow-lg">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="space-y-1">
@@ -1573,6 +1550,7 @@ export const ProposalReconciliationView: React.FC<ProposalReconciliationViewProp
           })
         )}
       </div>
+      </div>
 
       {/* Lightbox / View Attachment & Word Document Modal */}
       {viewingAttachment && (
@@ -1709,7 +1687,7 @@ export const ProposalReconciliationView: React.FC<ProposalReconciliationViewProp
                 {/* Print Button */}
                 <button
                   type="button"
-                  onClick={() => window.print()}
+                  onClick={() => printCleanDocument()}
                   className="bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 px-2.5 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors"
                   title="In Tờ Trình"
                 >

@@ -50,6 +50,7 @@ import { AHTLogo } from './AHTLogo';
 import { ProposalReconciliationView } from './ProposalReconciliationView';
 import { SearchableMaterialSelect } from './SearchableMaterialSelect';
 import { ProposalItem } from '../types';
+import { printCleanDocument } from '../utils/printHelper';
 
 interface TransactionManagementViewProps {
   currentUser: User;

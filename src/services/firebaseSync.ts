@@ -29,7 +29,7 @@ export const DELETED_TRANSACTIONS_COL = 'deleted_transactions';
 const LOCAL_DELETED_PROPOSALS_KEY = 'smart_deleted_proposal_numbers_v2';
 const LOCAL_DELETED_TX_KEY = 'smart_deleted_tx_codes_v1';
 
-function getLocalDeletedProposals(): Set<string> {
+export function getLocalDeletedProposals(): Set<string> {
   try {
     const raw = localStorage.getItem(LOCAL_DELETED_PROPOSALS_KEY);
     if (!raw) return new Set<string>();
@@ -40,7 +40,7 @@ function getLocalDeletedProposals(): Set<string> {
   }
 }
 
-function saveLocalDeletedProposal(target: string) {
+export function saveLocalDeletedProposal(target: string) {
   try {
     const current = getLocalDeletedProposals();
     const clean = target.toLowerCase().trim();
@@ -518,7 +518,33 @@ export async function deleteProposalFromCloud(proposalIdOrNumber: string) {
     if (found) {
       await batch.commit();
     }
+
+    // 4. Also automatically remove any linked transactions referencing this deleted proposal
+    try {
+      const txSnap = await getDocs(collection(db, TRANSACTIONS_COL));
+      const txBatch = writeBatch(db);
+      let txFound = false;
+      txSnap.forEach((d) => {
+        const txData = d.data();
+        const txProp = (txData.proposalNumber || '').trim();
+        if (
+          txProp &&
+          (isProposalMatch(txProp, target) ||
+            (normKey && normalizeProposalNumber(txProp) === normKey))
+        ) {
+          txBatch.delete(d.ref);
+          txFound = true;
+        }
+      });
+      if (txFound) {
+        await txBatch.commit();
+      }
+    } catch (txErr) {
+      console.warn('Could not cleanup linked transactions on cloud:', txErr);
+    }
+
     broadcastLocalChange('PROPOSALS');
+    broadcastLocalChange('TRANSACTIONS');
   } catch (e) {
     console.error('Error deleting proposal from Firebase:', e);
   }
@@ -587,6 +613,7 @@ export function subscribeToTransactions(
         return;
       }
       const localDelTx = getLocalDeletedTransactions();
+      const localDelProps = getLocalDeletedProposals();
       const txMap = new Map<string, InventoryTransaction>();
       snapshot.forEach((d) => {
         const data = d.data() as InventoryTransaction;
@@ -597,6 +624,20 @@ export function subscribeToTransactions(
 
         if (cloudDeletedTxCodes.has(codeLower) || cloudDeletedTxCodes.has(docIdLower) || localDelTx.has(codeLower) || localDelTx.has(docIdLower)) {
           return; // Discard deleted transactions
+        }
+
+        // Check if transaction references a deleted proposal
+        if (data.proposalNumber && data.proposalNumber.trim()) {
+          const propRaw = data.proposalNumber.trim().toLowerCase();
+          const propNorm = normalizeProposalNumber(propRaw);
+          if (
+            localDelProps.has(propRaw) ||
+            (propNorm && localDelProps.has(propNorm.toLowerCase())) ||
+            cloudDeletedKeys.has(propRaw) ||
+            (propNorm && cloudDeletedKeys.has(propNorm.toLowerCase()))
+          ) {
+            return; // Discard transactions referencing deleted proposals
+          }
         }
 
         if (!txMap.has(codeKey)) {

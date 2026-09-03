@@ -62,6 +62,7 @@ import {
   seedProposals,
   seedTransactions,
   seedUsers,
+  getLocalDeletedProposals,
 } from './services/firebaseSync';
 import {
   CheckCircle,
@@ -193,7 +194,15 @@ export function App() {
     if (saved !== null) {
       try {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) return parsed;
+        if (Array.isArray(parsed)) {
+          const deletedProps = getLocalDeletedProposals();
+          return parsed.filter((tx: InventoryTransaction) => {
+            if (!tx.proposalNumber) return true;
+            const norm = tx.proposalNumber.toLowerCase().replace(/[^a-z0-9]/g, '');
+            const raw = tx.proposalNumber.toLowerCase().trim();
+            return !deletedProps.has(raw) && (!norm || !deletedProps.has(norm));
+          });
+        }
       } catch {
         return [];
       }
@@ -854,6 +863,15 @@ export function App() {
       );
       safeStorage.setItem('smart_proposals_v5', JSON.stringify(nextList));
       return nextList;
+    });
+
+    // Automatically remove any transactions created for this deleted proposal
+    setTransactions((prev) => {
+      const remainingTxs = prev.filter(
+        (t) => !t.proposalNumber || !isProposalMatch(t.proposalNumber, propNum)
+      );
+      safeStorage.setItem('smart_transactions_v9', JSON.stringify(remainingTxs));
+      return remainingTxs;
     });
 
     // Delete from Firestore Cloud permanently
