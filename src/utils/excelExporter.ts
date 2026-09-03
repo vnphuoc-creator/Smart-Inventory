@@ -1,6 +1,6 @@
 import * as XLSX from 'xlsx';
 import { Material, InventoryTransaction, PurchaseProposal } from '../types';
-import { isProposalMatch } from './inventoryEngine';
+import { isProposalMatch, isWarehouseMatch } from './inventoryEngine';
 
 export interface ReportDateRange {
   startDate: string; // YYYY-MM-DD
@@ -34,19 +34,19 @@ export function calculateDateRangeReportData(
   warehouse?: string,
   proposals?: PurchaseProposal[]
 ): DetailedStockReportItem[] {
-  // 1. Deduplicate materials by code
+  // 1. Deduplicate materials by code (case-insensitive)
   const uniqueMaterialsMap = new Map<string, Material>();
   materials.forEach((m) => {
     if (!m || !m.code) return;
-    const cleanCode = m.code.trim();
+    const cleanCode = m.code.trim().toUpperCase();
     if (!uniqueMaterialsMap.has(cleanCode)) {
-      uniqueMaterialsMap.set(cleanCode, { ...m, code: cleanCode });
+      uniqueMaterialsMap.set(cleanCode, { ...m, code: m.code.trim() });
     } else {
       const existing = uniqueMaterialsMap.get(cleanCode)!;
       uniqueMaterialsMap.set(cleanCode, {
         ...existing,
         ...m,
-        code: cleanCode,
+        code: existing.code,
         initialStock: m.initialStock ?? existing.initialStock,
         unitPrice: m.unitPrice || existing.unitPrice,
       });
@@ -58,22 +58,39 @@ export function calculateDateRangeReportData(
 
   const isSpecificProposal = Boolean(proposalNumber && proposalNumber !== 'ALL');
   if (isSpecificProposal) {
-    approvedTx = approvedTx.filter((t) => isProposalMatch(t.proposalNumber, proposalNumber));
+    approvedTx = approvedTx.filter(
+      (t) =>
+        isProposalMatch(t.proposalNumber, proposalNumber) ||
+        t.items.some((i) => isProposalMatch(i.proposalNumber, proposalNumber))
+    );
   }
 
-  // Filter by warehouse if a specific warehouse is selected
-  if (warehouse && warehouse !== 'ALL' && warehouse !== 'Tất cả kho' && !warehouse.startsWith('ALL')) {
-    approvedTx = approvedTx.filter((t) => {
-      if (!t.warehouse) return true;
-      const wLower = warehouse.toLowerCase().trim();
-      const twLower = t.warehouse.toLowerCase().trim();
-      if (twLower.includes(wLower) || wLower.includes(twLower)) return true;
-      if (wLower.includes('doidnct') && (twLower.includes('điện nước') || twLower.includes('doidnct'))) return true;
-      if (wLower.includes('tổng') && twLower.includes('tổng')) return true;
-      if (wLower.includes('dự phòng') && twLower.includes('dự phòng')) return true;
-      return false;
+  // Filter by warehouse
+  approvedTx = approvedTx.filter((t) => isWarehouseMatch(t.warehouse, warehouse));
+
+  // Also ensure any material code present in approved transactions is registered
+  approvedTx.forEach((tx) => {
+    tx.items.forEach((item) => {
+      if (item.materialCode) {
+        const cleanCode = item.materialCode.trim().toUpperCase();
+        if (!uniqueMaterialsMap.has(cleanCode)) {
+          uniqueMaterialsMap.set(cleanCode, {
+            id: `tx-mat-${cleanCode}`,
+            code: item.materialCode.trim(),
+            name: item.materialName || item.materialCode.trim(),
+            category: 'Vật tư phụ & Công cụ dụng cụ',
+            unit: item.unit || 'Cái',
+            specification: 'Vật tư theo chứng từ',
+            location: 'Kho Tổng AHT',
+            initialStock: 0,
+            minStock: 0,
+            maxStock: 1000,
+            unitPrice: item.unitPrice || 0,
+          });
+        }
+      }
     });
-  }
+  });
 
   // 3. Determine target materials list
   let targetMaterials: Material[] = Array.from(uniqueMaterialsMap.values());
@@ -154,11 +171,16 @@ export function calculateDateRangeReportData(
     // When filtering by a specific proposal, opening stock is strictly based on that proposal's prior transactions
     let openingQty = isSpecificProposal ? 0 : (mat.initialStock || 0);
 
+    const cleanMatCode = mat.code?.trim().toUpperCase();
+
     // Adjust opening stock by approved transactions before startDate
     approvedTx.forEach((tx) => {
       if (tx.date < startDate) {
         tx.items.forEach((item) => {
-          if (item.materialCode === mat.code) {
+          if (item.materialCode?.trim().toUpperCase() === cleanMatCode) {
+            if (isSpecificProposal && !isProposalMatch(item.proposalNumber || tx.proposalNumber, proposalNumber)) {
+              return;
+            }
             if (tx.type === 'IMPORT') {
               openingQty += item.quantity;
             } else if (tx.type === 'EXPORT') {
@@ -179,7 +201,10 @@ export function calculateDateRangeReportData(
     approvedTx.forEach((tx) => {
       if (tx.date >= startDate && tx.date <= endDate) {
         tx.items.forEach((item) => {
-          if (item.materialCode === mat.code) {
+          if (item.materialCode?.trim().toUpperCase() === cleanMatCode) {
+            if (isSpecificProposal && !isProposalMatch(item.proposalNumber || tx.proposalNumber, proposalNumber)) {
+              return;
+            }
             const price = item.unitPrice > 0 ? item.unitPrice : (mat.unitPrice || 0);
             if (tx.type === 'IMPORT') {
               importQty += item.quantity;
@@ -201,7 +226,10 @@ export function calculateDateRangeReportData(
       approvedTx.forEach((tx) => {
         if (tx.type === 'IMPORT') {
           tx.items.forEach((item) => {
-            if (item.materialCode === mat.code) {
+            if (item.materialCode?.trim().toUpperCase() === cleanMatCode) {
+              if (isSpecificProposal && !isProposalMatch(item.proposalNumber || tx.proposalNumber, proposalNumber)) {
+                return;
+              }
               if (!lastImportDate || tx.date > lastImportDate) {
                 lastImportDate = tx.date;
               }
@@ -244,6 +272,180 @@ export function calculateDateRangeReportData(
       lastImportDate: formattedLastDate,
     };
   });
+}
+
+/**
+ * Export Individual Stock Card (Sổ Thẻ Kho Mẫu S12-DN) into formatted Excel
+ */
+export function exportStockCardToExcel(
+  material: Material,
+  entries: any[],
+  startDate?: string,
+  endDate?: string,
+  warehouseName = 'Kho Tổng AHT / Kho Đội Điện Nước',
+  proposalNumber?: string
+) {
+  const today = new Date();
+  const dateStr = `${today.getDate().toString().padStart(2, '0')}/${(today.getMonth() + 1).toString().padStart(2, '0')}/${today.getFullYear()}`;
+  const fromDateStr = startDate ? startDate.split('-').reverse().join('/') : '01/08/2026';
+  const toDateStr = endDate ? endDate.split('-').reverse().join('/') : dateStr;
+
+  const aoa: any[][] = [];
+
+  // Header rows
+  aoa.push(['CÔNG TY CỔ PHẦN ĐẦU TƯ KHAI THÁC NHÀ GA QUỐC TẾ ĐÀ NẴNG (AHT)']);
+  aoa.push(['ĐỘI ĐIỆN NƯỚC CÔNG TRÌNH - DOIDNCT']);
+  aoa.push([]);
+  aoa.push(['', '', '', '', 'SỔ THẺ KHO CHI TIẾT VẬT TƯ']);
+  aoa.push(['', '', '', '', `Từ ngày ${fromDateStr} đến ngày ${toDateStr}`]);
+  const displayWh = warehouseName === 'ALL' ? 'Tất cả các kho AHT' : warehouseName;
+  aoa.push(['', '', '', '', `Kho hàng: ${displayWh}`]);
+  if (proposalNumber && proposalNumber !== 'ALL') {
+    aoa.push(['', '', '', '', `Tờ trình: ${proposalNumber}`]);
+  }
+  aoa.push([]);
+  aoa.push([
+    `Mã vật tư: ${material.code}`,
+    '',
+    `Tên vật tư: ${material.name}`,
+    '',
+    `ĐVT: ${material.unit}`,
+    '',
+    `Đơn giá: ${material.unitPrice?.toLocaleString('vi-VN')} VNĐ`,
+  ]);
+  aoa.push([`Quy cách kỹ thuật: ${material.specification || 'Theo tiêu chuẩn nhà sản xuất'}`]);
+  aoa.push([]);
+
+  // Table header
+  aoa.push([
+    'STT',
+    'Ngày chứng từ',
+    'Số hiệu chứng từ',
+    'Diễn giải nội dung',
+    'Đơn vị / Đối tác',
+    'Số lượng Nhập (+)',
+    'Số lượng Xuất (-)',
+    'Số lượng Tồn',
+    'Đơn giá (VNĐ)',
+    'Thành tiền (VNĐ)',
+    'Người thực hiện',
+    'Ghi chú',
+  ]);
+
+  let totalIn = 0;
+  let totalOut = 0;
+
+  // Entries
+  entries.forEach((entry, idx) => {
+    const isInitial = entry.documentCode === 'TON-DAU-KY';
+    if (!isInitial) {
+      if (entry.documentType === 'IMPORT') totalIn += entry.quantityIn;
+      if (entry.documentType === 'EXPORT') totalOut += entry.quantityOut;
+    }
+
+    aoa.push([
+      idx + 1,
+      entry.date,
+      entry.documentCode,
+      entry.documentTitle,
+      entry.partner || '',
+      isInitial ? '-' : (entry.quantityIn > 0 ? entry.quantityIn : '-'),
+      isInitial ? '-' : (entry.quantityOut > 0 ? entry.quantityOut : '-'),
+      entry.balance,
+      entry.unitPrice,
+      entry.amount,
+      entry.operator || '',
+      entry.notes || '',
+    ]);
+  });
+
+  // Summary rows
+  const closingBalance = entries[entries.length - 1]?.balance ?? material.initialStock;
+  aoa.push([]);
+  aoa.push([
+    '',
+    '',
+    'CỘNG PHÁT SINH TRONG KỲ',
+    '',
+    '',
+    totalIn,
+    totalOut,
+    '-',
+    '',
+    '',
+    '',
+    '',
+  ]);
+  aoa.push([
+    '',
+    '',
+    'SỐ DƯ TỒN CUỐI KỲ',
+    '',
+    '',
+    '',
+    '',
+    closingBalance,
+    material.unitPrice,
+    closingBalance * (material.unitPrice || 0),
+    '',
+    '',
+  ]);
+
+  // Signatures
+  aoa.push([]);
+  aoa.push(['', '', '', '', '', '', '', '', '', `Đà Nẵng, ngày ${today.getDate()} tháng ${today.getMonth() + 1} năm ${today.getFullYear()}`]);
+  aoa.push([]);
+  aoa.push([
+    'NGƯỜI LẬP BIỂU',
+    '',
+    '',
+    'THỦ KHO',
+    '',
+    '',
+    '',
+    '',
+    '',
+    'QUẢN LÝ / PHÊ DUYỆT',
+  ]);
+  aoa.push([
+    '(Ký, ghi rõ họ tên)',
+    '',
+    '',
+    '(Ký, ghi rõ họ tên)',
+    '',
+    '',
+    '',
+    '',
+    '',
+    '(Ký, đóng dấu)',
+  ]);
+
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+
+  ws['!merges'] = [
+    { s: { r: 3, c: 0 }, e: { r: 3, c: 11 } },
+    { s: { r: 4, c: 0 }, e: { r: 4, c: 11 } },
+    { s: { r: 5, c: 0 }, e: { r: 5, c: 11 } },
+  ];
+
+  ws['!cols'] = [
+    { wch: 6 },  // STT
+    { wch: 14 }, // Ngày
+    { wch: 18 }, // Số hiệu
+    { wch: 38 }, // Diễn giải
+    { wch: 26 }, // Đối tác
+    { wch: 16 }, // Nhập
+    { wch: 16 }, // Xuất
+    { wch: 16 }, // Tồn
+    { wch: 16 }, // Đơn giá
+    { wch: 18 }, // Thành tiền
+    { wch: 20 }, // Người thực hiện
+    { wch: 24 }, // Ghi chú
+  ];
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'The_Kho');
+  XLSX.writeFile(wb, `The_Kho_${material.code}_${today.toISOString().split('T')[0].replace(/-/g, '')}.xlsx`);
 }
 
 /**

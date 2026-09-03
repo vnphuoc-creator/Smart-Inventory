@@ -201,7 +201,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 <div className="relative w-6 h-6 rounded-lg overflow-hidden border border-cyan-400/50 shadow shrink-0">
                   <img
                     src={seagullWelcoming}
-                    alt="Hải Âu AHT"
+                    alt="Avatar thành viên"
                     className="w-full h-full object-cover group-hover:scale-110 transition-transform"
                     referrerPolicy="no-referrer"
                   />
@@ -223,7 +223,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                       <div className="relative w-10 h-10 rounded-xl overflow-hidden border-2 border-cyan-400/60 shadow-md shrink-0 bg-slate-950">
                         <img
                           src={seagullWelcoming}
-                          alt="Hải Âu AHT"
+                          alt="Avatar thành viên"
                           className="w-full h-full object-cover animate-seagull-wave"
                           referrerPolicy="no-referrer"
                         />

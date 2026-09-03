@@ -33,6 +33,7 @@ import {
   DEFAULT_THEME_CONFIG,
 } from './types';
 import { calculateAllMaterialStocks, formatVND } from './utils/inventoryEngine';
+import { safeStorage } from './utils/safeStorage';
 import {
   subscribeToUsers,
   subscribeToMaterials,
@@ -70,7 +71,7 @@ import {
 export function App() {
   // Global User State with Firebase Cloud Real-time synchronization
   const [users, setUsers] = useState<User[]>(() => {
-    const saved = localStorage.getItem('smart_users_v6');
+    const saved = safeStorage.getItem('smart_users_v6');
     if (saved) {
       try {
         const parsed: User[] = JSON.parse(saved);
@@ -84,7 +85,7 @@ export function App() {
 
   // Authentication State
   const [currentUser, setCurrentUser] = useState<User | null>(() => {
-    const savedUserId = localStorage.getItem('smart_auth_user_id');
+    const savedUserId = safeStorage.getItem('smart_auth_user_id');
     if (savedUserId) {
       const found = users.find((u) => u.id === savedUserId);
       if (found) return found;
@@ -103,9 +104,9 @@ export function App() {
     }
   }, [users, currentUser]);
 
-  // Sync users to localStorage as offline cache
+  // Sync users to safeStorage as offline cache
   useEffect(() => {
-    localStorage.setItem('smart_users_v6', JSON.stringify(users));
+    safeStorage.setItem('smart_users_v6', JSON.stringify(users));
   }, [users]);
 
   // Connect Firebase Realtime Subscription for Users
@@ -125,7 +126,7 @@ export function App() {
 
   // Materials State
   const [materials, setMaterials] = useState<Material[]>(() => {
-    const saved = localStorage.getItem('smart_materials_v12');
+    const saved = safeStorage.getItem('smart_materials_v12');
     if (saved) {
       try {
         const parsed: Material[] = JSON.parse(saved);
@@ -140,7 +141,7 @@ export function App() {
   });
 
   useEffect(() => {
-    localStorage.setItem('smart_materials_v12', JSON.stringify(materials));
+    safeStorage.setItem('smart_materials_v12', JSON.stringify(materials));
   }, [materials]);
 
   // Firebase Realtime Subscription for Materials
@@ -155,7 +156,7 @@ export function App() {
 
   // Proposals State
   const [proposals, setProposals] = useState<PurchaseProposal[]>(() => {
-    const saved = localStorage.getItem('smart_proposals_v5');
+    const saved = safeStorage.getItem('smart_proposals_v5');
     if (saved !== null) {
       try {
         const parsed = JSON.parse(saved);
@@ -168,7 +169,7 @@ export function App() {
   });
 
   useEffect(() => {
-    localStorage.setItem('smart_proposals_v5', JSON.stringify(proposals));
+    safeStorage.setItem('smart_proposals_v5', JSON.stringify(proposals));
   }, [proposals]);
 
   // Firebase Realtime Subscription for Proposals
@@ -183,7 +184,7 @@ export function App() {
 
   // Transactions State
   const [transactions, setTransactions] = useState<InventoryTransaction[]>(() => {
-    const saved = localStorage.getItem('smart_transactions_v9');
+    const saved = safeStorage.getItem('smart_transactions_v9');
     if (saved !== null) {
       try {
         const parsed = JSON.parse(saved);
@@ -196,7 +197,7 @@ export function App() {
   });
 
   useEffect(() => {
-    localStorage.setItem('smart_transactions_v9', JSON.stringify(transactions));
+    safeStorage.setItem('smart_transactions_v9', JSON.stringify(transactions));
   }, [transactions]);
 
   // Firebase Realtime Subscription for Transactions
@@ -211,7 +212,7 @@ export function App() {
 
   // Real-time Activity Logs State
   const [activityLogs, setActivityLogs] = useState<ActivityLog[]>(() => {
-    const saved = localStorage.getItem('smart_activity_logs_v3');
+    const saved = safeStorage.getItem('smart_activity_logs_v3');
     if (saved !== null) {
       try {
         const parsed = JSON.parse(saved);
@@ -224,7 +225,7 @@ export function App() {
   });
 
   useEffect(() => {
-    localStorage.setItem('smart_activity_logs_v3', JSON.stringify(activityLogs));
+    safeStorage.setItem('smart_activity_logs_v3', JSON.stringify(activityLogs));
   }, [activityLogs]);
 
   // Firebase Realtime Subscription for Activity Logs
@@ -251,7 +252,7 @@ export function App() {
 
   // Advanced UI Theme Configuration State
   const [themeConfig, setThemeConfig] = useState<UIThemeConfig>(() => {
-    const saved = localStorage.getItem('smart_ui_theme_config_v2');
+    const saved = safeStorage.getItem('smart_ui_theme_config_v2');
     if (saved) {
       try {
         return { ...DEFAULT_THEME_CONFIG, ...JSON.parse(saved) };
@@ -259,7 +260,7 @@ export function App() {
         return DEFAULT_THEME_CONFIG;
       }
     }
-    const legacyTheme = localStorage.getItem('smart_theme_mode');
+    const legacyTheme = safeStorage.getItem('smart_theme_mode');
     if (legacyTheme === 'light') {
       return { ...DEFAULT_THEME_CONFIG, canvasMode: 'light-modern', preset: 'light-corporate' };
     }
@@ -344,15 +345,15 @@ export function App() {
 
   const handleApplyThemeConfig = (newConfig: UIThemeConfig) => {
     setThemeConfig(newConfig);
-    localStorage.setItem('smart_ui_theme_config_v2', JSON.stringify(newConfig));
+    safeStorage.setItem('smart_ui_theme_config_v2', JSON.stringify(newConfig));
     const isLight = newConfig.canvasMode === 'light-modern' || newConfig.canvasMode === 'danang-ibms';
-    localStorage.setItem('smart_theme_mode', isLight ? 'light' : 'dark');
+    safeStorage.setItem('smart_theme_mode', isLight ? 'light' : 'dark');
   };
 
   const handleResetThemeConfig = () => {
     setThemeConfig(DEFAULT_THEME_CONFIG);
-    localStorage.removeItem('smart_ui_theme_config_v2');
-    localStorage.setItem('smart_theme_mode', 'dark');
+    safeStorage.removeItem('smart_ui_theme_config_v2');
+    safeStorage.setItem('smart_theme_mode', 'dark');
   };
 
   const handleToggleTheme = () => {
@@ -466,7 +467,7 @@ export function App() {
   // Login handler
   const handleLogin = (user: User) => {
     setCurrentUser(user);
-    localStorage.setItem('smart_auth_user_id', user.id);
+    safeStorage.setItem('smart_auth_user_id', user.id);
 
     logActivity(
       'LOGIN',
@@ -489,7 +490,7 @@ export function App() {
       );
     }
     setCurrentUser(null);
-    localStorage.removeItem('smart_auth_user_id');
+    safeStorage.removeItem('smart_auth_user_id');
     showToast('Đã đăng xuất khỏi hệ thống.', 'info');
   };
 
@@ -676,7 +677,7 @@ export function App() {
           t.id?.toLowerCase() !== targetId.toLowerCase() &&
           t.code?.toLowerCase() !== code.toLowerCase()
       );
-      localStorage.setItem('smart_transactions_v9', JSON.stringify(nextList));
+      safeStorage.setItem('smart_transactions_v9', JSON.stringify(nextList));
       return nextList;
     });
 
@@ -731,7 +732,7 @@ export function App() {
           p.id?.toLowerCase() !== targetId.toLowerCase() &&
           p.proposalNumber?.toLowerCase() !== propNum.toLowerCase()
       );
-      localStorage.setItem('smart_proposals_v5', JSON.stringify(nextList));
+      safeStorage.setItem('smart_proposals_v5', JSON.stringify(nextList));
       return nextList;
     });
 
@@ -763,9 +764,9 @@ export function App() {
     setMaterials(INITIAL_MATERIALS);
     setTransactions(INITIAL_TRANSACTIONS);
     setProposals(INITIAL_PROPOSALS);
-    localStorage.setItem('smart_materials_v12', JSON.stringify(INITIAL_MATERIALS));
-    localStorage.setItem('smart_transactions_v9', JSON.stringify(INITIAL_TRANSACTIONS));
-    localStorage.setItem('smart_proposals_v5', JSON.stringify(INITIAL_PROPOSALS));
+    safeStorage.setItem('smart_materials_v12', JSON.stringify(INITIAL_MATERIALS));
+    safeStorage.setItem('smart_transactions_v9', JSON.stringify(INITIAL_TRANSACTIONS));
+    safeStorage.setItem('smart_proposals_v5', JSON.stringify(INITIAL_PROPOSALS));
     seedMaterials(INITIAL_MATERIALS);
     seedTransactions(INITIAL_TRANSACTIONS);
     seedProposals(INITIAL_PROPOSALS);
@@ -784,8 +785,8 @@ export function App() {
   const handleClearAllTransactionsAndProposals = async () => {
     setTransactions([]);
     setProposals([]);
-    localStorage.setItem('smart_transactions_v9', JSON.stringify([]));
-    localStorage.setItem('smart_proposals_v5', JSON.stringify([]));
+    safeStorage.setItem('smart_transactions_v9', JSON.stringify([]));
+    safeStorage.setItem('smart_proposals_v5', JSON.stringify([]));
     await clearTransactionsFromCloud();
     await clearProposalsFromCloud();
 
@@ -802,7 +803,7 @@ export function App() {
   // Handler: Clear Activity Logs
   const handleClearActivityLogs = async () => {
     setActivityLogs([]);
-    localStorage.setItem('smart_activity_logs_v3', JSON.stringify([]));
+    safeStorage.setItem('smart_activity_logs_v3', JSON.stringify([]));
     await clearLogsFromCloud();
     showToast('Đã xóa sạch toàn bộ lịch sử thao tác real-time!', 'info');
   };
@@ -866,7 +867,7 @@ export function App() {
   }
 
   return (
-    <div className="flex h-screen bg-slate-950 text-slate-100 overflow-hidden font-sans">
+    <div className="flex h-screen h-[100dvh] bg-slate-950 text-slate-100 overflow-hidden font-sans">
       {/* Sidebar Navigation */}
       <Sidebar
         activeTab={activeTab}
@@ -1012,7 +1013,7 @@ export function App() {
                 allUsers={users}
                 onSelectUser={(u) => {
                   setCurrentUser(u);
-                  localStorage.setItem('smart_auth_user_id', u.id);
+                  safeStorage.setItem('smart_auth_user_id', u.id);
                   showToast(`Đã chuyển phiên làm việc sang: ${u.fullName}`);
                 }}
                 onUpdateUser={handleUpdateUser}

@@ -43,6 +43,7 @@ import {
 import {
   calculateDateRangeReportData,
   exportToOfficialExcel,
+  exportStockCardToExcel,
   DetailedStockReportItem,
 } from '../utils/excelExporter';
 import { ALL_MATERIAL_CATEGORIES } from '../data/materialsData';
@@ -70,7 +71,7 @@ export const StockLedgerView: React.FC<StockLedgerViewProps> = ({
   );
 
   // Date Range Filters for Report
-  const [datePreset, setDatePreset] = useState<'ALL' | 'TODAY' | 'WEEK' | 'MONTH' | 'AUG2026' | 'YEAR' | 'CUSTOM'>('ALL');
+  const [datePreset, setDatePreset] = useState<'ALL' | 'TODAY' | 'WEEK' | 'MONTH' | 'YEAR' | 'CUSTOM'>('ALL');
   const [startDate, setStartDate] = useState('2024-01-01');
   const [endDate, setEndDate] = useState('2026-12-31');
   const [warehouseName, setWarehouseName] = useState('ALL');
@@ -108,15 +109,21 @@ export const StockLedgerView: React.FC<StockLedgerViewProps> = ({
     return Array.from(set).sort();
   }, [transactions, proposals]);
 
-  // Update if initial code changes
+  // Update if initial code changes or when materials load
   React.useEffect(() => {
     if (initialMaterialCode) {
       setSelectedMaterialCode(initialMaterialCode);
     }
   }, [initialMaterialCode]);
 
+  React.useEffect(() => {
+    if (!selectedMaterialCode && uniqueMaterials.length > 0) {
+      setSelectedMaterialCode(uniqueMaterials[0].code);
+    }
+  }, [uniqueMaterials, selectedMaterialCode]);
+
   // Handle Preset Date selection
-  const handleSelectPreset = (preset: 'ALL' | 'TODAY' | 'WEEK' | 'MONTH' | 'AUG2026' | 'YEAR') => {
+  const handleSelectPreset = (preset: 'ALL' | 'TODAY' | 'WEEK' | 'MONTH' | 'YEAR') => {
     setDatePreset(preset);
     const now = new Date();
     const pad = (n: number) => n.toString().padStart(2, '0');
@@ -142,9 +149,6 @@ export const StockLedgerView: React.FC<StockLedgerViewProps> = ({
       const last = new Date(y, m + 1, 0);
       setStartDate(`${y}-${pad(m + 1)}-${pad(first.getDate())}`);
       setEndDate(`${y}-${pad(m + 1)}-${pad(last.getDate())}`);
-    } else if (preset === 'AUG2026') {
-      setStartDate('2026-08-01');
-      setEndDate('2026-08-31');
     } else if (preset === 'YEAR') {
       setStartDate('2026-01-01');
       setEndDate('2026-12-31');
@@ -184,7 +188,8 @@ export const StockLedgerView: React.FC<StockLedgerViewProps> = ({
   // Filter report data by category, search, and onlyMovement toggle
   const filteredReportData = useMemo(() => {
     return fullReportData.filter((item) => {
-      if (onlyMovement && item.importQty === 0 && item.exportQty === 0 && item.openingQty === 0 && item.closingQty === 0) {
+      // When "onlyMovement" is active, strictly show items that have actual import or export activity in the selected range
+      if (onlyMovement && item.importQty === 0 && item.exportQty === 0) {
         return false;
       }
       if (reportCategory !== 'ALL' && item.category !== reportCategory) return false;
@@ -232,27 +237,77 @@ export const StockLedgerView: React.FC<StockLedgerViewProps> = ({
     setSubTab('CARD');
   };
 
+  // Effective Material code with fallback
+  const effectiveMaterialCode = useMemo(() => {
+    if (selectedMaterialCode) return selectedMaterialCode;
+    return uniqueMaterials[0]?.code || '';
+  }, [selectedMaterialCode, uniqueMaterials]);
+
   // Active Material details for Stock Card tab
   const activeMaterial = useMemo(() => {
+    const clean = effectiveMaterialCode.trim().toUpperCase();
     return (
-      calculatedStocks.find((m) => m.code === selectedMaterialCode) ||
-      uniqueMaterials.find((m) => m.code === selectedMaterialCode) ||
+      calculatedStocks.find((m) => m.code?.trim().toUpperCase() === clean) ||
+      uniqueMaterials.find((m) => m.code?.trim().toUpperCase() === clean) ||
       uniqueMaterials[0]
     );
-  }, [calculatedStocks, uniqueMaterials, selectedMaterialCode]);
+  }, [calculatedStocks, uniqueMaterials, effectiveMaterialCode]);
 
-  // Stock Card entries for selected material
+  // Stock Card entries for selected material (with period, proposal, and warehouse filtering)
   const stockCardEntries: StockCardEntry[] = useMemo(() => {
-    if (!selectedMaterialCode) return [];
-    return generateStockCard(selectedMaterialCode, uniqueMaterials, transactions);
-  }, [selectedMaterialCode, uniqueMaterials, transactions]);
+    if (!effectiveMaterialCode) return [];
+    return generateStockCard(
+      effectiveMaterialCode,
+      uniqueMaterials,
+      transactions,
+      startDate,
+      endDate,
+      selectedProposalNumber,
+      warehouseName
+    );
+  }, [
+    effectiveMaterialCode,
+    uniqueMaterials,
+    transactions,
+    startDate,
+    endDate,
+    selectedProposalNumber,
+    warehouseName,
+  ]);
+
+  // Stock Card summary calculations
+  const cardOpeningQty = useMemo(() => {
+    const initEntry = stockCardEntries.find((e) => e.documentCode === 'TON-DAU-KY');
+    return initEntry ? initEntry.balance : (activeMaterial?.initialStock || 0);
+  }, [stockCardEntries, activeMaterial]);
+
+  const cardImportQty = useMemo(() => {
+    return stockCardEntries
+      .filter((e) => e.documentCode !== 'TON-DAU-KY' && e.documentType === 'IMPORT')
+      .reduce((sum, e) => sum + e.quantityIn, 0);
+  }, [stockCardEntries]);
+
+  const cardExportQty = useMemo(() => {
+    return stockCardEntries
+      .filter((e) => e.documentType === 'EXPORT')
+      .reduce((sum, e) => sum + e.quantityOut, 0);
+  }, [stockCardEntries]);
+
+  const cardClosingQty = useMemo(() => {
+    if (stockCardEntries.length === 0) return activeMaterial?.initialStock || 0;
+    return stockCardEntries[stockCardEntries.length - 1].balance;
+  }, [stockCardEntries, activeMaterial]);
+
+  const cardTotalValue = useMemo(() => {
+    return Math.max(0, cardClosingQty) * (activeMaterial?.unitPrice || 0);
+  }, [cardClosingQty, activeMaterial]);
 
   // Chart data for stock card balance
   const balanceChartData = useMemo(() => {
     return stockCardEntries.map((e) => ({
       name: `${e.date.slice(5)} (${e.documentCode})`,
       'Tồn kho': e.balance,
-      'Nhập': e.quantityIn,
+      'Nhập': e.documentCode === 'TON-DAU-KY' ? 0 : e.quantityIn,
       'Xuất': e.quantityOut,
     }));
   }, [stockCardEntries]);
@@ -264,10 +319,23 @@ export const StockLedgerView: React.FC<StockLedgerViewProps> = ({
     return parts.length === 3 ? `${parts[2]}/${parts[1]}/${parts[0]}` : dStr;
   };
 
-  // Export to Excel handler
+  // Export to Excel handler (Báo cáo tổng hợp)
   const handleExportExcel = () => {
     exportToOfficialExcel(
       filteredReportData,
+      startDate,
+      endDate,
+      warehouseName,
+      selectedProposalNumber
+    );
+  };
+
+  // Export to Excel handler (Sổ Thẻ Kho)
+  const handleExportStockCardExcel = () => {
+    if (!activeMaterial) return;
+    exportStockCardToExcel(
+      activeMaterial,
+      stockCardEntries,
       startDate,
       endDate,
       warehouseName,
@@ -339,17 +407,6 @@ export const StockLedgerView: React.FC<StockLedgerViewProps> = ({
                   }`}
                 >
                   Tất cả thời gian
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleSelectPreset('AUG2026')}
-                  className={`px-3 py-1 rounded-lg text-xs font-semibold transition-colors ${
-                    datePreset === 'AUG2026'
-                      ? 'bg-blue-600 text-white shadow-sm'
-                      : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
-                  }`}
-                >
-                  Tháng 8/2026
                 </button>
                 <button
                   type="button"
@@ -726,8 +783,33 @@ export const StockLedgerView: React.FC<StockLedgerViewProps> = ({
                 <tbody className="divide-y divide-slate-800 font-mono text-xs">
                   {filteredReportData.length === 0 ? (
                     <tr>
-                      <td colSpan={14} className="px-4 py-8 text-center text-slate-500 font-sans">
-                        Không có dữ liệu vật tư phù hợp với bộ lọc.
+                      <td colSpan={14} className="px-4 py-12 text-center text-slate-400 font-sans">
+                        <div className="max-w-md mx-auto flex flex-col items-center justify-center gap-3">
+                          <div className="w-10 h-10 rounded-full bg-slate-800 text-slate-400 flex items-center justify-center">
+                            <RotateCcw className="w-5 h-5" />
+                          </div>
+                          <div>
+                            <p className="font-semibold text-slate-200 text-sm">
+                              {onlyMovement
+                                ? `Không có phát sinh nhập/xuất trong kỳ này ${warehouseName !== 'ALL' ? `(Kho ${warehouseName})` : ''}`
+                                : 'Không tìm thấy dữ liệu vật tư phù hợp với bộ lọc'}
+                            </p>
+                            <p className="text-xs text-slate-400 mt-1">
+                              {onlyMovement
+                                ? `Kho hiện có ${fullReportData.length} mặt hàng tồn kho nhưng chưa có phiếu nhập/xuất trong khoảng thời gian đã chọn.`
+                                : 'Vui lòng kiểm tra lại từ khóa tìm kiếm hoặc khoảng ngày.'}
+                            </p>
+                          </div>
+                          {onlyMovement && (
+                            <button
+                              type="button"
+                              onClick={() => setOnlyMovement(false)}
+                              className="px-4 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-semibold transition-colors shadow"
+                            >
+                              Xem tất cả tồn kho ({fullReportData.length} mục)
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ) : (
@@ -814,6 +896,51 @@ export const StockLedgerView: React.FC<StockLedgerViewProps> = ({
                     ))
                   )}
                 </tbody>
+                {/* Official Table Footer matching Totals */}
+                <tfoot className="bg-slate-850 text-white font-bold border-t-2 border-slate-600">
+                  <tr>
+                    <td className="px-2 py-2.5 border-r border-slate-700 font-mono text-center text-[11px] text-slate-400">
+                      ∑
+                    </td>
+                    <td className="px-3 py-2.5 border-r border-slate-700 font-mono text-center text-[11px] text-slate-400">
+                      TỔNG CỘNG
+                    </td>
+                    <td className="px-3 py-2.5 border-r border-slate-700 uppercase tracking-wide text-amber-400 font-sans">
+                      VẬT TƯ AHT ({filteredReportData.length} mục)
+                    </td>
+                    <td className="px-2 py-2.5 border-r border-slate-700 text-center">-</td>
+                    {/* Đầu kỳ */}
+                    <td className="px-2.5 py-2.5 border-r border-slate-700 text-right font-mono text-slate-200">
+                      {formatNumber(reportTotals.openingQty)}
+                    </td>
+                    <td className="px-2.5 py-2.5 border-r border-slate-700 text-right font-mono text-slate-200">
+                      {formatVND(reportTotals.openingValue)}
+                    </td>
+                    {/* Nhập */}
+                    <td className="px-2.5 py-2.5 border-r border-slate-700 text-right font-mono text-blue-300">
+                      {formatNumber(reportTotals.importQty)}
+                    </td>
+                    <td className="px-2.5 py-2.5 border-r border-slate-700 text-right font-mono text-blue-300">
+                      {formatVND(reportTotals.importValue)}
+                    </td>
+                    {/* Xuất */}
+                    <td className="px-2.5 py-2.5 border-r border-slate-700 text-right font-mono text-amber-300">
+                      {formatNumber(reportTotals.exportQty)}
+                    </td>
+                    <td className="px-2.5 py-2.5 border-r border-slate-700 text-right font-mono text-amber-300">
+                      {formatVND(reportTotals.exportValue)}
+                    </td>
+                    {/* Cuối kỳ */}
+                    <td className="px-2.5 py-2.5 border-r border-slate-700 text-right font-mono text-emerald-300">
+                      {formatNumber(reportTotals.closingQty)}
+                    </td>
+                    <td className="px-2.5 py-2.5 border-r border-slate-700 text-right font-mono text-emerald-300">
+                      {formatVND(reportTotals.closingValue)}
+                    </td>
+                    <td className="px-3 py-2.5 text-center text-slate-400">-</td>
+                    <td className="px-2 py-2.5 text-center text-slate-400 no-print">-</td>
+                  </tr>
+                </tfoot>
               </table>
             </div>
 
@@ -877,16 +1004,16 @@ export const StockLedgerView: React.FC<StockLedgerViewProps> = ({
       {/* ========================================================================= */}
       {subTab === 'CARD' && (
         <div className="space-y-6">
-          {/* Material Selector & Stock Card summary */}
-          <div className="no-print bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-5 space-y-4">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          {/* Material Selector & Quick Period Filter Strip */}
+          <div className="no-print bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-5 space-y-4 shadow-sm">
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
               {/* Searchable Material Dropdown */}
               <div className="flex-1 max-w-xl">
                 <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1.5">
                   Tìm kiếm & Chọn mặt hàng xem Sổ Thẻ Kho:
                 </label>
                 <SearchableMaterialSelect
-                  value={selectedMaterialCode}
+                  value={effectiveMaterialCode}
                   materials={uniqueMaterials}
                   calculatedStocks={calculatedStocks}
                   onChange={(code) => setSelectedMaterialCode(code)}
@@ -898,49 +1025,127 @@ export const StockLedgerView: React.FC<StockLedgerViewProps> = ({
               <div className="flex items-center gap-2 shrink-0">
                 <button
                   type="button"
-                  onClick={handlePrint}
-                  className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-sm"
+                  onClick={handleExportStockCardExcel}
+                  className="bg-emerald-600 hover:bg-emerald-500 text-white px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all shadow-md shadow-emerald-600/20"
+                  title="Xuất Sổ Thẻ Kho chi tiết ra file Excel (.xlsx)"
                 >
-                  <Printer className="w-4 h-4" /> In PDF Thẻ Kho
+                  <Download className="w-4 h-4" />
+                  <span>Xuất Excel Thẻ Kho (.xlsx)</span>
                 </button>
+                <button
+                  type="button"
+                  onClick={handlePrint}
+                  className="bg-blue-600 hover:bg-blue-500 text-white px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all shadow-md shadow-blue-600/20"
+                  title="In trực tiếp hoặc chọn 'Lưu dưới dạng PDF' khổ A4"
+                >
+                  <Printer className="w-4 h-4" />
+                  <span>In / PDF Thẻ Kho</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Quick Period & Warehouse filters for Stock Card */}
+            <div className="pt-3 border-t border-slate-800 flex flex-wrap items-center justify-between gap-3 text-xs">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-slate-400 font-medium flex items-center gap-1">
+                  <Calendar className="w-3.5 h-3.5 text-blue-400" /> Kỳ Thẻ Kho:
+                </span>
+                <button
+                  type="button"
+                  onClick={() => handleSelectPreset('ALL')}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-colors ${
+                    datePreset === 'ALL'
+                      ? 'bg-blue-600 text-white shadow-sm'
+                      : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                  }`}
+                >
+                  Tất cả
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleSelectPreset('MONTH')}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ${
+                    datePreset === 'MONTH'
+                      ? 'bg-blue-600 text-white shadow-sm'
+                      : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                  }`}
+                >
+                  Tháng này
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleSelectPreset('YEAR')}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ${
+                    datePreset === 'YEAR'
+                      ? 'bg-blue-600 text-white shadow-sm'
+                      : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                  }`}
+                >
+                  Năm 2026
+                </button>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-1.5 text-slate-400">
+                  <span>Kho:</span>
+                  <select
+                    value={warehouseName}
+                    onChange={(e) => setWarehouseName(e.target.value)}
+                    className="bg-slate-800 border border-slate-700 text-amber-300 rounded-lg px-2 py-1 text-xs focus:outline-none"
+                  >
+                    <option value="ALL">Tất cả kho</option>
+                    <option value="DOIDNCT: Đội Điện nước công trình-DOIDNCT">Đội Điện Nước</option>
+                    <option value="Kho Tổng">Kho Tổng AHT</option>
+                    <option value="Kho Dự Phòng Kỹ Thuật">Kho Dự Phòng</option>
+                  </select>
+                </div>
+                {selectedProposalNumber !== 'ALL' && (
+                  <div className="flex items-center gap-1 bg-amber-950/40 border border-amber-800/60 px-2 py-0.5 rounded text-amber-300 text-xs">
+                    <span>Tờ trình: {selectedProposalNumber}</span>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedProposalNumber('ALL')}
+                      className="ml-1 text-slate-400 hover:text-white"
+                      title="Xem tất cả"
+                    >
+                      ×
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
 
             {/* Selected Material Quick Summary Cards */}
             {activeMaterial && (
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-3 border-t border-slate-800">
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 pt-3 border-t border-slate-800">
                 <div className="bg-slate-850 p-3 rounded-xl border border-slate-800">
                   <span className="text-[11px] text-slate-400 block">Tồn Đầu Kỳ</span>
                   <strong className="text-sm text-white font-mono">
-                    {formatNumber(activeMaterial.initialStock)} {activeMaterial.unit}
+                    {formatNumber(cardOpeningQty)} {activeMaterial.unit}
                   </strong>
                 </div>
                 <div className="bg-slate-850 p-3 rounded-xl border border-slate-800">
                   <span className="text-[11px] text-blue-400 block">Tổng Lượng Nhập</span>
                   <strong className="text-sm text-blue-300 font-mono">
-                    +{formatNumber(
-                      stockCardEntries.reduce((sum, e) => sum + e.quantityIn, 0)
-                    )}{' '}
-                    {activeMaterial.unit}
+                    +{formatNumber(cardImportQty)} {activeMaterial.unit}
                   </strong>
                 </div>
                 <div className="bg-slate-850 p-3 rounded-xl border border-slate-800">
                   <span className="text-[11px] text-amber-400 block">Tổng Lượng Xuất</span>
                   <strong className="text-sm text-amber-300 font-mono">
-                    -{formatNumber(
-                      stockCardEntries.reduce((sum, e) => sum + e.quantityOut, 0)
-                    )}{' '}
-                    {activeMaterial.unit}
+                    -{formatNumber(cardExportQty)} {activeMaterial.unit}
                   </strong>
                 </div>
                 <div className="bg-slate-850 p-3 rounded-xl border border-slate-800">
-                  <span className="text-[11px] text-emerald-400 block">Tồn Kho Hiện Tại</span>
+                  <span className="text-[11px] text-emerald-400 block">Tồn Cuối Kỳ</span>
                   <strong className="text-sm text-emerald-300 font-mono">
-                    {formatNumber(
-                      stockCardEntries[stockCardEntries.length - 1]?.balance ??
-                        activeMaterial.initialStock
-                    )}{' '}
-                    {activeMaterial.unit}
+                    {formatNumber(cardClosingQty)} {activeMaterial.unit}
+                  </strong>
+                </div>
+                <div className="bg-slate-850 p-3 rounded-xl border border-slate-800 col-span-2 sm:col-span-1">
+                  <span className="text-[11px] text-purple-400 block">Giá Trị Tồn Cuối</span>
+                  <strong className="text-sm text-purple-300 font-mono">
+                    {formatVND(cardTotalValue)}
                   </strong>
                 </div>
               </div>
@@ -956,7 +1161,7 @@ export const StockLedgerView: React.FC<StockLedgerViewProps> = ({
                   Diễn Biến Tồn Kho Của {activeMaterial?.name}
                 </h3>
                 <p className="text-xs text-slate-400">
-                  Đường cong biến động số lượng tồn sau từng đợt nhập/xuất
+                  Đường cong biến động số lượng tồn sau từng đợt nhập/xuất trong kỳ
                 </p>
               </div>
             </div>
@@ -1000,11 +1205,14 @@ export const StockLedgerView: React.FC<StockLedgerViewProps> = ({
                     <div className="text-xs sm:text-sm font-black tracking-wide text-slate-200 uppercase leading-tight">
                       CÔNG TY CỔ PHẦN ĐẦU TƯ KHAI THÁC<br />NHÀ GA QUỐC TẾ ĐÀ NẴNG
                     </div>
+                    <div className="text-[11px] text-slate-400 font-semibold mt-0.5">
+                      ĐỘI ĐIỆN NƯỚC CÔNG TRÌNH - DOIDNCT
+                    </div>
                   </div>
                 </div>
                 <div className="text-right hidden sm:block">
-                  <div className="text-[11px] font-bold text-slate-400">Mẫu biểu: Sổ Thẻ Kho</div>
-                  <div className="text-[10px] text-slate-500">Mã: {activeMaterial?.code}</div>
+                  <div className="text-[11px] font-bold text-slate-400">Mẫu biểu: S12-DN (Sổ Thẻ Kho)</div>
+                  <div className="text-[10px] text-slate-500 font-mono">Mã VT: {activeMaterial?.code}</div>
                 </div>
               </div>
 
@@ -1012,12 +1220,30 @@ export const StockLedgerView: React.FC<StockLedgerViewProps> = ({
                 <h2 className="text-lg sm:text-xl font-black text-white uppercase tracking-wider">
                   THẺ KHO ĐIỆN TỬ CHI TIẾT
                 </h2>
-                <p className="text-xs font-semibold text-blue-300 mt-1">
-                  Vật tư: {activeMaterial?.name} ({activeMaterial?.code}) - ĐVT: {activeMaterial?.unit}
+                <p className="text-xs italic text-slate-400 mt-1">
+                  Từ ngày {formatDisplayDate(startDate)} đến ngày {formatDisplayDate(endDate)}
                 </p>
-                <p className="text-[11px] text-slate-400">
-                  Quy cách / Chủng loại: {activeMaterial?.specification || 'Theo tiêu chuẩn kỹ thuật nhà sản xuất'}
-                </p>
+                <div className="flex flex-wrap items-center justify-center gap-3 text-xs text-slate-300 mt-1">
+                  <p>
+                    Kho hàng:{' '}
+                    <span className="text-amber-400 font-bold">
+                      {warehouseName === 'ALL' ? 'Tất cả các kho AHT' : warehouseName}
+                    </span>
+                  </p>
+                  {selectedProposalNumber !== 'ALL' && (
+                    <p className="text-blue-400 font-bold bg-blue-950/60 px-2 py-0.5 rounded border border-blue-800/50">
+                      Tờ trình: {selectedProposalNumber}
+                    </p>
+                  )}
+                </div>
+                <div className="mt-2.5 p-2 bg-slate-900/60 border border-slate-800 rounded-xl inline-block max-w-xl text-left">
+                  <div className="text-xs font-semibold text-blue-300">
+                    Mặt hàng: <span className="text-white font-bold">{activeMaterial?.name}</span> ({activeMaterial?.code}) - ĐVT: <span className="text-white font-bold">{activeMaterial?.unit}</span>
+                  </div>
+                  <div className="text-[11px] text-slate-400 mt-0.5">
+                    Đơn giá kết chuyển: <strong className="text-slate-200">{formatVND(activeMaterial?.unitPrice || 0)}</strong> | Quy cách: {activeMaterial?.specification || 'Theo tiêu chuẩn kỹ thuật nhà sản xuất'}
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -1032,55 +1258,169 @@ export const StockLedgerView: React.FC<StockLedgerViewProps> = ({
               <table className="w-full text-xs text-left">
                 <thead className="bg-slate-950 text-slate-400 font-semibold border-b border-slate-800 uppercase text-[10px]">
                   <tr>
-                    <th className="px-3 py-2.5">STT</th>
+                    <th className="px-3 py-2.5 text-center">STT</th>
                     <th className="px-3 py-2.5">Ngày</th>
                     <th className="px-3 py-2.5">Số Phiếu</th>
                     <th className="px-3 py-2.5">Nội Dung / Diễn Giải</th>
                     <th className="px-3 py-2.5">Đối Tác</th>
                     <th className="px-3 py-2.5 text-right text-blue-400">Nhập (+)</th>
                     <th className="px-3 py-2.5 text-right text-amber-400">Xuất (-)</th>
-                    <th className="px-3 py-2.5 text-right text-emerald-400">Tồn Cuối</th>
+                    <th className="px-3 py-2.5 text-right text-emerald-400">Tồn Kho</th>
                     <th className="px-3 py-2.5 text-right">Đơn Giá</th>
                     <th className="px-3 py-2.5 text-right">Thành Tiền</th>
                     <th className="px-3 py-2.5">Người Thực Hiện</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800 font-mono text-xs">
-                  {stockCardEntries.map((entry, idx) => (
-                    <tr key={idx} className="hover:bg-slate-800/50 transition-colors">
-                      <td className="px-3 py-2 text-slate-500 text-center">{idx + 1}</td>
-                      <td className="px-3 py-2 text-slate-300 whitespace-nowrap">{entry.date}</td>
-                      <td className="px-3 py-2 text-blue-400 font-bold whitespace-nowrap">
-                        {entry.documentCode}
-                      </td>
-                      <td className="px-3 py-2 font-sans text-slate-200 max-w-xs truncate">
-                        {entry.documentTitle}
-                      </td>
-                      <td className="px-3 py-2 font-sans text-slate-400 max-w-[140px] truncate">
-                        {entry.partner}
-                      </td>
-                      <td className="px-3 py-2 text-right text-blue-300 font-semibold">
-                        {entry.quantityIn > 0 ? `+${formatNumber(entry.quantityIn)}` : '-'}
-                      </td>
-                      <td className="px-3 py-2 text-right text-amber-300 font-semibold">
-                        {entry.quantityOut > 0 ? `-${formatNumber(entry.quantityOut)}` : '-'}
-                      </td>
-                      <td className="px-3 py-2 text-right text-emerald-300 font-bold">
-                        {formatNumber(entry.balance)}
-                      </td>
-                      <td className="px-3 py-2 text-right text-slate-400">
-                        {formatVND(entry.unitPrice)}
-                      </td>
-                      <td className="px-3 py-2 text-right text-slate-300 font-semibold">
-                        {formatVND(entry.amount)}
-                      </td>
-                      <td className="px-3 py-2 font-sans text-slate-400 text-xs">
-                        {entry.operator}
+                  {stockCardEntries.length === 0 ? (
+                    <tr>
+                      <td colSpan={11} className="px-4 py-8 text-center text-slate-500 font-sans">
+                        Chưa có dữ liệu phát sinh nào cho mặt hàng này trong kỳ đã chọn.
                       </td>
                     </tr>
-                  ))}
+                  ) : (
+                    stockCardEntries.map((entry, idx) => {
+                      const isInitial = entry.documentCode === 'TON-DAU-KY';
+                      return (
+                        <tr
+                          key={idx}
+                          className={`transition-colors ${
+                            isInitial
+                              ? 'bg-blue-950/30 text-blue-100 font-semibold border-b border-blue-900/40'
+                              : 'hover:bg-slate-800/50'
+                          }`}
+                        >
+                          <td className="px-3 py-2 text-slate-500 text-center">{idx + 1}</td>
+                          <td className="px-3 py-2 text-slate-300 whitespace-nowrap">{entry.date}</td>
+                          <td className={`px-3 py-2 font-bold whitespace-nowrap ${isInitial ? 'text-cyan-300' : 'text-blue-400'}`}>
+                            {isInitial ? 'TỒN ĐẦU KỲ' : entry.documentCode}
+                          </td>
+                          <td className="px-3 py-2 font-sans text-slate-200 max-w-xs truncate">
+                            {entry.documentTitle}
+                          </td>
+                          <td className="px-3 py-2 font-sans text-slate-400 max-w-[140px] truncate">
+                            {entry.partner}
+                          </td>
+                          <td className="px-3 py-2 text-right text-blue-300 font-semibold">
+                            {entry.quantityIn > 0 ? `+${formatNumber(entry.quantityIn)}` : '-'}
+                          </td>
+                          <td className="px-3 py-2 text-right text-amber-300 font-semibold">
+                            {entry.quantityOut > 0 ? `-${formatNumber(entry.quantityOut)}` : '-'}
+                          </td>
+                          <td className="px-3 py-2 text-right text-emerald-300 font-bold">
+                            {formatNumber(entry.balance)}
+                          </td>
+                          <td className="px-3 py-2 text-right text-slate-400">
+                            {formatVND(entry.unitPrice)}
+                          </td>
+                          <td className="px-3 py-2 text-right text-slate-300 font-semibold">
+                            {formatVND(entry.amount)}
+                          </td>
+                          <td className="px-3 py-2 font-sans text-slate-400 text-xs">
+                            {entry.operator}
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
                 </tbody>
+                {/* Official Stock Card Footer Summary */}
+                <tfoot className="bg-slate-950 text-white font-bold border-t-2 border-slate-700">
+                  <tr className="border-b border-slate-800">
+                    <td colSpan={5} className="px-3 py-2.5 text-right uppercase tracking-wider text-slate-300 font-sans">
+                      CỘNG PHÁT SINH TRONG KỲ:
+                    </td>
+                    <td className="px-3 py-2.5 text-right font-mono text-blue-300">
+                      +{formatNumber(cardImportQty)}
+                    </td>
+                    <td className="px-3 py-2.5 text-right font-mono text-amber-300">
+                      -{formatNumber(cardExportQty)}
+                    </td>
+                    <td colSpan={4} className="px-3 py-2.5 text-slate-400 text-xs font-sans italic">
+                      (Chênh lệch: {formatNumber(cardImportQty - cardExportQty)} {activeMaterial?.unit})
+                    </td>
+                  </tr>
+                  <tr className="bg-slate-900 text-emerald-300 font-bold">
+                    <td colSpan={5} className="px-3 py-2.5 text-right uppercase tracking-wider text-amber-300 font-sans">
+                      SỐ DƯ TỒN CUỐI KỲ:
+                    </td>
+                    <td colSpan={2} className="px-3 py-2.5 text-center text-slate-400 text-xs font-mono">
+                      (Đầu kỳ: {formatNumber(cardOpeningQty)})
+                    </td>
+                    <td className="px-3 py-2.5 text-right font-mono text-emerald-300 text-sm">
+                      {formatNumber(cardClosingQty)}
+                    </td>
+                    <td className="px-3 py-2.5 text-right font-mono text-slate-300">
+                      {formatVND(activeMaterial?.unitPrice || 0)}
+                    </td>
+                    <td className="px-3 py-2.5 text-right font-mono text-emerald-300 text-sm">
+                      {formatVND(cardTotalValue)}
+                    </td>
+                    <td className="px-3 py-2.5 text-slate-400 text-xs font-sans">
+                      {activeMaterial?.unit}
+                    </td>
+                  </tr>
+                </tfoot>
               </table>
+            </div>
+
+            {/* Official Stock Card Signatures */}
+            <div className="p-6 bg-slate-950/60 border-t border-slate-800 print-signatures">
+              <div className="text-right text-xs italic text-slate-400 mb-6">
+                Đà Nẵng, ngày {new Date().getDate()} tháng {new Date().getMonth() + 1} năm {new Date().getFullYear()}
+              </div>
+
+              <div className="grid grid-cols-3 gap-8 text-center text-xs">
+                {/* 1. Người ghi thẻ */}
+                <div className="space-y-1">
+                  <div className="font-bold text-slate-200 uppercase text-xs sm:text-sm">NGƯỜI GHI THẺ</div>
+                  <div className="text-[11px] text-slate-400 italic">(Ký, ghi rõ họ tên)</div>
+                  <div className="h-20 flex items-end justify-center font-medium text-slate-400">
+                    <span className="border-b border-dashed border-slate-600/80 w-36 block"></span>
+                  </div>
+                </div>
+
+                {/* 2. Thủ kho */}
+                <div className="space-y-1">
+                  <div className="font-bold text-slate-200 uppercase text-xs sm:text-sm">THỦ KHO</div>
+                  <div className="text-[11px] text-slate-400 italic">(Ký, ghi rõ họ tên)</div>
+                  <div className="h-20 flex items-end justify-center font-medium text-slate-400">
+                    <span className="border-b border-dashed border-slate-600/80 w-36 block"></span>
+                  </div>
+                </div>
+
+                {/* 3. Phê duyệt / Kế toán */}
+                <div className="space-y-1">
+                  <div className="font-bold text-slate-200 uppercase text-xs sm:text-sm">QUẢN LÝ / KẾ TOÁN</div>
+                  <div className="text-[11px] text-slate-400 italic">(Ký, đóng dấu)</div>
+                  <div className="h-20 flex items-end justify-center font-medium text-slate-400">
+                    <span className="border-b border-dashed border-slate-600/80 w-36 block"></span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Footer buttons */}
+            <div className="no-print p-3 bg-slate-950 border-t border-slate-800 flex flex-col sm:flex-row items-center justify-between text-xs text-slate-400 gap-2">
+              <div>
+                Thẻ kho mặt hàng: <strong className="text-white">{activeMaterial?.name}</strong> ({activeMaterial?.code})
+              </div>
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={handlePrint}
+                  className="text-blue-400 hover:text-blue-300 font-bold flex items-center gap-1 text-xs"
+                >
+                  <Printer className="w-3.5 h-3.5" /> In / PDF Thẻ Kho
+                </button>
+                <button
+                  type="button"
+                  onClick={handleExportStockCardExcel}
+                  className="text-emerald-400 hover:text-emerald-300 font-bold flex items-center gap-1 text-xs"
+                >
+                  <Download className="w-3.5 h-3.5" /> Tải Excel Thẻ Kho (.xlsx)
+                </button>
+              </div>
             </div>
           </div>
         </div>

@@ -80,6 +80,25 @@ export function isProposalMatch(a?: string | null, b?: string | null): boolean {
 }
 
 /**
+ * Checks if a transaction's warehouse matches the selected warehouse filter
+ */
+export function isWarehouseMatch(txWarehouse?: string | null, selectedWarehouse?: string | null): boolean {
+  if (!selectedWarehouse || selectedWarehouse === 'ALL' || selectedWarehouse === 'Tất cả kho' || selectedWarehouse.startsWith('ALL')) {
+    return true;
+  }
+  if (!txWarehouse) {
+    return true;
+  }
+  const sel = selectedWarehouse.toLowerCase().trim();
+  const txW = txWarehouse.toLowerCase().trim();
+  if (txW === sel || txW.includes(sel) || sel.includes(txW)) return true;
+  if (sel.includes('doidnct') && (txW.includes('điện nước') || txW.includes('doidnct'))) return true;
+  if (sel.includes('tổng') && txW.includes('tổng')) return true;
+  if (sel.includes('dự phòng') && txW.includes('dự phòng')) return true;
+  return false;
+}
+
+/**
  * Format currency VNĐ
  */
 export function formatVND(amount: number): string {
@@ -125,6 +144,7 @@ export function calculateAllMaterialStocks(
   const pendingTx = transactions.filter((t) => t.status === 'PENDING');
 
   return materials.map((mat) => {
+    const matCodeClean = mat.code?.trim().toUpperCase();
     let totalImported = 0;
     let totalExported = 0;
     let pendingImport = 0;
@@ -133,7 +153,7 @@ export function calculateAllMaterialStocks(
     // Calculate approved movements
     for (const tx of approvedTx) {
       for (const item of tx.items) {
-        if (item.materialCode === mat.code) {
+        if (item.materialCode?.trim().toUpperCase() === matCodeClean) {
           if (tx.type === 'IMPORT') {
             totalImported += item.quantity;
           } else if (tx.type === 'EXPORT') {
@@ -146,7 +166,7 @@ export function calculateAllMaterialStocks(
     // Calculate pending movements
     for (const tx of pendingTx) {
       for (const item of tx.items) {
-        if (item.materialCode === mat.code) {
+        if (item.materialCode?.trim().toUpperCase() === matCodeClean) {
           if (tx.type === 'IMPORT') {
             pendingImport += item.quantity;
           } else if (tx.type === 'EXPORT') {
@@ -156,16 +176,17 @@ export function calculateAllMaterialStocks(
       }
     }
 
-    const currentStock = mat.initialStock + totalImported - totalExported;
+    const currentStock = (mat.initialStock || 0) + totalImported - totalExported;
     const availableStock = currentStock - pendingExport;
-    const totalValue = Math.max(0, currentStock) * mat.unitPrice;
+    const currentPrice = mat.unitPrice || 0;
+    const totalValue = Math.max(0, currentStock) * currentPrice;
 
     let stockStatus: CalculatedMaterialStock['stockStatus'] = 'OPTIMAL';
     if (currentStock <= 0) {
       stockStatus = 'OUT_OF_STOCK';
-    } else if (currentStock <= mat.minStock) {
+    } else if (currentStock <= (mat.minStock || 0)) {
       stockStatus = 'LOW_STOCK';
-    } else if (currentStock >= mat.maxStock) {
+    } else if (currentStock >= (mat.maxStock || 1000)) {
       stockStatus = 'OVER_STOCK';
     }
 
@@ -184,65 +205,140 @@ export function calculateAllMaterialStocks(
 }
 
 /**
- * Generate Stock Card (Sổ Thẻ Kho) for a specific material
+ * Generate Stock Card (Sổ Thẻ Kho) for a specific material with period & filter support
  */
 export function generateStockCard(
   materialCode: string,
   materials: Material[],
-  transactions: Transaction[]
+  transactions: Transaction[],
+  startDate?: string,
+  endDate?: string,
+  proposalNumber?: string,
+  warehouse?: string
 ): StockCardEntry[] {
-  const material = materials.find((m) => m.code === materialCode);
+  if (!materialCode) return [];
+  const cleanTargetCode = materialCode.trim().toUpperCase();
+  const material = materials.find((m) => m.code?.trim().toUpperCase() === cleanTargetCode);
   if (!material) return [];
 
   const entries: StockCardEntry[] = [];
-  let currentBalance = material.initialStock;
+  const isSpecificProposal = Boolean(proposalNumber && proposalNumber !== 'ALL');
 
-  // Initial balance entry
-  entries.push({
-    id: `card-init-${materialCode}`,
-    date: '2026-08-01',
-    documentCode: 'TON-DAU-KY',
-    documentType: 'IMPORT',
-    documentTitle: 'Số dư tồn kho đầu kỳ',
-    partner: 'Kho vận nội bộ',
-    quantityIn: material.initialStock,
-    quantityOut: 0,
-    balance: currentBalance,
-    unitPrice: material.unitPrice,
-    amount: currentBalance * material.unitPrice,
-    operator: 'Hệ thống khởi tạo',
-    notes: 'Số dư ban đầu ghi nhận tại ngày 01/08/2026',
+  // 1. Filter approved transactions containing this material with warehouse & proposal checks
+  let relevantApprovedTx = transactions.filter((tx) => {
+    if (tx.status !== 'APPROVED') return false;
+
+    // Check if contains this material
+    const hasMaterial = tx.items.some(
+      (i) => i.materialCode?.trim().toUpperCase() === cleanTargetCode
+    );
+    if (!hasMaterial) return false;
+
+    // Filter proposal
+    if (isSpecificProposal) {
+      const matchProposal =
+        isProposalMatch(tx.proposalNumber, proposalNumber) ||
+        tx.items.some(
+          (i) =>
+            i.materialCode?.trim().toUpperCase() === cleanTargetCode &&
+            isProposalMatch(i.proposalNumber, proposalNumber)
+        );
+      if (!matchProposal) return false;
+    }
+
+    // Filter warehouse
+    if (!isWarehouseMatch(tx.warehouse, warehouse)) {
+      return false;
+    }
+
+    return true;
   });
 
-  // Find all approved transactions containing this material, sorted by date
-  const relevantApprovedTx = transactions
-    .filter((tx) => tx.status === 'APPROVED' && tx.items.some((i) => i.materialCode === materialCode))
-    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+  // Sort chronologically
+  relevantApprovedTx = relevantApprovedTx.sort(
+    (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
+  );
 
-  for (const tx of relevantApprovedTx) {
-    const item = tx.items.find((i) => i.materialCode === materialCode);
-    if (!item) continue;
+  // 2. Calculate Opening Stock (Tồn đầu kỳ trước startDate)
+  let openingQty = isSpecificProposal ? 0 : (material.initialStock || 0);
 
-    const qtyIn = tx.type === 'IMPORT' ? item.quantity : 0;
-    const qtyOut = tx.type === 'EXPORT' ? item.quantity : 0;
-
-    currentBalance = currentBalance + qtyIn - qtyOut;
-
-    entries.push({
-      id: `card-${tx.id}-${materialCode}`,
-      date: tx.date,
-      documentCode: tx.code,
-      documentType: tx.type,
-      documentTitle: tx.title,
-      partner: tx.partner,
-      quantityIn: qtyIn,
-      quantityOut: qtyOut,
-      balance: currentBalance,
-      unitPrice: item.unitPrice || material.unitPrice,
-      amount: (qtyIn || qtyOut) * (item.unitPrice || material.unitPrice),
-      operator: tx.approverName || tx.creatorName,
-      notes: tx.reason,
+  if (startDate) {
+    relevantApprovedTx.forEach((tx) => {
+      if (tx.date < startDate) {
+        tx.items.forEach((item) => {
+          if (item.materialCode?.trim().toUpperCase() === cleanTargetCode) {
+            if (isSpecificProposal && !isProposalMatch(item.proposalNumber || tx.proposalNumber, proposalNumber)) {
+              return;
+            }
+            if (tx.type === 'IMPORT') {
+              openingQty += item.quantity;
+            } else if (tx.type === 'EXPORT') {
+              openingQty -= item.quantity;
+            }
+          }
+        });
+      }
     });
+  }
+
+  let currentBalance = openingQty;
+  const unitPrice = material.unitPrice || 0;
+
+  // 3. Add Opening Balance entry (quantityIn = 0, quantityOut = 0 so it doesn't inflate import totals)
+  entries.push({
+    id: `card-init-${cleanTargetCode}`,
+    date: startDate || '2026-08-01',
+    documentCode: 'TON-DAU-KY',
+    documentType: 'IMPORT',
+    documentTitle: `Số dư tồn kho đầu kỳ ${startDate ? `(đến ${formatDisplayDate(startDate)})` : ''}`,
+    partner: 'Kho vận nội bộ AHT',
+    quantityIn: 0,
+    quantityOut: 0,
+    balance: currentBalance,
+    unitPrice: unitPrice,
+    amount: currentBalance * unitPrice,
+    operator: 'Hệ thống tự động kết chuyển',
+    notes: `Tồn lũy kế ban đầu: ${formatNumber(currentBalance)} ${material.unit}`,
+  });
+
+  // 4. Add transactions within period [startDate, endDate]
+  for (const tx of relevantApprovedTx) {
+    if (startDate && tx.date < startDate) continue;
+    if (endDate && tx.date > endDate) continue;
+
+    const matchingItems = tx.items.filter(
+      (i) => i.materialCode?.trim().toUpperCase() === cleanTargetCode
+    );
+    if (matchingItems.length === 0) continue;
+
+    for (const item of matchingItems) {
+      if (isSpecificProposal && !isProposalMatch(item.proposalNumber || tx.proposalNumber, proposalNumber)) {
+        continue;
+      }
+
+      const qtyIn = tx.type === 'IMPORT' ? item.quantity : 0;
+      const qtyOut = tx.type === 'EXPORT' ? item.quantity : 0;
+      currentBalance = currentBalance + qtyIn - qtyOut;
+
+      const itemPrice = item.unitPrice > 0 ? item.unitPrice : unitPrice;
+      const txAmount = (qtyIn || qtyOut) * itemPrice;
+
+      entries.push({
+        id: `card-${tx.id}-${cleanTargetCode}-${entries.length}`,
+        date: tx.date,
+        documentCode: tx.code,
+        documentType: tx.type,
+        documentTitle: tx.title || (tx.type === 'IMPORT' ? 'Phiếu Nhập Kho' : 'Phiếu Xuất Kho'),
+        partner: tx.partner || (tx.type === 'IMPORT' ? 'Nhà cung cấp' : 'Đội thi công'),
+        quantityIn: qtyIn,
+        quantityOut: qtyOut,
+        balance: currentBalance,
+        unitPrice: itemPrice,
+        amount: txAmount,
+        operator: tx.approverName || tx.creatorName || 'Cán bộ quản lý kho',
+        notes: tx.proposalNumber ? `Tờ trình: ${tx.proposalNumber} - ${tx.reason || ''}` : tx.reason,
+      });
+    }
   }
 
   return entries;

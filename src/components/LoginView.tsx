@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { User } from '../types';
 import { AHTLogo } from './AHTLogo';
+import { safeStorage } from '../utils/safeStorage';
 import seagullWelcoming from '../assets/images/danang_seagull_welcoming_1788356485133.jpg';
 
 interface LoginViewProps {
@@ -22,7 +23,7 @@ interface LoginViewProps {
 
 export const LoginView: React.FC<LoginViewProps> = ({ users, onLogin }) => {
   const [emailOrUsername, setEmailOrUsername] = useState(() => {
-    return localStorage.getItem('smart_auth_email_saved') || '';
+    return safeStorage.getItem('smart_auth_email_saved') || '';
   });
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -89,9 +90,9 @@ export const LoginView: React.FC<LoginViewProps> = ({ users, onLogin }) => {
 
     // Save remember me preference
     if (rememberMe) {
-      localStorage.setItem('smart_auth_email_saved', foundUser.email);
+      safeStorage.setItem('smart_auth_email_saved', foundUser.email);
     } else {
-      localStorage.removeItem('smart_auth_email_saved');
+      safeStorage.removeItem('smart_auth_email_saved');
     }
 
     onLogin(foundUser);
@@ -121,7 +122,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ users, onLogin }) => {
             <div className="relative w-9 h-9 rounded-xl overflow-hidden border border-cyan-400/60 bg-slate-950 shadow">
               <img
                 src={seagullWelcoming}
-                alt="Hải Âu AHT"
+                alt="Linh vật chào đón"
                 className="w-full h-full object-cover animate-seagull-wave"
                 referrerPolicy="no-referrer"
               />

@@ -395,7 +395,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <div className="relative w-9 h-9 rounded-xl overflow-hidden border border-cyan-400/60 shrink-0 shadow-md bg-slate-950 group">
                 <img
                   src={seagullWelcoming}
-                  alt="Hải Âu AHT"
+                  alt="Avatar ca trực"
                   className="w-full h-full object-cover group-hover:scale-110 transition-transform"
                   referrerPolicy="no-referrer"
                 />

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Camera, Upload, Trash2, X, RefreshCw, Check } from 'lucide-react';
+import { safeStorage } from '../utils/safeStorage';
 
 interface AHTLogoProps {
   className?: string;
@@ -15,7 +16,7 @@ export const AHTLogo: React.FC<AHTLogoProps> = ({
   size = 'md',
 }) => {
   const [customLogo, setCustomLogo] = useState<string | null>(() => {
-    return localStorage.getItem('smart_custom_logo');
+    return safeStorage.getItem('smart_custom_logo');
   });
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [urlInput, setUrlInput] = useState('');
@@ -25,7 +26,7 @@ export const AHTLogo: React.FC<AHTLogoProps> = ({
   // Sync custom logo across tabs/renders
   useEffect(() => {
     const handleStorage = () => {
-      setCustomLogo(localStorage.getItem('smart_custom_logo'));
+      setCustomLogo(safeStorage.getItem('smart_custom_logo'));
     };
     window.addEventListener('storage', handleStorage);
     return () => window.removeEventListener('storage', handleStorage);
@@ -45,7 +46,7 @@ export const AHTLogo: React.FC<AHTLogoProps> = ({
     reader.onload = (event) => {
       const base64 = event.target?.result as string;
       if (base64) {
-        localStorage.setItem('smart_custom_logo', base64);
+        safeStorage.setItem('smart_custom_logo', base64);
         setCustomLogo(base64);
         setIsModalOpen(false);
       }
@@ -55,14 +56,14 @@ export const AHTLogo: React.FC<AHTLogoProps> = ({
 
   const handleSaveUrl = () => {
     if (!urlInput.trim()) return;
-    localStorage.setItem('smart_custom_logo', urlInput.trim());
+    safeStorage.setItem('smart_custom_logo', urlInput.trim());
     setCustomLogo(urlInput.trim());
     setUrlInput('');
     setIsModalOpen(false);
   };
 
   const handleResetToDefault = () => {
-    localStorage.removeItem('smart_custom_logo');
+    safeStorage.removeItem('smart_custom_logo');
     setCustomLogo(null);
     setIsModalOpen(false);
   };

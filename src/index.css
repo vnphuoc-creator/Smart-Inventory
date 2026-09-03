@@ -448,6 +448,9 @@
     box-sizing: border-box !important;
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
+    font-family: 'Roboto', 'Be Vietnam Pro', 'Inter', 'Times New Roman', Arial, sans-serif !important;
+    text-rendering: optimizeLegibility !important;
+    -webkit-font-smoothing: antialiased !important;
   }
 
   html, body, #root, .app-root-container {
@@ -456,7 +459,7 @@
     color: #000000 !important;
     box-shadow: none !important;
     text-shadow: none !important;
-    font-family: "Times New Roman", Times, "Segoe UI", Arial, sans-serif !important;
+    font-family: 'Roboto', 'Be Vietnam Pro', 'Inter', 'Times New Roman', Arial, sans-serif !important;
     height: auto !important;
     min-height: 0 !important;
     max-height: none !important;
@@ -589,8 +592,24 @@
   .printable-area strong,
   .printable-area b,
   .printable-area td,
-  .printable-area th {
+  .printable-area th,
+  .proposal-print-document p,
+  .proposal-print-document span,
+  .proposal-print-document td,
+  .proposal-print-document th,
+  .docx-preview-wrapper * {
     color: #000000 !important;
+    font-family: 'Roboto', 'Be Vietnam Pro', 'Inter', 'Times New Roman', Arial, sans-serif !important;
+  }
+
+  /* Keep mono numbers clean and aligned without font corruption */
+  .font-mono, [class*="font-mono"] {
+    font-family: 'Roboto', 'Be Vietnam Pro', 'Consolas', 'Courier New', monospace !important;
+    letter-spacing: normal !important;
+  }
+
+  .font-sans, [class*="font-sans"], .font-serif, [class*="font-serif"] {
+    font-family: 'Roboto', 'Be Vietnam Pro', 'Inter', 'Times New Roman', Arial, sans-serif !important;
   }
 
   .printable-area h1,
@@ -1265,7 +1284,7 @@
 }
 
 /* ========================================================================= */
-/* DA NANG AIRPORT SEAGULL MASCOT ANIMATIONS (CHIM HẢI ÂU AHT)               */
+/* DA NANG AIRPORT SEAGULL MASCOT ANIMATIONS                                 */
 /* ========================================================================= */
 @keyframes seagullFloat {
   0%, 100% {

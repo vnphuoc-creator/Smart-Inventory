@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { safeStorage } from '../utils/safeStorage';
 import {
   Palette,
   Layout,
@@ -225,8 +226,8 @@ export const ThemeCustomizerView: React.FC<ThemeCustomizerViewProps> = ({
   };
 
   const handleSavePermanently = () => {
-    localStorage.setItem('smart_ui_theme_config_v2', JSON.stringify(config));
-    localStorage.setItem('smart_theme_mode', config.canvasMode === 'light-modern' ? 'light' : 'dark');
+    safeStorage.setItem('smart_ui_theme_config_v2', JSON.stringify(config));
+    safeStorage.setItem('smart_theme_mode', config.canvasMode === 'light-modern' ? 'light' : 'dark');
     onApplyConfig(config);
     setIsSaved(true);
     onShowToast('Đã lưu cấu hình thiết kế giao diện thành công!', 'success');
@@ -261,7 +262,7 @@ export const ThemeCustomizerView: React.FC<ThemeCustomizerViewProps> = ({
         if (imported && typeof imported === 'object') {
           const merged: UIThemeConfig = { ...DEFAULT_THEME_CONFIG, ...imported };
           updateConfig(merged);
-          localStorage.setItem('smart_ui_theme_config_v2', JSON.stringify(merged));
+          safeStorage.setItem('smart_ui_theme_config_v2', JSON.stringify(merged));
           onShowToast('Đã nạp thành công cấu hình giao diện từ file JSON!', 'success');
         }
       } catch {

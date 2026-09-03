@@ -1,4 +1,5 @@
 import React, { useState, useRef, useMemo } from 'react';
+import { safeStorage } from '../utils/safeStorage';
 import {
   Settings,
   Building2,
@@ -117,7 +118,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
 
   // --- UNIT MANAGEMENT STATE ---
   const [units, setUnits] = useState<string[]>(() => {
-    const saved = localStorage.getItem('cfg_custom_units');
+    const saved = safeStorage.getItem('cfg_custom_units');
     if (saved) {
       try {
         return JSON.parse(saved);
@@ -143,20 +144,20 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
 
   // --- LOGO & COMPANY INFO STATE ---
   const [companyName, setCompanyName] = useState(() => {
-    return localStorage.getItem('cfg_company_name') || 'CÔNG TY CỔ PHẦN ĐẦU TƯ KHAI THÁC NHÀ GA QUỐC TẾ ĐÀ NẴNG (AHT)';
+    return safeStorage.getItem('cfg_company_name') || 'CÔNG TY CỔ PHẦN ĐẦU TƯ KHAI THÁC NHÀ GA QUỐC TẾ ĐÀ NẴNG (AHT)';
   });
   const [departmentName, setDepartmentName] = useState(() => {
-    return localStorage.getItem('cfg_department_name') || 'Đội Điện Nước Công Trình (DOIDNCT)';
+    return safeStorage.getItem('cfg_department_name') || 'Đội Điện Nước Công Trình (DOIDNCT)';
   });
   const [circularStandard, setCircularStandard] = useState(() => {
-    return localStorage.getItem('cfg_circular') || 'Thông tư 99/2025/TT-BTC';
+    return safeStorage.getItem('cfg_circular') || 'Thông tư 99/2025/TT-BTC';
   });
   const [companySaveSuccess, setCompanySaveSuccess] = useState(false);
 
   // Logo file upload
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [customLogoUrl, setCustomLogoUrl] = useState<string | null>(() => {
-    return localStorage.getItem('smart_custom_logo');
+    return safeStorage.getItem('smart_custom_logo');
   });
 
   // --- EXCEL IMPORT MODAL STATE ---
@@ -357,7 +358,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       newUnits.push(val);
     }
     setUnits(newUnits);
-    localStorage.setItem('cfg_custom_units', JSON.stringify(newUnits));
+    safeStorage.setItem('cfg_custom_units', JSON.stringify(newUnits));
     setShowAddUnitModal(false);
     setEditingUnitIndex(null);
     setUnitInputValue('');
@@ -370,7 +371,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     if (window.confirm(`Bạn có chắc chắn muốn xóa đơn vị tính "${toDel}"?`)) {
       const newUnits = units.filter((_, i) => i !== idx);
       setUnits(newUnits);
-      localStorage.setItem('cfg_custom_units', JSON.stringify(newUnits));
+      safeStorage.setItem('cfg_custom_units', JSON.stringify(newUnits));
       setUnitToast(`Đã xóa đơn vị tính "${toDel}".`);
       setTimeout(() => setUnitToast(null), 3000);
     }
@@ -409,9 +410,9 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   // Company info handler
   const handleSaveCompanyInfo = (e: React.FormEvent) => {
     e.preventDefault();
-    localStorage.setItem('cfg_company_name', companyName);
-    localStorage.setItem('cfg_department_name', departmentName);
-    localStorage.setItem('cfg_circular', circularStandard);
+    safeStorage.setItem('cfg_company_name', companyName);
+    safeStorage.setItem('cfg_department_name', departmentName);
+    safeStorage.setItem('cfg_circular', circularStandard);
     setCompanySaveSuccess(true);
     setTimeout(() => setCompanySaveSuccess(false), 3000);
   };
@@ -424,7 +425,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     reader.onload = (uploadEvent) => {
       const dataUrl = uploadEvent.target?.result as string;
       setCustomLogoUrl(dataUrl);
-      localStorage.setItem('smart_custom_logo', dataUrl);
+      safeStorage.setItem('smart_custom_logo', dataUrl);
       window.dispatchEvent(new Event('storage'));
     };
     reader.readAsDataURL(file);
@@ -432,7 +433,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
 
   const handleResetLogo = () => {
     setCustomLogoUrl(null);
-    localStorage.removeItem('smart_custom_logo');
+    safeStorage.removeItem('smart_custom_logo');
     window.dispatchEvent(new Event('storage'));
   };
 
@@ -1463,7 +1464,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
           if (onUpdateMaterials) {
             onUpdateMaterials(updated);
           }
-          localStorage.setItem('smart_materials_v12', JSON.stringify(updated));
+          safeStorage.setItem('smart_materials_v12', JSON.stringify(updated));
           setUnitToast(`Đã cập nhật thành công ${updated.length} vật tư lên hệ thống web!`);
           setTimeout(() => setUnitToast(null), 4000);
         }}
