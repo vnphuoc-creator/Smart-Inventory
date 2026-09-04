@@ -1554,9 +1554,9 @@ export const ProposalReconciliationView: React.FC<ProposalReconciliationViewProp
 
       {/* Lightbox / View Attachment & Word Document Modal */}
       {viewingAttachment && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-950/85 backdrop-blur-sm animate-in fade-in duration-150">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-950/85 backdrop-blur-sm animate-in fade-in duration-150 print:static print:p-0 print:m-0 print:bg-white print:z-auto">
           <div
-            className="w-full max-w-5xl bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[94vh]"
+            className="w-full max-w-5xl bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[94vh] print:max-w-none print:w-full print:bg-white print:border-none print:shadow-none print:max-h-none print:rounded-none"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Modal Header */}
@@ -1674,7 +1674,7 @@ export const ProposalReconciliationView: React.FC<ProposalReconciliationViewProp
                     } else if (viewingAttachment.url && viewingAttachment.url.startsWith('http')) {
                       window.open(viewingAttachment.url, '_blank');
                     } else {
-                      window.print();
+                      printCleanDocument();
                     }
                   }}
                   className="bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 px-2.5 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors"
@@ -1707,7 +1707,7 @@ export const ProposalReconciliationView: React.FC<ProposalReconciliationViewProp
             </div>
 
             {/* Modal Body */}
-            <div className="overflow-y-auto flex-1 bg-slate-950/80 p-3 sm:p-6 min-h-[450px] max-h-[calc(94vh-80px)]">
+            <div className="overflow-y-auto flex-1 bg-slate-950/80 p-3 sm:p-6 min-h-[450px] max-h-[calc(94vh-80px)] print:bg-white print:p-0 print:m-0 print:overflow-visible print:max-h-none">
               {attachmentTab === 'document' ? (
                 <div className="w-full flex justify-center py-2">
                   {/* PDF Document */}
@@ -1732,7 +1732,7 @@ export const ProposalReconciliationView: React.FC<ProposalReconciliationViewProp
                         <div className="pt-2 flex justify-center gap-3">
                           <button
                             type="button"
-                            onClick={() => window.print()}
+                            onClick={() => printCleanDocument()}
                             className="bg-blue-600 hover:bg-blue-500 text-white px-5 py-2.5 rounded-xl text-xs font-semibold inline-flex items-center gap-2"
                           >
                             <Printer className="w-4 h-4" /> In Tờ Trình Số Hóa

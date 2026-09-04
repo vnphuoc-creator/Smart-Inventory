@@ -49,6 +49,7 @@ import {
 import { ALL_MATERIAL_CATEGORIES } from '../data/materialsData';
 import { AHTLogo } from './AHTLogo';
 import { SearchableMaterialSelect } from './SearchableMaterialSelect';
+import { printCleanDocument } from '../utils/printHelper';
 
 interface StockLedgerViewProps {
   materials: Material[];
@@ -131,15 +132,15 @@ export const StockLedgerView: React.FC<StockLedgerViewProps> = ({
 
     if (preset === 'ALL') {
       setStartDate('2024-01-01');
-      setEndDate('2026-12-31');
+      setEndDate(`${now.getFullYear()}-12-31`);
     } else if (preset === 'TODAY') {
       setStartDate(todayStr);
       setEndDate(todayStr);
     } else if (preset === 'WEEK') {
-      const day = now.getDay();
-      const diff = now.getDate() - day + (day === 0 ? -6 : 1);
-      const mon = new Date(now.setDate(diff));
-      const sun = new Date(now.setDate(diff + 6));
+      const day = now.getDay(); // 0 is Sunday, 1 is Monday ... 6 is Saturday
+      const diffToMonday = day === 0 ? -6 : 1 - day;
+      const mon = new Date(now.getFullYear(), now.getMonth(), now.getDate() + diffToMonday);
+      const sun = new Date(now.getFullYear(), now.getMonth(), now.getDate() + diffToMonday + 6);
       setStartDate(`${mon.getFullYear()}-${pad(mon.getMonth() + 1)}-${pad(mon.getDate())}`);
       setEndDate(`${sun.getFullYear()}-${pad(sun.getMonth() + 1)}-${pad(sun.getDate())}`);
     } else if (preset === 'MONTH') {
@@ -150,8 +151,9 @@ export const StockLedgerView: React.FC<StockLedgerViewProps> = ({
       setStartDate(`${y}-${pad(m + 1)}-${pad(first.getDate())}`);
       setEndDate(`${y}-${pad(m + 1)}-${pad(last.getDate())}`);
     } else if (preset === 'YEAR') {
-      setStartDate('2026-01-01');
-      setEndDate('2026-12-31');
+      const y = now.getFullYear();
+      setStartDate(`${y}-01-01`);
+      setEndDate(`${y}-12-31`);
     }
   };
 
@@ -345,7 +347,7 @@ export const StockLedgerView: React.FC<StockLedgerViewProps> = ({
 
   // Print Report Handler
   const handlePrint = () => {
-    window.print();
+    printCleanDocument();
   };
 
   return (
@@ -636,9 +638,9 @@ export const StockLedgerView: React.FC<StockLedgerViewProps> = ({
           </div>
 
           {/* Official Spreadsheet Template Preview (Matching official AHT layout) */}
-          <div className="printable-area bg-slate-900 border border-slate-700/80 rounded-2xl shadow-xl overflow-hidden">
+          <div className="printable-area bg-slate-900 border border-slate-700/80 rounded-2xl shadow-xl overflow-hidden print:bg-white print:border-none print:shadow-none print:rounded-none print:p-0 print:m-0">
             {/* Spreadsheet Official Top Header */}
-            <div className="p-6 bg-slate-950/80 border-b border-slate-800">
+            <div className="p-6 bg-slate-950/80 border-b border-slate-800 print:bg-white print:border-b-2 print:border-black print:p-2">
               <div className="print-header-row flex items-center justify-between gap-4">
                 <div className="print-header-left flex items-center gap-3">
                   <AHTLogo className="h-10 w-auto" showPlane={false} allowUpload={false} />
@@ -682,8 +684,8 @@ export const StockLedgerView: React.FC<StockLedgerViewProps> = ({
             </div>
 
             {/* Official Multi-Header Table */}
-            <div className="overflow-x-auto">
-              <table className="printable-table w-full text-xs text-left border-collapse min-w-[1000px]">
+            <div className="overflow-x-auto print:overflow-visible">
+              <table className="printable-table w-full text-xs text-left border-collapse min-w-[1000px] print:min-w-0 print:w-full">
                 <thead>
                   {/* Row 1 Header */}
                   <tr className="bg-slate-850 text-slate-300 font-bold border-b border-slate-700 text-center">
@@ -1063,6 +1065,17 @@ export const StockLedgerView: React.FC<StockLedgerViewProps> = ({
                 </button>
                 <button
                   type="button"
+                  onClick={() => handleSelectPreset('WEEK')}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ${
+                    datePreset === 'WEEK'
+                      ? 'bg-blue-600 text-white shadow-sm'
+                      : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                  }`}
+                >
+                  Tuần này
+                </button>
+                <button
+                  type="button"
                   onClick={() => handleSelectPreset('MONTH')}
                   className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ${
                     datePreset === 'MONTH'
@@ -1195,9 +1208,9 @@ export const StockLedgerView: React.FC<StockLedgerViewProps> = ({
           </div>
 
           {/* Stock Card Log Table */}
-          <div className="printable-area bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-sm">
+          <div className="printable-area bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-sm print:bg-white print:border-none print:shadow-none print:rounded-none print:p-0 print:m-0">
             {/* Header for official print / export */}
-            <div className="p-6 bg-slate-950/80 border-b border-slate-800">
+            <div className="p-6 bg-slate-950/80 border-b border-slate-800 print:bg-white print:border-b-2 print:border-black print:p-2">
               <div className="flex items-start justify-between gap-4">
                 <div className="flex items-center gap-3">
                   <AHTLogo className="h-10 w-auto" showPlane={false} allowUpload={false} />
@@ -1254,8 +1267,8 @@ export const StockLedgerView: React.FC<StockLedgerViewProps> = ({
               <span className="text-xs text-slate-400 font-mono">{activeMaterial?.code}</span>
             </div>
 
-            <div className="overflow-x-auto">
-              <table className="w-full text-xs text-left">
+            <div className="overflow-x-auto print:overflow-visible">
+              <table className="w-full text-xs text-left print:w-full">
                 <thead className="bg-slate-950 text-slate-400 font-semibold border-b border-slate-800 uppercase text-[10px]">
                   <tr>
                     <th className="px-3 py-2.5 text-center">STT</th>

@@ -440,22 +440,24 @@
 /* ========================================================================= */
 /* HIGH-PRECISION ENTERPRISE PRINT & PDF STYLES (A4 LANDSCAPE & PORTRAIT)   */
 /* ========================================================================= */
+
+@page {
+  size: A4 landscape;
+  margin: 0; /* CRITICAL: Suppresses browser automatic header (Date/Time/Title) and footer (URL/Page) */
+}
+
+@page portrait-doc {
+  size: A4 portrait;
+  margin: 0;
+}
+
+.print-portrait,
+.proposal-print-document,
+.transaction-voucher-print {
+  page: portrait-doc;
+}
+
 @media print {
-  @page {
-    size: A4 landscape;
-    margin: 0mm !important; /* CRITICAL: Suppresses browser automatic header (Date/Time) and footer (http:// URL) */
-  }
-
-  @page portrait {
-    size: A4 portrait;
-    margin: 0mm !important; /* CRITICAL: Suppresses browser automatic header (Date/Time) and footer (http:// URL) */
-  }
-
-  .print-portrait,
-  .proposal-print-document {
-    page: portrait;
-  }
-
   *, *::before, *::after {
     box-sizing: border-box !important;
     -webkit-print-color-adjust: exact !important;
@@ -595,6 +597,7 @@
   /* Printable Area Container: Strictly prints from Logo & Title downwards with clean paper margins */
   .printable-area,
   .proposal-print-document,
+  .transaction-voucher-print,
   .docx-preview-wrapper {
     display: block !important;
     position: static !important;
@@ -615,6 +618,7 @@
 
   .printable-area *,
   .proposal-print-document *,
+  .transaction-voucher-print *,
   .docx-preview-wrapper * {
     color: #000000 !important;
     text-shadow: none !important;
@@ -632,9 +636,13 @@
   .proposal-print-document span,
   .proposal-print-document td,
   .proposal-print-document th,
+  .transaction-voucher-print p,
+  .transaction-voucher-print span,
+  .transaction-voucher-print td,
+  .transaction-voucher-print th,
   .docx-preview-wrapper * {
     color: #000000 !important;
-    font-family: 'Segoe UI', system-ui, -apple-system, BlinkMacSystemFont, 'Roboto', 'Be Vietnam Pro', 'Inter', Arial, sans-serif !important;
+    font-family: 'Segoe UI', 'Be Vietnam Pro', -apple-system, BlinkMacSystemFont, 'Roboto', Arial, sans-serif !important;
   }
 
   /* Clear and crisp numeric tabular alignment */
@@ -642,10 +650,11 @@
     font-family: 'Segoe UI', system-ui, -apple-system, 'Roboto', 'Consolas', monospace !important;
     font-variant-numeric: tabular-nums !important;
     letter-spacing: normal !important;
+    font-weight: 600 !important;
   }
 
   .font-sans, [class*="font-sans"], .font-serif, [class*="font-serif"] {
-    font-family: 'Segoe UI', system-ui, -apple-system, BlinkMacSystemFont, 'Roboto', 'Be Vietnam Pro', 'Inter', Arial, sans-serif !important;
+    font-family: 'Segoe UI', 'Be Vietnam Pro', -apple-system, BlinkMacSystemFont, 'Roboto', Arial, sans-serif !important;
   }
 
   /* Top Header Branding Layout in Print */
@@ -676,7 +685,7 @@
     font-weight: 800 !important;
     text-align: center !important;
     margin: 4px 0 !important;
-    font-family: 'Segoe UI', system-ui, -apple-system, BlinkMacSystemFont, 'Roboto', 'Be Vietnam Pro', Arial, sans-serif !important;
+    font-family: 'Segoe UI', 'Be Vietnam Pro', -apple-system, BlinkMacSystemFont, 'Roboto', Arial, sans-serif !important;
   }
 
   .printable-area h3,
@@ -689,9 +698,11 @@
   /* High-precision Table Grid for Printing */
   .printable-table,
   .proposal-print-document table,
+  .transaction-voucher-print table,
   table {
     width: 100% !important;
     max-width: 100% !important;
+    min-width: 0 !important;
     border-collapse: collapse !important;
     page-break-inside: auto !important;
     font-size: 8pt !important;
@@ -710,57 +721,13 @@
   td,
   .printable-table th,
   .printable-table td {
-    border: 1px solid #334155 !important;
+    border: 1px solid #1e293b !important;
     padding: 3.5px 4.5px !important;
     color: #000000 !important;
     background: #ffffff !important;
     background-color: #ffffff !important;
     font-size: 8pt !important;
     line-height: 1.25 !important;
-  }
-
-  /* Number and code columns never wrap or break awkwardly */
-  .printable-table td.col-numeric,
-  .printable-table th.col-numeric,
-  .printable-table td[class*="text-right"],
-  .printable-table th[class*="text-right"],
-  .printable-table td.font-mono {
-    white-space: nowrap !important;
-    font-variant-numeric: tabular-nums !important;
-    text-align: right !important;
-  }
-
-  .printable-table td.col-center,
-  .printable-table th.col-center,
-  .printable-table td[class*="text-center"],
-  .printable-table th[class*="text-center"] {
-    white-space: nowrap !important;
-    text-align: center !important;
-  }
-
-  .printable-table td.col-item-name,
-  .printable-table th.col-item-name {
-    white-space: normal !important;
-    word-break: break-word !important;
-    text-align: left !important;
-  }
-
-  tr,
-  .printable-table tr {
-    page-break-inside: avoid !important;
-    page-break-after: auto !important;
-  }
-
-  th,
-  td,
-  .printable-table th,
-  .printable-table td {
-    border: 1px solid #000000 !important;
-    padding: 4px 6px !important;
-    color: #000000 !important;
-    background: #ffffff !important;
-    background-color: #ffffff !important;
-    font-size: 8.5pt !important;
     word-break: break-word !important;
     overflow-wrap: break-word !important;
   }
@@ -783,6 +750,41 @@
   .printable-table tfoot,
   table tfoot {
     display: table-footer-group !important;
+  }
+
+  /* Total rows in tables */
+  .printable-table tfoot tr,
+  .printable-table tr.bg-slate-800\/90,
+  .printable-table tr.bg-slate-100 {
+    background-color: #e2e8f0 !important;
+    font-weight: 800 !important;
+  }
+
+  /* Number and code columns never wrap or break awkwardly */
+  .printable-table td.col-numeric,
+  .printable-table th.col-numeric,
+  .printable-table td[class*="text-right"],
+  .printable-table th[class*="text-right"],
+  .printable-table td.font-mono {
+    white-space: nowrap !important;
+    font-variant-numeric: tabular-nums !important;
+    text-align: right !important;
+    font-weight: 600 !important;
+  }
+
+  .printable-table td.col-center,
+  .printable-table th.col-center,
+  .printable-table td[class*="text-center"],
+  .printable-table th[class*="text-center"] {
+    white-space: nowrap !important;
+    text-align: center !important;
+  }
+
+  .printable-table td.col-item-name,
+  .printable-table th.col-item-name {
+    white-space: normal !important;
+    word-break: break-word !important;
+    text-align: left !important;
   }
 
   /* Avoid breaking signatures across pages */

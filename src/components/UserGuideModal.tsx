@@ -21,6 +21,7 @@ import {
   Lightbulb,
 } from 'lucide-react';
 import { User } from '../types';
+import { printCleanDocument } from '../utils/printHelper';
 
 interface UserGuideModalProps {
   isOpen: boolean;
@@ -41,12 +42,12 @@ export const UserGuideModal: React.FC<UserGuideModalProps> = ({
   if (!isOpen) return null;
 
   const handlePrint = () => {
-    window.print();
+    printCleanDocument();
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-950/85 backdrop-blur-sm animate-in fade-in">
-      <div className="w-full max-w-5xl h-[90vh] bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl flex flex-col overflow-hidden text-white">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-950/85 backdrop-blur-sm animate-in fade-in print:static print:p-0 print:m-0 print:bg-white print:z-auto">
+      <div className="w-full max-w-5xl h-[90vh] bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl flex flex-col overflow-hidden text-white print:max-w-none print:w-full print:h-auto print:bg-white print:text-black print:border-none print:shadow-none print:rounded-none">
         {/* Modal Header */}
         <div className="p-4 sm:p-5 bg-slate-850 border-b border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shrink-0">
           <div className="flex items-center gap-3">

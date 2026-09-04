@@ -1002,7 +1002,9 @@ export const TransactionManagementView: React.FC<TransactionManagementViewProps>
 
   return (
     <div className="space-y-6 pb-12">
-      {/* Header and top action bar */}
+      {/* Background Main Page (Hidden during print) */}
+      <div className="no-print space-y-6">
+        {/* Header and top action bar */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2.5">
@@ -2164,12 +2166,13 @@ export const TransactionManagementView: React.FC<TransactionManagementViewProps>
           </div>
         </div>
       )}
+      </div>
 
       {/* Modal: View / Print Voucher (Phiếu Kho Chuẩn Kế Toán) */}
       {selectedTxForView && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-150">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-150 print:static print:p-0 print:m-0 print:bg-white print:z-auto">
           <div
-            className="w-full max-w-3xl bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh]"
+            className="w-full max-w-3xl bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh] print:max-w-none print:w-full print:bg-white print:border-none print:shadow-none print:max-h-none print:rounded-none"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="no-print p-4 border-b border-slate-800 flex items-center justify-between bg-slate-850">
@@ -2179,10 +2182,10 @@ export const TransactionManagementView: React.FC<TransactionManagementViewProps>
               </div>
               <div className="flex items-center gap-2">
                 <button
-                  onClick={() => window.print()}
-                  className="bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5 border border-slate-700"
+                  onClick={() => printCleanDocument()}
+                  className="bg-blue-600 hover:bg-blue-500 text-white px-3.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 shadow-sm transition-colors"
                 >
-                  <Printer className="w-3.5 h-3.5" /> In Chứng Từ
+                  <Printer className="w-3.5 h-3.5" /> In Chứng Từ (PDF)
                 </button>
                 <button
                   onClick={() => setSelectedTxForView(null)}
@@ -2194,7 +2197,7 @@ export const TransactionManagementView: React.FC<TransactionManagementViewProps>
             </div>
 
             {/* Voucher Document Print Body */}
-            <div className="printable-area p-6 overflow-y-auto bg-white text-slate-900 print:p-0 font-sans space-y-4">
+            <div className="printable-area transaction-voucher-print print-portrait p-6 overflow-y-auto bg-white text-slate-900 print:p-0 font-sans space-y-4 print:overflow-visible">
               <div className="flex justify-between items-start border-b border-slate-300 pb-4">
                 <div className="flex items-center gap-3">
                   <AHTLogo className="h-10" showPlane={false} allowUpload={false} />

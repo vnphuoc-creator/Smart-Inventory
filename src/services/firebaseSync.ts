@@ -29,6 +29,9 @@ export const DELETED_TRANSACTIONS_COL = 'deleted_transactions';
 const LOCAL_DELETED_PROPOSALS_KEY = 'smart_deleted_proposal_numbers_v2';
 const LOCAL_DELETED_TX_KEY = 'smart_deleted_tx_codes_v1';
 
+// Shared module-scoped set of deleted proposal keys from Cloud Firestore
+let globalCloudDeletedProposalKeys = new Set<string>();
+
 export function getLocalDeletedProposals(): Set<string> {
   try {
     const raw = localStorage.getItem(LOCAL_DELETED_PROPOSALS_KEY);
@@ -350,23 +353,20 @@ export function subscribeToProposals(
   const proposalsRef = collection(db, PROPOSALS_COL);
   const deletedRef = collection(db, DELETED_PROPOSALS_COL);
 
-  // In-memory set of deleted proposal keys
-  let cloudDeletedKeys = new Set<string>();
-
   // Subscribe to tombstones so deletions on ANY device immediately drop from ALL devices
   onSnapshot(
     deletedRef,
     (delSnap) => {
-      cloudDeletedKeys = new Set<string>();
+      globalCloudDeletedProposalKeys = new Set<string>();
       delSnap.forEach((d) => {
         const data = d.data();
         const norm = (data.normKey || d.id || '').trim().toLowerCase();
         const propNum = (data.proposalNumber || '').trim().toLowerCase();
-        if (norm) cloudDeletedKeys.add(norm);
+        if (norm) globalCloudDeletedProposalKeys.add(norm);
         if (propNum) {
-          cloudDeletedKeys.add(propNum);
+          globalCloudDeletedProposalKeys.add(propNum);
           const pNorm = normalizeProposalNumber(propNum);
-          if (pNorm) cloudDeletedKeys.add(pNorm.toLowerCase());
+          if (pNorm) globalCloudDeletedProposalKeys.add(pNorm.toLowerCase());
         }
       });
     },
@@ -395,9 +395,9 @@ export function subscribeToProposals(
 
         // Check if this proposal has been permanently deleted
         const isDeleted =
-          cloudDeletedKeys.has(normKeyLower) ||
-          cloudDeletedKeys.has(rawNumLower) ||
-          cloudDeletedKeys.has(docIdLower) ||
+          globalCloudDeletedProposalKeys.has(normKeyLower) ||
+          globalCloudDeletedProposalKeys.has(rawNumLower) ||
+          globalCloudDeletedProposalKeys.has(docIdLower) ||
           localDeleted.has(normKeyLower) ||
           localDeleted.has(rawNumLower) ||
           localDeleted.has(docIdLower);
@@ -633,8 +633,8 @@ export function subscribeToTransactions(
           if (
             localDelProps.has(propRaw) ||
             (propNorm && localDelProps.has(propNorm.toLowerCase())) ||
-            cloudDeletedKeys.has(propRaw) ||
-            (propNorm && cloudDeletedKeys.has(propNorm.toLowerCase()))
+            globalCloudDeletedProposalKeys.has(propRaw) ||
+            (propNorm && globalCloudDeletedProposalKeys.has(propNorm.toLowerCase()))
           ) {
             return; // Discard transactions referencing deleted proposals
           }
