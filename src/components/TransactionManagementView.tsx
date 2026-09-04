@@ -2182,7 +2182,7 @@ export const TransactionManagementView: React.FC<TransactionManagementViewProps>
               </div>
               <div className="flex items-center gap-2">
                 <button
-                  onClick={() => printCleanDocument()}
+                  onClick={() => printCleanDocument('portrait')}
                   className="bg-blue-600 hover:bg-blue-500 text-white px-3.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 shadow-sm transition-colors"
                 >
                   <Printer className="w-3.5 h-3.5" /> In Chứng Từ (PDF)

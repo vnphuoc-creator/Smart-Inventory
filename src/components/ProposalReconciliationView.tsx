@@ -1674,7 +1674,7 @@ export const ProposalReconciliationView: React.FC<ProposalReconciliationViewProp
                     } else if (viewingAttachment.url && viewingAttachment.url.startsWith('http')) {
                       window.open(viewingAttachment.url, '_blank');
                     } else {
-                      printCleanDocument();
+                      printCleanDocument('portrait');
                     }
                   }}
                   className="bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 px-2.5 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors"
@@ -1687,7 +1687,7 @@ export const ProposalReconciliationView: React.FC<ProposalReconciliationViewProp
                 {/* Print Button */}
                 <button
                   type="button"
-                  onClick={() => printCleanDocument()}
+                  onClick={() => printCleanDocument('portrait')}
                   className="bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 px-2.5 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors"
                   title="In Tờ Trình"
                 >
@@ -1732,7 +1732,7 @@ export const ProposalReconciliationView: React.FC<ProposalReconciliationViewProp
                         <div className="pt-2 flex justify-center gap-3">
                           <button
                             type="button"
-                            onClick={() => printCleanDocument()}
+                            onClick={() => printCleanDocument('portrait')}
                             className="bg-blue-600 hover:bg-blue-500 text-white px-5 py-2.5 rounded-xl text-xs font-semibold inline-flex items-center gap-2"
                           >
                             <Printer className="w-4 h-4" /> In Tờ Trình Số Hóa

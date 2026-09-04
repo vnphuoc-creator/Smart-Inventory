@@ -443,18 +443,7 @@
 
 @page {
   size: A4 landscape;
-  margin: 0; /* CRITICAL: Suppresses browser automatic header (Date/Time/Title) and footer (URL/Page) */
-}
-
-@page portrait-doc {
-  size: A4 portrait;
-  margin: 0;
-}
-
-.print-portrait,
-.proposal-print-document,
-.transaction-voucher-print {
-  page: portrait-doc;
+  margin: 0mm; /* CRITICAL: Suppresses browser automatic header (Date/Time/Title) and footer (URL/Page) */
 }
 
 @media print {

@@ -693,7 +693,7 @@ export const StockLedgerView: React.FC<StockLedgerViewProps> = ({
                       STT
                     </th>
                     <th rowSpan={2} className="px-3 py-2.5 border-r border-slate-700 w-36">
-                      Mã số
+                      Mã vật tư
                     </th>
                     <th rowSpan={2} className="px-3 py-2.5 border-r border-slate-700 text-left min-w-[220px]">
                       Mặt hàng
@@ -737,7 +737,7 @@ export const StockLedgerView: React.FC<StockLedgerViewProps> = ({
                     <th className="px-2.5 py-1.5 border-r border-slate-700 text-emerald-300">Giá trị</th>
                   </tr>
 
-                  {/* Row 3: Category Summary / Subtotal Row (VẬT TƯ AHT) */}
+                  {/* Row 3: Category Summary / Subtotal Row */}
                   <tr className="bg-slate-800/90 text-white font-bold border-b-2 border-slate-600">
                     <td className="px-2 py-2 border-r border-slate-700 font-mono text-center text-[11px] text-slate-400">
                       -
@@ -746,7 +746,7 @@ export const StockLedgerView: React.FC<StockLedgerViewProps> = ({
                       TỔNG CỘNG
                     </td>
                     <td className="px-3 py-2 border-r border-slate-700 uppercase tracking-wide text-amber-400">
-                      VẬT TƯ AHT ({filteredReportData.length} mục)
+                      TỔNG CỘNG TẤT CẢ VẬT TƯ
                     </td>
                     <td className="px-2 py-2 border-r border-slate-700 text-center">-</td>
                     {/* Đầu kỳ */}
@@ -826,16 +826,15 @@ export const StockLedgerView: React.FC<StockLedgerViewProps> = ({
                         <td className="col-center px-2.5 py-2 border-r border-slate-800 text-slate-400 text-center font-mono">
                           {idx + 1}
                         </td>
-                        {/* Mã số */}
+                        {/* Mã vật tư */}
                         <td className="col-center px-3 py-2 border-r border-slate-800 font-bold text-blue-400 whitespace-nowrap">
-                          <button
-                            type="button"
+                          <span
                             onClick={() => handleOpenMaterialCard(item.code)}
-                            className="hover:underline hover:text-blue-300 text-left font-mono"
+                            className="hover:underline hover:text-blue-300 text-left font-mono cursor-pointer print:text-black print:no-underline"
                             title="Xem Thẻ Kho mặt hàng này"
                           >
                             {item.code}
-                          </button>
+                          </span>
                         </td>
                         {/* Mặt hàng */}
                         <td className="col-item-name px-3 py-2 border-r border-slate-800 font-sans text-slate-200">
@@ -908,7 +907,7 @@ export const StockLedgerView: React.FC<StockLedgerViewProps> = ({
                       TỔNG CỘNG
                     </td>
                     <td className="px-3 py-2.5 border-r border-slate-700 uppercase tracking-wide text-amber-400 font-sans">
-                      VẬT TƯ AHT ({filteredReportData.length} mục)
+                      TỔNG CỘNG TẤT CẢ VẬT TƯ
                     </td>
                     <td className="px-2 py-2.5 border-r border-slate-700 text-center">-</td>
                     {/* Đầu kỳ */}

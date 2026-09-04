@@ -166,25 +166,25 @@ export function App() {
     if (saved !== null) {
       try {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) return parsed;
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
       } catch {
-        return [];
+        return INITIAL_PROPOSALS;
       }
     }
-    return [];
+    return INITIAL_PROPOSALS;
   });
 
   useEffect(() => {
     safeStorage.setItem('smart_proposals_v5', JSON.stringify(proposals));
   }, [proposals]);
 
-  // Firebase Realtime Subscription for Proposals (No auto-fallback to initial data to prevent deleted proposals from reappearing)
+  // Firebase Realtime Subscription for Proposals with persistent fallbacks
   useEffect(() => {
     const unsubscribe = subscribeToProposals((cloudProposals) => {
-      if (cloudProposals) {
+      if (cloudProposals && cloudProposals.length > 0) {
         setProposals(cloudProposals);
       }
-    });
+    }, INITIAL_PROPOSALS);
     return () => unsubscribe();
   }, []);
 
@@ -270,25 +270,33 @@ export function App() {
   const [lastSyncedTime, setLastSyncedTime] = useState<Date>(new Date());
 
   // Manual & automatic refresh function directly from Cloud Server
-  const handleManualRefresh = async () => {
+  const handleManualRefresh = async (isUserInitiated = false) => {
     setIsRefreshing(true);
     setSyncStatus('syncing');
     try {
       const data = await refreshAllFromCloud();
       if (data.users && data.users.length > 0) setUsers(data.users);
       if (data.materials && data.materials.length > 0) setMaterials(data.materials);
-      if (data.proposals) setProposals(data.proposals);
-      if (data.transactions) setTransactions(data.transactions);
+      if (data.proposals && data.proposals.length > 0) {
+        setProposals(data.proposals);
+      }
+      if (data.transactions && data.transactions.length > 0) {
+        setTransactions(data.transactions);
+      }
       if (data.settings) {
         if (data.settings.themeConfig) setThemeConfig(data.settings.themeConfig);
       }
       setLastSyncedTime(new Date());
       setSyncStatus('synced');
-      showToast('Đã đồng bộ toàn bộ dữ liệu thời gian thực từ Cloud!');
+      if (isUserInitiated) {
+        showToast('Đã đồng bộ toàn bộ dữ liệu từ Cloud thành công!');
+      }
     } catch (e) {
       console.warn('Manual refresh failed, keeping active cache:', e);
       setSyncStatus('offline');
-      showToast('Không thể kết nối Cloud, đang dùng dữ liệu lưu tạm.', 'info');
+      if (isUserInitiated) {
+        showToast('Không thể kết nối Cloud, đang dùng dữ liệu lưu tạm.', 'info');
+      }
     } finally {
       setIsRefreshing(false);
     }

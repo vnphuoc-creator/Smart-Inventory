@@ -376,8 +376,25 @@ export function subscribeToProposals(
   return onSnapshot(
     proposalsRef,
     (snapshot) => {
-      // NEVER auto-reseed on empty - if the user deleted all proposals, keep it empty!
       if (snapshot.empty) {
+        const localDeleted = getLocalDeletedProposals();
+        if (initialFallback && initialFallback.length > 0) {
+          const validInitial = initialFallback.filter((p) => {
+            const norm = (normalizeProposalNumber(p.proposalNumber) || p.id).toLowerCase();
+            const raw = (p.proposalNumber || '').toLowerCase().trim();
+            return (
+              !globalCloudDeletedProposalKeys.has(norm) &&
+              !globalCloudDeletedProposalKeys.has(raw) &&
+              !localDeleted.has(norm) &&
+              !localDeleted.has(raw)
+            );
+          });
+          if (validInitial.length > 0) {
+            seedProposals(validInitial);
+            onUpdate(validInitial);
+            return;
+          }
+        }
         onUpdate([]);
         return;
       }

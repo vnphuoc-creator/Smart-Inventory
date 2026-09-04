@@ -5,27 +5,56 @@
  * or footer (http://... URL / page number).
  */
 
-export function printCleanDocument() {
+export function printCleanDocument(orientation: 'landscape' | 'portrait' = 'landscape') {
   const originalTitle = document.title;
-  
-  // Blank the document title temporarily so browsers with header print enabled won't print the page title
+
+  // Temporarily clear document title so browsers never print title in margin
   try {
     document.title = '';
   } catch {}
+
+  // Inject dynamic @page rule with margin: 0 to force browsers (Chrome/Edge/Safari)
+  // to eliminate the margin box completely, removing headers (date/time) and footers (URL/page).
+  const styleId = 'dynamic-print-aht-rules';
+  let styleEl = document.getElementById(styleId) as HTMLStyleElement | null;
+  if (!styleEl) {
+    styleEl = document.createElement('style');
+    styleEl.id = styleId;
+    document.head.appendChild(styleEl);
+  }
+
+  styleEl.innerHTML = `
+    @page {
+      size: A4 ${orientation} !important;
+      margin: 0mm !important;
+    }
+    @media print {
+      @page {
+        size: A4 ${orientation} !important;
+        margin: 0mm !important;
+      }
+      html, body {
+        margin: 0 !important;
+        padding: 0 !important;
+      }
+    }
+  `;
 
   const cleanup = () => {
     try {
       document.title = originalTitle;
     } catch {}
+    if (styleEl && styleEl.parentNode) {
+      styleEl.parentNode.removeChild(styleEl);
+    }
     window.removeEventListener('afterprint', cleanup);
   };
 
   window.addEventListener('afterprint', cleanup);
 
-  // Give DOM a frame to settle, then open browser print dialog
   requestAnimationFrame(() => {
     window.print();
-    // Fallback restoration in case afterprint does not fire in some browsers
-    setTimeout(cleanup, 2000);
+    setTimeout(cleanup, 2500);
   });
 }
+
