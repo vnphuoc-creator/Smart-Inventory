@@ -54,6 +54,17 @@ export function saveLocalDeletedProposal(target: string) {
   } catch {}
 }
 
+export function removeLocalDeletedProposal(target: string) {
+  try {
+    const current = getLocalDeletedProposals();
+    const clean = target.toLowerCase().trim();
+    const norm = normalizeProposalNumber(clean);
+    if (clean) current.delete(clean);
+    if (norm) current.delete(norm.toLowerCase().trim());
+    localStorage.setItem(LOCAL_DELETED_PROPOSALS_KEY, JSON.stringify(Array.from(current)));
+  } catch {}
+}
+
 export function clearLocalDeletedProposals() {
   try {
     localStorage.removeItem(LOCAL_DELETED_PROPOSALS_KEY);
@@ -77,6 +88,15 @@ function saveLocalDeletedTransaction(codeOrId: string) {
     const current = getLocalDeletedTransactions();
     const clean = codeOrId.toLowerCase().trim();
     if (clean) current.add(clean);
+    localStorage.setItem(LOCAL_DELETED_TX_KEY, JSON.stringify(Array.from(current)));
+  } catch {}
+}
+
+export function removeLocalDeletedTransaction(codeOrId: string) {
+  try {
+    const current = getLocalDeletedTransactions();
+    const clean = codeOrId.toLowerCase().trim();
+    if (clean) current.delete(clean);
     localStorage.setItem(LOCAL_DELETED_TX_KEY, JSON.stringify(Array.from(current)));
   } catch {}
 }
@@ -226,37 +246,34 @@ export function subscribeToMaterials(
   return onSnapshot(
     materialsRef,
     (snapshot) => {
+      // NEVER auto-reseed on empty snapshot, protecting existing cloud data
       if (snapshot.empty) {
-        if (initialFallback && initialFallback.length > 0) {
-          seedMaterials(initialFallback);
-          onUpdate(initialFallback);
-        } else {
-          onUpdate([]);
-        }
-      } else {
-        // Deduplicate materials by code to ensure identical inventory across all devices
-        const mapByCode = new Map<string, Material>();
-        snapshot.forEach((d) => {
-          const m = d.data() as Material;
-          if (!m.id) m.id = d.id;
-          const code = (m.code || '').trim().toUpperCase();
-          if (!code) return;
-
-          if (!mapByCode.has(code)) {
-            mapByCode.set(code, m);
-          } else {
-            // Keep the more complete record (prefer non-zero initialStock or longer name)
-            const existing = mapByCode.get(code)!;
-            const existingStock = existing.initialStock || 0;
-            const newStock = m.initialStock || 0;
-            if (newStock > existingStock || (newStock === existingStock && (m.name?.length || 0) > (existing.name?.length || 0))) {
-              mapByCode.set(code, { ...existing, ...m });
-            }
-          }
-        });
-        const list = Array.from(mapByCode.values());
-        onUpdate(list);
+        onUpdate([]);
+        return;
       }
+
+      // Deduplicate materials by code to ensure identical inventory across all devices
+      const mapByCode = new Map<string, Material>();
+      snapshot.forEach((d) => {
+        const m = d.data() as Material;
+        if (!m.id) m.id = d.id;
+        const code = (m.code || '').trim().toUpperCase();
+        if (!code) return;
+
+        if (!mapByCode.has(code)) {
+          mapByCode.set(code, m);
+        } else {
+          // Keep the more complete record (prefer non-zero initialStock or longer name)
+          const existing = mapByCode.get(code)!;
+          const existingStock = existing.initialStock || 0;
+          const newStock = m.initialStock || 0;
+          if (newStock > existingStock || (newStock === existingStock && (m.name?.length || 0) > (existing.name?.length || 0))) {
+            mapByCode.set(code, { ...existing, ...m });
+          }
+        }
+      });
+      const list = Array.from(mapByCode.values());
+      onUpdate(list);
     },
     (err) => {
       console.error('Firebase materials sync error:', err);
@@ -348,13 +365,74 @@ export async function seedMaterials(materials: Material[]) {
  */
 export function subscribeToProposals(
   onUpdate: (proposals: PurchaseProposal[]) => void,
-  initialFallback?: PurchaseProposal[]
+  _initialFallback?: PurchaseProposal[]
 ) {
   const proposalsRef = collection(db, PROPOSALS_COL);
   const deletedRef = collection(db, DELETED_PROPOSALS_COL);
 
+  let latestProposalDocs: any[] = [];
+
+  const emitFilteredProposals = () => {
+    const localDeleted = getLocalDeletedProposals();
+    const proposalsMap = new Map<string, PurchaseProposal>();
+
+    latestProposalDocs.forEach((d) => {
+      const data = d.data() as PurchaseProposal;
+      if (!data.id) data.id = d.id;
+      const normKey = normalizeProposalNumber(data.proposalNumber) || data.id;
+      const normKeyLower = normKey.toLowerCase().trim();
+      const rawNumLower = (data.proposalNumber || '').toLowerCase().trim();
+      const docIdLower = (d.id || '').toLowerCase().trim();
+
+      // Check if this proposal has been permanently deleted
+      const isDeleted =
+        globalCloudDeletedProposalKeys.has(normKeyLower) ||
+        globalCloudDeletedProposalKeys.has(rawNumLower) ||
+        globalCloudDeletedProposalKeys.has(docIdLower) ||
+        localDeleted.has(normKeyLower) ||
+        localDeleted.has(rawNumLower) ||
+        localDeleted.has(docIdLower);
+
+      if (isDeleted) {
+        return; // Strictly discard deleted proposals
+      }
+
+      if (!proposalsMap.has(normKey)) {
+        proposalsMap.set(normKey, data);
+      } else {
+        // Merge items from any duplicate document to ensure full line-item integrity
+        const existing = proposalsMap.get(normKey)!;
+        const mergedItemsMap = new Map<string, any>();
+        (existing.items || []).forEach((it) => {
+          const itCode = (it.materialCode || '').trim().toUpperCase();
+          mergedItemsMap.set(itCode, it);
+        });
+        (data.items || []).forEach((it) => {
+          const itCode = (it.materialCode || '').trim().toUpperCase();
+          if (!mergedItemsMap.has(itCode) || (it.requestedQuantity || 0) > (mergedItemsMap.get(itCode).requestedQuantity || 0)) {
+            mergedItemsMap.set(itCode, it);
+          }
+        });
+
+        proposalsMap.set(normKey, {
+          ...existing,
+          ...data,
+          title: data.title || existing.title,
+          date: data.date || existing.date,
+          department: data.department || existing.department,
+          notes: data.notes || existing.notes,
+          items: Array.from(mergedItemsMap.values()),
+        });
+      }
+    });
+
+    const list = Array.from(proposalsMap.values());
+    list.sort((a, b) => new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime());
+    onUpdate(list);
+  };
+
   // Subscribe to tombstones so deletions on ANY device immediately drop from ALL devices
-  onSnapshot(
+  const unsubDeleted = onSnapshot(
     deletedRef,
     (delSnap) => {
       globalCloudDeletedProposalKeys = new Set<string>();
@@ -369,110 +447,60 @@ export function subscribeToProposals(
           if (pNorm) globalCloudDeletedProposalKeys.add(pNorm.toLowerCase());
         }
       });
+      if (latestProposalDocs.length > 0) {
+        emitFilteredProposals();
+      }
     },
     (err) => console.warn('deleted_proposals sync warning:', err)
   );
 
-  return onSnapshot(
+  const unsubProposals = onSnapshot(
     proposalsRef,
     (snapshot) => {
       if (snapshot.empty) {
-        const localDeleted = getLocalDeletedProposals();
-        if (initialFallback && initialFallback.length > 0) {
-          const validInitial = initialFallback.filter((p) => {
-            const norm = (normalizeProposalNumber(p.proposalNumber) || p.id).toLowerCase();
-            const raw = (p.proposalNumber || '').toLowerCase().trim();
-            return (
-              !globalCloudDeletedProposalKeys.has(norm) &&
-              !globalCloudDeletedProposalKeys.has(raw) &&
-              !localDeleted.has(norm) &&
-              !localDeleted.has(raw)
-            );
-          });
-          if (validInitial.length > 0) {
-            seedProposals(validInitial);
-            onUpdate(validInitial);
-            return;
-          }
-        }
+        latestProposalDocs = [];
         onUpdate([]);
         return;
       }
-
-      const localDeleted = getLocalDeletedProposals();
-      const proposalsMap = new Map<string, PurchaseProposal>();
-
-      snapshot.forEach((d) => {
-        const data = d.data() as PurchaseProposal;
-        if (!data.id) data.id = d.id;
-        const normKey = normalizeProposalNumber(data.proposalNumber) || data.id;
-        const normKeyLower = normKey.toLowerCase().trim();
-        const rawNumLower = (data.proposalNumber || '').toLowerCase().trim();
-        const docIdLower = (d.id || '').toLowerCase().trim();
-
-        // Check if this proposal has been permanently deleted
-        const isDeleted =
-          globalCloudDeletedProposalKeys.has(normKeyLower) ||
-          globalCloudDeletedProposalKeys.has(rawNumLower) ||
-          globalCloudDeletedProposalKeys.has(docIdLower) ||
-          localDeleted.has(normKeyLower) ||
-          localDeleted.has(rawNumLower) ||
-          localDeleted.has(docIdLower);
-
-        if (isDeleted) {
-          return; // Strictly discard deleted proposals
-        }
-
-        if (!proposalsMap.has(normKey)) {
-          proposalsMap.set(normKey, data);
-        } else {
-          // Merge items from any duplicate document to ensure full line-item integrity
-          const existing = proposalsMap.get(normKey)!;
-          const mergedItemsMap = new Map<string, any>();
-          (existing.items || []).forEach((it) => {
-            const itCode = (it.materialCode || '').trim().toUpperCase();
-            mergedItemsMap.set(itCode, it);
-          });
-          (data.items || []).forEach((it) => {
-            const itCode = (it.materialCode || '').trim().toUpperCase();
-            if (!mergedItemsMap.has(itCode) || (it.requestedQuantity || 0) > (mergedItemsMap.get(itCode).requestedQuantity || 0)) {
-              mergedItemsMap.set(itCode, it);
-            }
-          });
-
-          proposalsMap.set(normKey, {
-            ...existing,
-            ...data,
-            title: data.title || existing.title,
-            date: data.date || existing.date,
-            department: data.department || existing.department,
-            notes: data.notes || existing.notes,
-            items: Array.from(mergedItemsMap.values()),
-          });
-        }
-      });
-
-      const list = Array.from(proposalsMap.values());
-      list.sort((a, b) => new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime());
-      onUpdate(list);
+      latestProposalDocs = snapshot.docs;
+      emitFilteredProposals();
     },
     (err) => {
       console.error('Firebase proposals sync error:', err);
     }
   );
+
+  return () => {
+    unsubDeleted();
+    unsubProposals();
+  };
 }
 
 export async function saveProposalToCloud(proposal: PurchaseProposal) {
   try {
-    const normKey = normalizeProposalNumber(proposal.proposalNumber);
+    const rawNum = (proposal.proposalNumber || '').trim();
+    const normKey = normalizeProposalNumber(rawNum);
     const docId = proposal.id || (normKey ? `prop_${sanitizeDocId(normKey)}` : `prop_${Date.now()}`);
     const ref = doc(db, PROPOSALS_COL, docId);
     await setDoc(ref, cleanForFirestore(proposal), { merge: true });
 
-    // If previously marked deleted, unmark it when re-created
+    // If previously marked deleted, unmark it when re-created or updated
+    if (rawNum) {
+      removeLocalDeletedProposal(rawNum);
+      globalCloudDeletedProposalKeys.delete(rawNum.toLowerCase());
+    }
     if (normKey) {
+      removeLocalDeletedProposal(normKey);
+      globalCloudDeletedProposalKeys.delete(normKey.toLowerCase());
       try {
         await deleteDoc(doc(db, DELETED_PROPOSALS_COL, normKey.toLowerCase()));
+      } catch {}
+    }
+    if (proposal.id) {
+      removeLocalDeletedProposal(proposal.id);
+      globalCloudDeletedProposalKeys.delete(proposal.id.toLowerCase());
+      try {
+        await deleteDoc(doc(db, DELETED_PROPOSALS_COL, proposal.id.toLowerCase()));
       } catch {}
     }
 
@@ -602,13 +630,66 @@ export async function seedProposals(proposals: PurchaseProposal[]) {
  */
 export function subscribeToTransactions(
   onUpdate: (transactions: InventoryTransaction[]) => void,
-  initialFallback?: InventoryTransaction[]
+  _initialFallback?: InventoryTransaction[]
 ) {
   const txRef = collection(db, TRANSACTIONS_COL);
   const delTxRef = collection(db, DELETED_TRANSACTIONS_COL);
 
   let cloudDeletedTxCodes = new Set<string>();
-  onSnapshot(
+  let latestTxDocs: any[] = [];
+
+  const emitFilteredTransactions = () => {
+    if (latestTxDocs.length === 0) {
+      onUpdate([]);
+      return;
+    }
+    const localDelTx = getLocalDeletedTransactions();
+    const localDelProps = getLocalDeletedProposals();
+    const txMap = new Map<string, InventoryTransaction>();
+
+    latestTxDocs.forEach((d) => {
+      const data = d.data() as InventoryTransaction;
+      if (!data.id) data.id = d.id;
+      const codeKey = (data.code || data.id).trim().toUpperCase();
+      const codeLower = codeKey.toLowerCase();
+      const docIdLower = (d.id || '').toLowerCase().trim();
+
+      if (cloudDeletedTxCodes.has(codeLower) || cloudDeletedTxCodes.has(docIdLower) || localDelTx.has(codeLower) || localDelTx.has(docIdLower)) {
+        return; // Discard deleted transactions
+      }
+
+      // Check if transaction references a deleted proposal
+      if (data.proposalNumber && data.proposalNumber.trim()) {
+        const propRaw = data.proposalNumber.trim().toLowerCase();
+        const propNorm = normalizeProposalNumber(propRaw);
+        if (
+          localDelProps.has(propRaw) ||
+          (propNorm && localDelProps.has(propNorm.toLowerCase())) ||
+          globalCloudDeletedProposalKeys.has(propRaw) ||
+          (propNorm && globalCloudDeletedProposalKeys.has(propNorm.toLowerCase()))
+        ) {
+          return; // Discard transactions referencing deleted proposals
+        }
+      }
+
+      if (!txMap.has(codeKey)) {
+        txMap.set(codeKey, data);
+      } else {
+        const existing = txMap.get(codeKey)!;
+        const existingTime = new Date(existing.updatedAt || existing.createdAt || 0).getTime();
+        const newTime = new Date(data.updatedAt || data.createdAt || 0).getTime();
+        if (newTime >= existingTime) {
+          txMap.set(codeKey, { ...existing, ...data });
+        }
+      }
+    });
+
+    const list = Array.from(txMap.values());
+    list.sort((a, b) => new Date(b.date || b.createdAt || 0).getTime() - new Date(a.date || a.createdAt || 0).getTime());
+    onUpdate(list);
+  };
+
+  const unsubDelTx = onSnapshot(
     delTxRef,
     (snap) => {
       cloudDeletedTxCodes = new Set<string>();
@@ -617,65 +698,33 @@ export function subscribeToTransactions(
         const code = (data.code || d.id || '').trim().toLowerCase();
         if (code) cloudDeletedTxCodes.add(code);
       });
+      if (latestTxDocs.length > 0) {
+        emitFilteredTransactions();
+      }
     },
     (err) => console.warn('deleted_transactions sync warning:', err)
   );
 
-  return onSnapshot(
+  const unsubTx = onSnapshot(
     txRef,
     (snapshot) => {
-      // NEVER auto-reseed on empty
       if (snapshot.empty) {
+        latestTxDocs = [];
         onUpdate([]);
         return;
       }
-      const localDelTx = getLocalDeletedTransactions();
-      const localDelProps = getLocalDeletedProposals();
-      const txMap = new Map<string, InventoryTransaction>();
-      snapshot.forEach((d) => {
-        const data = d.data() as InventoryTransaction;
-        if (!data.id) data.id = d.id;
-        const codeKey = (data.code || data.id).trim().toUpperCase();
-        const codeLower = codeKey.toLowerCase();
-        const docIdLower = (d.id || '').toLowerCase().trim();
-
-        if (cloudDeletedTxCodes.has(codeLower) || cloudDeletedTxCodes.has(docIdLower) || localDelTx.has(codeLower) || localDelTx.has(docIdLower)) {
-          return; // Discard deleted transactions
-        }
-
-        // Check if transaction references a deleted proposal
-        if (data.proposalNumber && data.proposalNumber.trim()) {
-          const propRaw = data.proposalNumber.trim().toLowerCase();
-          const propNorm = normalizeProposalNumber(propRaw);
-          if (
-            localDelProps.has(propRaw) ||
-            (propNorm && localDelProps.has(propNorm.toLowerCase())) ||
-            globalCloudDeletedProposalKeys.has(propRaw) ||
-            (propNorm && globalCloudDeletedProposalKeys.has(propNorm.toLowerCase()))
-          ) {
-            return; // Discard transactions referencing deleted proposals
-          }
-        }
-
-        if (!txMap.has(codeKey)) {
-          txMap.set(codeKey, data);
-        } else {
-          const existing = txMap.get(codeKey)!;
-          const existingTime = new Date(existing.updatedAt || existing.createdAt || 0).getTime();
-          const newTime = new Date(data.updatedAt || data.createdAt || 0).getTime();
-          if (newTime >= existingTime) {
-            txMap.set(codeKey, { ...existing, ...data });
-          }
-        }
-      });
-      const list = Array.from(txMap.values());
-      list.sort((a, b) => new Date(b.date || b.createdAt || 0).getTime() - new Date(a.date || a.createdAt || 0).getTime());
-      onUpdate(list);
+      latestTxDocs = snapshot.docs;
+      emitFilteredTransactions();
     },
     (err) => {
       console.error('Firebase transactions sync error:', err);
     }
   );
+
+  return () => {
+    unsubDelTx();
+    unsubTx();
+  };
 }
 
 export async function saveTransactionToCloud(tx: InventoryTransaction) {
@@ -895,8 +944,25 @@ export async function saveSystemSettingsToCloud(settings: Partial<SystemSettings
 }
 
 /**
+ * Helper to fetch documents prioritizing fresh server data with graceful cache fallback
+ */
+async function fetchServerCollection(colName: string) {
+  try {
+    return await getDocsFromServer(collection(db, colName));
+  } catch (err) {
+    console.warn(`[refreshAllFromCloud] getDocsFromServer note for "${colName}":`, err);
+    try {
+      return await getDocs(collection(db, colName));
+    } catch (e) {
+      console.error(`[refreshAllFromCloud] Failed to fetch "${colName}":`, e);
+      return null;
+    }
+  }
+}
+
+/**
  * 7. FORCE REFRESH ALL COLLECTIONS DIRECTLY FROM CLOUD SERVER
- * Used by manual refresh button and visibility-change / online triggers
+ * Used on app startup, manual refresh button, visibility-change, focus, and periodic heartbeat
  */
 export async function refreshAllFromCloud(): Promise<{
   users: User[];
@@ -906,13 +972,13 @@ export async function refreshAllFromCloud(): Promise<{
   settings?: SystemSettingsConfig;
 }> {
   const [usersSnap, matsSnap, propsSnap, txsSnap, setSnap, delPropsSnap, delTxsSnap] = await Promise.all([
-    getDocsFromServer(collection(db, USERS_COL)),
-    getDocsFromServer(collection(db, MATERIALS_COL)),
-    getDocsFromServer(collection(db, PROPOSALS_COL)),
-    getDocsFromServer(collection(db, TRANSACTIONS_COL)),
-    getDocs(collection(db, SETTINGS_COL)).catch(() => null),
-    getDocs(collection(db, DELETED_PROPOSALS_COL)).catch(() => null),
-    getDocs(collection(db, DELETED_TRANSACTIONS_COL)).catch(() => null),
+    fetchServerCollection(USERS_COL),
+    fetchServerCollection(MATERIALS_COL),
+    fetchServerCollection(PROPOSALS_COL),
+    fetchServerCollection(TRANSACTIONS_COL),
+    fetchServerCollection(SETTINGS_COL),
+    fetchServerCollection(DELETED_PROPOSALS_COL),
+    fetchServerCollection(DELETED_TRANSACTIONS_COL),
   ]);
 
   // Load deleted tombstones
@@ -937,63 +1003,83 @@ export async function refreshAllFromCloud(): Promise<{
 
   // Process users
   const usersMap = new Map<string, User>();
-  usersSnap.forEach((d) => {
-    const u = d.data() as User;
-    if (!u.id) u.id = d.id;
-    usersMap.set((u.email || u.id).trim().toLowerCase(), u);
-  });
+  if (usersSnap) {
+    usersSnap.forEach((d) => {
+      const u = d.data() as User;
+      if (!u.id) u.id = d.id;
+      usersMap.set((u.email || u.id).trim().toLowerCase(), u);
+    });
+  }
   const users = Array.from(usersMap.values()).sort((a, b) => (a.stt || 0) - (b.stt || 0));
 
   // Process materials (deduplicated)
   const matsMap = new Map<string, Material>();
-  matsSnap.forEach((d) => {
-    const m = d.data() as Material;
-    if (!m.id) m.id = d.id;
-    const code = (m.code || '').trim().toUpperCase();
-    if (!code) return;
-    if (!matsMap.has(code) || (m.initialStock || 0) > (matsMap.get(code)!.initialStock || 0)) {
-      matsMap.set(code, m);
-    }
-  });
+  if (matsSnap) {
+    matsSnap.forEach((d) => {
+      const m = d.data() as Material;
+      if (!m.id) m.id = d.id;
+      const code = (m.code || '').trim().toUpperCase();
+      if (!code) return;
+      if (!matsMap.has(code) || (m.initialStock || 0) > (matsMap.get(code)!.initialStock || 0)) {
+        matsMap.set(code, m);
+      }
+    });
+  }
   const materials = Array.from(matsMap.values());
 
   // Process proposals (deduplicated & filtering out tombstones)
   const propsMap = new Map<string, PurchaseProposal>();
-  propsSnap.forEach((d) => {
-    const p = d.data() as PurchaseProposal;
-    if (!p.id) p.id = d.id;
-    const norm = normalizeProposalNumber(p.proposalNumber) || p.id;
-    const normLower = norm.toLowerCase().trim();
-    const rawLower = (p.proposalNumber || '').toLowerCase().trim();
-    const docIdLower = (d.id || '').toLowerCase().trim();
+  if (propsSnap) {
+    propsSnap.forEach((d) => {
+      const p = d.data() as PurchaseProposal;
+      if (!p.id) p.id = d.id;
+      const norm = normalizeProposalNumber(p.proposalNumber) || p.id;
+      const normLower = norm.toLowerCase().trim();
+      const rawLower = (p.proposalNumber || '').toLowerCase().trim();
+      const docIdLower = (d.id || '').toLowerCase().trim();
 
-    if (deletedPropsSet.has(normLower) || deletedPropsSet.has(rawLower) || deletedPropsSet.has(docIdLower)) {
-      return; // Skip deleted proposals
-    }
+      if (deletedPropsSet.has(normLower) || deletedPropsSet.has(rawLower) || deletedPropsSet.has(docIdLower)) {
+        return; // Skip deleted proposals
+      }
 
-    if (!propsMap.has(norm)) {
-      propsMap.set(norm, p);
-    }
-  });
+      if (!propsMap.has(norm)) {
+        propsMap.set(norm, p);
+      }
+    });
+  }
   const proposals = Array.from(propsMap.values()).sort((a, b) => new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime());
 
   // Process transactions (deduplicated & filtering out tombstones)
   const txMap = new Map<string, InventoryTransaction>();
-  txsSnap.forEach((d) => {
-    const tx = d.data() as InventoryTransaction;
-    if (!tx.id) tx.id = d.id;
-    const code = (tx.code || tx.id).trim().toUpperCase();
-    const codeLower = code.toLowerCase();
-    const docIdLower = (d.id || '').toLowerCase().trim();
+  if (txsSnap) {
+    txsSnap.forEach((d) => {
+      const tx = d.data() as InventoryTransaction;
+      if (!tx.id) tx.id = d.id;
+      const code = (tx.code || tx.id).trim().toUpperCase();
+      const codeLower = code.toLowerCase();
+      const docIdLower = (d.id || '').toLowerCase().trim();
 
-    if (deletedTxSet.has(codeLower) || deletedTxSet.has(docIdLower)) {
-      return; // Skip deleted transactions
-    }
+      if (deletedTxSet.has(codeLower) || deletedTxSet.has(docIdLower)) {
+        return; // Skip deleted transactions
+      }
 
-    if (!txMap.has(code)) {
-      txMap.set(code, tx);
-    }
-  });
+      // Skip transactions referencing deleted proposals
+      if (tx.proposalNumber && tx.proposalNumber.trim()) {
+        const propRaw = tx.proposalNumber.trim().toLowerCase();
+        const propNorm = normalizeProposalNumber(propRaw);
+        if (
+          deletedPropsSet.has(propRaw) ||
+          (propNorm && deletedPropsSet.has(propNorm.toLowerCase()))
+        ) {
+          return;
+        }
+      }
+
+      if (!txMap.has(code)) {
+        txMap.set(code, tx);
+      }
+    });
+  }
   const transactions = Array.from(txMap.values()).sort(
     (a, b) => new Date(b.date || b.createdAt || 0).getTime() - new Date(a.date || a.createdAt || 0).getTime()
   );

@@ -2,8 +2,6 @@ import { initializeApp, getApps, getApp } from 'firebase/app';
 import {
   getFirestore,
   initializeFirestore,
-  persistentLocalCache,
-  persistentMultipleTabManager
 } from 'firebase/firestore';
 import firebaseConfig from '../firebase-applet-config.json';
 
@@ -14,19 +12,11 @@ const customDbId =
     ? firebaseConfig.firestoreDatabaseId
     : undefined;
 
+// Robust, direct Firestore initialization ensuring identical, immediate real-time sync across Chrome, Edge, and all platforms
 let firestoreInstance;
 try {
-  firestoreInstance = initializeFirestore(
-    app,
-    {
-      ignoreUndefinedProperties: true,
-      localCache: persistentLocalCache({
-        tabManager: persistentMultipleTabManager(),
-      }),
-    },
-    customDbId
-  );
-} catch {
+  firestoreInstance = customDbId ? getFirestore(app, customDbId) : getFirestore(app);
+} catch (e) {
   try {
     firestoreInstance = initializeFirestore(
       app,

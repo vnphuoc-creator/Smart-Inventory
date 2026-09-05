@@ -42,3 +42,35 @@ export const safeStorage = {
     }
   },
 };
+
+/**
+ * Safe sessionStorage wrapper for per-session authentication
+ */
+export const safeSessionStorage = {
+  getItem(key: string): string | null {
+    try {
+      if (typeof window === 'undefined' || !window.sessionStorage) return null;
+      return window.sessionStorage.getItem(key);
+    } catch {
+      return null;
+    }
+  },
+
+  setItem(key: string, value: string): boolean {
+    try {
+      if (typeof window === 'undefined' || !window.sessionStorage) return false;
+      window.sessionStorage.setItem(key, value);
+      return true;
+    } catch {
+      return false;
+    }
+  },
+
+  removeItem(key: string): void {
+    try {
+      if (typeof window === 'undefined' || !window.sessionStorage) return;
+      window.sessionStorage.removeItem(key);
+    } catch {}
+  },
+};
+

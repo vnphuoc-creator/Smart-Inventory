@@ -411,20 +411,40 @@ export const Sidebar: React.FC<SidebarProps> = ({
               </div>
             </div>
 
-            <div className="mt-2 pt-2 border-t border-slate-800/80 flex items-center justify-between text-[11px]">
-              <span className="text-[10px] bg-blue-950/80 text-cyan-400 font-semibold px-2 py-0.5 rounded-md border border-cyan-500/20">
+            <div className="mt-2 pt-2 border-t border-slate-800/80 flex items-center justify-between gap-1 text-[11px]">
+              <span className="text-[10px] bg-blue-950/80 text-cyan-400 font-semibold px-1.5 py-0.5 rounded-md border border-cyan-500/20 truncate">
                 {isMasterAdmin ? 'Master Admin' : currentUser.role}
               </span>
 
-              <button
-                type="button"
-                onClick={onLogout}
-                className="text-rose-400 hover:text-rose-300 hover:bg-rose-950/30 px-2 py-1 rounded-lg flex items-center gap-1.5 font-medium transition"
-                title="Đăng xuất khỏi hệ thống"
-              >
-                <LogOut className="w-3.5 h-3.5" />
-                <span>Đăng xuất</span>
-              </button>
+              <div className="flex items-center gap-1 shrink-0">
+                {onOpenChangePassword && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (isOpenMobile) onToggleMobile();
+                      onOpenChangePassword();
+                    }}
+                    className="text-amber-400 hover:text-amber-300 hover:bg-amber-950/30 px-2 py-1 rounded-lg flex items-center gap-1 font-medium transition text-[11px]"
+                    title="Đổi mật khẩu tài khoản"
+                  >
+                    <KeyRound className="w-3.5 h-3.5" />
+                    <span>Đổi MK</span>
+                  </button>
+                )}
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (isOpenMobile) onToggleMobile();
+                    onLogout();
+                  }}
+                  className="text-rose-400 hover:text-rose-300 hover:bg-rose-950/30 px-2 py-1 rounded-lg flex items-center gap-1 font-medium transition text-[11px]"
+                  title="Đăng xuất khỏi hệ thống"
+                >
+                  <LogOut className="w-3.5 h-3.5" />
+                  <span>Đăng xuất</span>
+                </button>
+              </div>
             </div>
           </div>
         </div>

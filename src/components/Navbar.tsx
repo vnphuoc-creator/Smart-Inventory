@@ -117,20 +117,33 @@ export const Navbar: React.FC<NavbarProps> = ({
         </div>
       )}
 
-      <div className="w-full px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16 gap-3">
-          {/* Left: Organization / System Branding (Exact match with screenshot) */}
-          <div className="flex items-center gap-3">
+      <div className="w-full px-2 sm:px-6 lg:px-8">
+        <div className="flex items-center justify-between h-16 gap-2 sm:gap-3">
+          {/* Left: Organization / System Branding */}
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
             <button
               type="button"
               onClick={onToggleSidebar}
-              className="lg:hidden p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 transition-colors"
+              className="lg:hidden p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 transition-colors shrink-0"
               title="Mở thanh điều hướng"
             >
               <Menu className="w-5 h-5" />
             </button>
 
-            <div className="min-w-0">
+            {/* Mobile-optimized compact branding */}
+            <div className="min-w-0 flex-1 sm:hidden">
+              <h2 className="text-white font-bold text-xs tracking-tight truncate flex items-center gap-1">
+                <span>Kho Đội ĐNCT</span>
+                <span className="text-slate-500">•</span>
+                <span className="text-slate-300 font-medium">T2</span>
+              </h2>
+              <p className="text-cyan-400 text-[10px] font-medium truncate">
+                Cảng HKQT Đà Nẵng
+              </p>
+            </div>
+
+            {/* Desktop / Tablet full branding */}
+            <div className="min-w-0 hidden sm:block">
               <h2 className="text-white font-bold text-sm sm:text-base tracking-wide flex items-center gap-2 truncate header-brand-title">
                 <span>Cảng HKQT Đà Nẵng</span>
                 <span className="text-slate-400 font-bold">&bull;</span>
@@ -138,7 +151,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               </h2>
               <p className="text-cyan-400 text-xs font-semibold flex items-center gap-1.5 mt-0.5 truncate header-brand-desc">
                 <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse"></span>
-                <span>Quản Lý Xuất - Nhập - Tồn Vật Tư Kỹ Thuật</span>
+                <span>Quản Lý Xuất - Nhập - Tồn Vật Tư Thuộc Đội ĐNCT</span>
               </p>
             </div>
           </div>
@@ -161,15 +174,15 @@ export const Navbar: React.FC<NavbarProps> = ({
             </button>
           </div>
 
-          {/* Right Section: Theme toggle & User Menu (Clock removed as it's already in the sidebar) */}
-          <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+          {/* Right Section: Theme toggle & User Menu */}
+          <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
             {/* Light / Dark Mode Toggle Button */}
             {onToggleTheme && (
               <button
                 type="button"
                 id="btn-header-theme-toggle"
                 onClick={onToggleTheme}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs transition-all shadow-sm font-medium ${
+                className={`flex items-center gap-1.5 p-2 sm:px-3 sm:py-1.5 rounded-xl text-xs transition-all shadow-sm font-medium shrink-0 ${
                   theme === 'dark'
                     ? 'bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 hover:text-white'
                     : 'bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-800 hover:text-slate-950 font-semibold'
@@ -190,13 +203,13 @@ export const Navbar: React.FC<NavbarProps> = ({
               </button>
             )}
 
-            {/* User Greeting Pill & Dropdown (Exact match with screenshot) */}
+            {/* User Greeting Pill & Dropdown */}
             <div className="relative" ref={dropdownRef}>
               <button
                 type="button"
                 id="btn-user-profile-menu"
                 onClick={() => setShowUserDropdown(!showUserDropdown)}
-                className="flex items-center gap-2 bg-blue-950/50 hover:bg-blue-900/60 border border-blue-600/40 px-3 py-1.5 rounded-xl text-xs transition-all shadow-sm group"
+                className="flex items-center gap-1.5 sm:gap-2 bg-blue-950/50 hover:bg-blue-900/60 border border-blue-600/40 px-2 sm:px-3 py-1.5 rounded-xl text-xs transition-all shadow-sm group shrink-0"
               >
                 <div className="relative w-6 h-6 rounded-lg overflow-hidden border border-cyan-400/50 shadow shrink-0">
                   <img
@@ -207,17 +220,18 @@ export const Navbar: React.FC<NavbarProps> = ({
                   />
                   <span className="absolute -bottom-0.5 -right-0.5 w-2 h-2 bg-emerald-400 rounded-full border border-slate-900" />
                 </div>
-                <div className="text-left hidden sm:block max-w-[160px] truncate">
-                  <span className="font-semibold text-slate-100 text-xs truncate">
-                    Xin chào, {currentUser.fullName}
+                <div className="text-left max-w-[90px] sm:max-w-[160px] truncate">
+                  <span className="font-semibold text-slate-100 text-xs truncate block">
+                    <span className="sm:hidden">{currentUser.fullName.split(' ').pop() || 'Tài khoản'}</span>
+                    <span className="hidden sm:inline">Xin chào, {currentUser.fullName}</span>
                   </span>
                 </div>
-                <ChevronDown className="w-3.5 h-3.5 text-blue-300 group-hover:translate-y-0.5 transition-transform" />
+                <ChevronDown className="w-3.5 h-3.5 text-blue-300 group-hover:translate-y-0.5 transition-transform shrink-0" />
               </button>
 
               {/* User Dropdown */}
               {showUserDropdown && (
-                <div className="absolute right-0 mt-2 w-72 bg-slate-900 border border-slate-700 rounded-2xl p-3 shadow-2xl z-50 animate-in fade-in zoom-in-95">
+                <div className="absolute right-0 mt-2 w-72 max-w-[calc(100vw-1rem)] bg-slate-900 border border-slate-700 rounded-2xl p-3 shadow-2xl z-50 animate-in fade-in zoom-in-95">
                   <div className="p-3 bg-slate-800/90 rounded-xl border border-slate-700 mb-2">
                     <div className="flex items-center gap-2.5">
                       <div className="relative w-10 h-10 rounded-xl overflow-hidden border-2 border-cyan-400/60 shadow-md shrink-0 bg-slate-950">

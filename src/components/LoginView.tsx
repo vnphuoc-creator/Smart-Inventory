@@ -130,10 +130,10 @@ export const LoginView: React.FC<LoginViewProps> = ({ users, onLogin }) => {
           </div>
 
           <h1 className="text-2xl font-black tracking-tight text-white sm:text-3xl flex items-center justify-center gap-2">
-            <span>Quản Lý Kho Thông Minh</span>
+            <span>Quản Lý Kho Đội ĐNCT</span>
           </h1>
           <p className="mt-1.5 text-xs sm:text-sm text-cyan-300 font-medium flex items-center justify-center gap-1.5">
-            <span>Kho Đội Điện Nước Công Trình &bull; Cảng HKQT Đà Nẵng</span>
+            <span>Hệ thống Quản lý Xuất - Nhập - Tồn Vật tư thuộc đội ĐNCT</span>
           </p>
         </div>
 

@@ -42,34 +42,34 @@ export const UserGuideModal: React.FC<UserGuideModalProps> = ({
   if (!isOpen) return null;
 
   const handlePrint = () => {
-    printCleanDocument();
+    printCleanDocument('portrait');
   };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-950/85 backdrop-blur-sm animate-in fade-in print:static print:p-0 print:m-0 print:bg-white print:z-auto">
       <div className="w-full max-w-5xl h-[90vh] bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl flex flex-col overflow-hidden text-white print:max-w-none print:w-full print:h-auto print:bg-white print:text-black print:border-none print:shadow-none print:rounded-none">
         {/* Modal Header */}
-        <div className="p-4 sm:p-5 bg-slate-850 border-b border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shrink-0">
+        <div className="p-4 sm:p-5 bg-slate-850 border-b border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shrink-0 print:bg-white print:border-b-2 print:border-black print:p-2">
           <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-xl bg-blue-600/20 text-blue-400 border border-blue-500/30">
+            <div className="p-2.5 rounded-xl bg-blue-600/20 text-blue-400 border border-blue-500/30 no-print">
               <BookOpen className="w-6 h-6" />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h2 className="text-base sm:text-lg font-bold text-white tracking-tight">
+                <h2 className="text-base sm:text-lg font-bold text-white print:text-black tracking-tight">
                   Cẩm Nang Hướng Dẫn Sử Dụng Hệ Thống Vật Tư Thông Minh
                 </h2>
-                <span className="text-[10px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 px-2 py-0.5 rounded-full font-bold">
+                <span className="text-[10px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 px-2 py-0.5 rounded-full font-bold no-print">
                   v2.5 AHT
                 </span>
               </div>
-              <p className="text-xs text-slate-400 mt-0.5">
+              <p className="text-xs text-slate-400 print:text-slate-600 mt-0.5">
                 Dành cho Nhân viên (Thủ kho / Kỹ thuật viên) & Quản lý (Trưởng phòng / Admin)
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex items-center gap-2 shrink-0 no-print">
             <button
               onClick={handlePrint}
               className="bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors"
@@ -89,7 +89,7 @@ export const UserGuideModal: React.FC<UserGuideModalProps> = ({
         </div>
 
         {/* Role Tabs & Search Bar */}
-        <div className="px-4 sm:px-6 py-3 bg-slate-900 border-b border-slate-800 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 shrink-0">
+        <div className="no-print px-4 sm:px-6 py-3 bg-slate-900 border-b border-slate-800 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 shrink-0">
           <div className="flex items-center gap-1.5 bg-slate-800/90 p-1 rounded-xl overflow-x-auto no-scrollbar">
             <button
               onClick={() => setActiveRoleTab('EMPLOYEE')}

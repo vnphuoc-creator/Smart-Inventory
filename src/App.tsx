@@ -33,7 +33,7 @@ import {
   DEFAULT_THEME_CONFIG,
 } from './types';
 import { calculateAllMaterialStocks, formatVND, isProposalMatch } from './utils/inventoryEngine';
-import { safeStorage } from './utils/safeStorage';
+import { safeStorage, safeSessionStorage } from './utils/safeStorage';
 import {
   subscribeToUsers,
   subscribeToMaterials,
@@ -89,15 +89,17 @@ export function App() {
     return INITIAL_USERS;
   });
 
-  // Authentication State
+  // Authentication State: Bắt buộc đăng nhập tên và mật khẩu khi mở hệ thống
   const [currentUser, setCurrentUser] = useState<User | null>(() => {
-    const savedUserId = safeStorage.getItem('smart_auth_user_id');
-    if (savedUserId) {
-      const found = users.find((u) => u.id === savedUserId);
+    // Xóa auth lưu trữ vĩnh viễn cũ để không bao giờ tự động đăng nhập master admin
+    safeStorage.removeItem('smart_auth_user_id');
+    const sessionUserId = safeSessionStorage.getItem('smart_auth_session_user_id');
+    if (sessionUserId) {
+      const found = users.find((u) => u.id === sessionUserId);
       if (found) return found;
     }
-    // Default to the master admin
-    return users.find((u) => u.email === 'vn.phuoc235@gmail.com') || users.find((u) => u.role === 'ADMIN') || users[0];
+    // Không tự động đăng nhập - luôn yêu cầu đăng nhập khi mở hệ thống
+    return null;
   });
 
   // Keep currentUser synced if user record is updated in users list (e.g. password changed on another device)
@@ -160,31 +162,31 @@ export function App() {
     return () => unsubscribe();
   }, []);
 
-  // Proposals State
+  // Proposals State - default to empty array so demo proposals never conflict with real cloud data
   const [proposals, setProposals] = useState<PurchaseProposal[]>(() => {
     const saved = safeStorage.getItem('smart_proposals_v5');
     if (saved !== null) {
       try {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        if (Array.isArray(parsed)) return parsed;
       } catch {
-        return INITIAL_PROPOSALS;
+        return [];
       }
     }
-    return INITIAL_PROPOSALS;
+    return [];
   });
 
   useEffect(() => {
     safeStorage.setItem('smart_proposals_v5', JSON.stringify(proposals));
   }, [proposals]);
 
-  // Firebase Realtime Subscription for Proposals with persistent fallbacks
+  // Firebase Realtime Subscription for Proposals (no fallback to obsolete demo proposals)
   useEffect(() => {
     const unsubscribe = subscribeToProposals((cloudProposals) => {
-      if (cloudProposals && cloudProposals.length > 0) {
+      if (cloudProposals !== undefined) {
         setProposals(cloudProposals);
       }
-    }, INITIAL_PROPOSALS);
+    });
     return () => unsubscribe();
   }, []);
 
@@ -270,17 +272,17 @@ export function App() {
   const [lastSyncedTime, setLastSyncedTime] = useState<Date>(new Date());
 
   // Manual & automatic refresh function directly from Cloud Server
-  const handleManualRefresh = async (isUserInitiated = false) => {
+  const handleManualRefresh = async (isUserInitiated: boolean = false) => {
     setIsRefreshing(true);
     setSyncStatus('syncing');
     try {
       const data = await refreshAllFromCloud();
       if (data.users && data.users.length > 0) setUsers(data.users);
       if (data.materials && data.materials.length > 0) setMaterials(data.materials);
-      if (data.proposals && data.proposals.length > 0) {
+      if (data.proposals !== undefined) {
         setProposals(data.proposals);
       }
-      if (data.transactions && data.transactions.length > 0) {
+      if (data.transactions !== undefined) {
         setTransactions(data.transactions);
       }
       if (data.settings) {
@@ -288,19 +290,28 @@ export function App() {
       }
       setLastSyncedTime(new Date());
       setSyncStatus('synced');
-      if (isUserInitiated) {
+      if (isUserInitiated === true) {
         showToast('Đã đồng bộ toàn bộ dữ liệu từ Cloud thành công!');
       }
     } catch (e) {
       console.warn('Manual refresh failed, keeping active cache:', e);
       setSyncStatus('offline');
-      if (isUserInitiated) {
+      if (isUserInitiated === true) {
         showToast('Không thể kết nối Cloud, đang dùng dữ liệu lưu tạm.', 'info');
       }
     } finally {
       setIsRefreshing(false);
     }
   };
+
+  // Immediate Cloud synchronization on initial page mount & background heartbeat every 45s
+  useEffect(() => {
+    handleManualRefresh(false);
+    const interval = setInterval(() => {
+      handleManualRefresh(false);
+    }, 45000);
+    return () => clearInterval(interval);
+  }, []);
 
   // Real-time Cloud System Settings subscription (theme, company, logo, units)
   useEffect(() => {
@@ -587,7 +598,8 @@ export function App() {
   // Login handler
   const handleLogin = (user: User) => {
     setCurrentUser(user);
-    safeStorage.setItem('smart_auth_user_id', user.id);
+    safeSessionStorage.setItem('smart_auth_session_user_id', user.id);
+    safeStorage.removeItem('smart_auth_user_id');
 
     logActivity(
       'LOGIN',
@@ -611,6 +623,7 @@ export function App() {
     }
     setCurrentUser(null);
     safeStorage.removeItem('smart_auth_user_id');
+    safeSessionStorage.removeItem('smart_auth_session_user_id');
     showToast('Đã đăng xuất khỏi hệ thống.', 'info');
   };
 
@@ -1159,7 +1172,8 @@ export function App() {
                 allUsers={users}
                 onSelectUser={(u) => {
                   setCurrentUser(u);
-                  safeStorage.setItem('smart_auth_user_id', u.id);
+                  safeSessionStorage.setItem('smart_auth_session_user_id', u.id);
+                  safeStorage.removeItem('smart_auth_user_id');
                   showToast(`Đã chuyển phiên làm việc sang: ${u.fullName}`);
                 }}
                 onUpdateUser={handleUpdateUser}

@@ -1,6 +1,6 @@
 {
-  "name": "Hệ Thống Quản Lý Kho Vật Tư AHT | Cảng HKQT Đà Nẵng",
-  "description": "Hệ thống Quản lý Xuất - Nhập - Tồn Vật tư Cơ điện & Cấp thoát nước (Mã chuẩn DN_*) - Cảng Hàng không Quốc tế Đà Nẵng",
+  "name": "Hệ Thống Quản Lý Kho Vật Tư ĐNCT | Cảng HKQT Đà Nẵng",
+  "description": "Hệ thống Quản lý Xuất - Nhập - Tồn Vật tư thuộc đội ĐNCT",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

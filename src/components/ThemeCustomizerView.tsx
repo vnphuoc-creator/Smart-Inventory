@@ -147,7 +147,7 @@ const PRESET_LIST: PresetOption[] = [
   {
     id: 'monochrome-titan',
     name: 'Monochrome Titanium',
-    description: 'Xám titan tối giản, phong cách kỹ thuật cơ điện chính xác',
+    description: 'Xám titan tối giản, phong cách kỹ thuật ĐNCT chính xác',
     canvasMode: 'dark-slate',
     primaryColor: '#475569',
     accentColor: '#64748b',
@@ -769,7 +769,7 @@ export const ThemeCustomizerView: React.FC<ThemeCustomizerViewProps> = ({
                     DN
                   </div>
                   <div>
-                    <div className="text-xs font-bold leading-none">Kho Cơ Điện &amp; Cấp Thoát Nước</div>
+                    <div className="text-xs font-bold leading-none">Kho Đội ĐNCT</div>
                     <div className="text-[10px] opacity-70 mt-0.5">Mã chuẩn DN_* | Cảng HKQT Đà Nẵng</div>
                   </div>
                 </div>
