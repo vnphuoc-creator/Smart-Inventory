@@ -9,7 +9,8 @@ dotenv.config();
 const app = express();
 const PORT = 3000;
 
-app.use(express.json({ limit: "10mb" }));
+app.use(express.json({ limit: "50mb" }));
+app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 
 // Lazy initialize Gemini client to avoid crashes if key is not immediately available
 let geminiClient: GoogleGenAI | null = null;
@@ -486,57 +487,70 @@ app.post("/api/ai/scan-proposal", async (req, res) => {
 
   if (ai && (fileData || fileText || docHtml)) {
     try {
-      let contents: any[] = [];
+      const parts: any[] = [];
 
-      if (fileData && typeof fileData === "string" && fileData.startsWith("data:")) {
-        const matches = fileData.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
-        if (matches && matches.length === 3) {
-          const mimeType = matches[1];
-          const base64Data = matches[2];
-          contents.push({
+      if (fileData && typeof fileData === "string") {
+        if (fileData.includes(";base64,")) {
+          const splitParts = fileData.split(";base64,");
+          const mime = splitParts[0].replace(/^data:/, "").trim() || "image/jpeg";
+          const b64 = splitParts[1].trim();
+          parts.push({
             inlineData: {
-              data: base64Data,
-              mimeType: mimeType,
+              data: b64,
+              mimeType: mime,
             },
           });
+        } else if (fileData.startsWith("data:")) {
+          const match = fileData.match(/^data:([^;]+);base64,(.+)$/s);
+          if (match) {
+            parts.push({
+              inlineData: {
+                data: match[2].trim(),
+                mimeType: match[1].trim() || "image/jpeg",
+              },
+            });
+          }
         }
       }
 
-      const promptText = `Bạn là chuyên gia phân tích và bóc tách tài liệu Tờ trình / Báo giá / Đề xuất vật tư của Cảng Hàng Không Quốc Tế Đà Nẵng (AHT - Đội ĐNCT).
+      const promptText = `Bạn là chuyên gia OCR hình ảnh và phân tích tài liệu Tờ trình / Báo giá / Đề xuất vật tư của Cảng Hàng Không Quốc Tế Đà Nẵng (AHT - Đội Điện Nước Công Trình ĐNCT/PKT).
 
-QUY TẮC CỐT LÕI (BẮT BUỘC TUÂN THỦ 100%):
-1. Thông tin chung:
-   - proposalNumber: Số tờ trình (ví dụ "29-DNCT/PKT", "17-DNCT/PKT", "26-DNCT/PKT", "31-DNCT/PKT", "08-DNCT/PKT", "45-DNCT/PKT",...).
-   - title: Tiêu đề đề xuất / Trích yếu (V/v: ...).
-   - partner: Đơn vị đề xuất / Nhà cung ứng.
+TỆP ĐÍNH KÈM CÓ THỂ LÀ ẢNH CHỤP (PHOTO/CAMERA), ẢNH CHỤP MÀN HÌNH (SCREENSHOT/PASTE), HOẶC VĂN BẢN SCAN CỦA TỜ TRÌNH.
+Hãy đọc kỹ toàn bộ chữ và bảng biểu trong ảnh (OCR):
+
+QUY TẮC CỐT LÕI (BẮT BUỘC TUÂN THỦ):
+1. THÔNG TIN CHUNG:
+   - proposalNumber: Số tờ trình xuất hiện trên văn bản (ví dụ "17-DNCT/PKT", "31-DNCT/PKT", "29-DNCT/PKT", "26-DNCT/PKT", "08-DNCT/PKT", "45-DNCT/PKT", hoặc dạng tương tự Số: .../ĐNCT-PKT). Chuẩn hóa về dạng "[Số]-DNCT/PKT".
+   - title: Tiêu đề tờ trình / Trích yếu (V/v: ... hoặc Tiêu đề văn bản).
+   - partner: Đơn vị đề xuất / Nhà cung cấp.
    - reason: Lý do nhập kho / Mục đích đề xuất.
-   - date: Ngày lập tờ trình (YYYY-MM-DD nếu có).
+   - date: Ngày lập tờ trình (định dạng YYYY-MM-DD nếu thấy trên ảnh).
 
 2. DANH SÁCH VẬT TƯ (items):
-   - CHỈ trích xuất các mặt hàng từ BẢNG DANH MỤC VẬT TƯ KỸ THUẬT (bảng chứa danh sách hàng hóa có Tên vật tư, Quy cách, ĐVT, Số lượng, Đơn giá).
-   - TUYỆT ĐỐI KHÔNG ĐƯỢC trích xuất các trường thông tin hành chính, tiêu đề phiếu hoặc chữ ký thành vật tư!
-     Ví dụ KHÔNG trích xuất: "Số tờ trình", "Bản in", "Phó trưởng phòng", "Ngày yêu cầu", "Thuộc ca", "Bổ sung", "Chi phí", "Phạm vi", "Ngày giao", "Số tiền", "Kính gửi", "Căn cứ", "Tổng cộng", "Người lập biểu", "Giám đốc", "Kế toán".
-   - Với mỗi mặt hàng thực sự:
-     + materialName: Tên và quy cách kỹ thuật đầy đủ.
-     + quantity: Số lượng yêu cầu (số nguyên hoặc số thập phân dương).
-     + unit: Đơn vị tính chuẩn (Bộ, Cái, Mét, Cuộn, Cây, Thùng, Hộp, Bình, Lít, Kg, v.v.).
-     + unitPrice: Đơn giá (nếu có, không có thì để theo danh mục tham chiếu).
-     + materialCode: Khớp chính xác với mã chuẩn bắt đầu bằng "DN_" trong danh sách vật tư tham chiếu dưới đây (nếu tìm thấy mã khớp tên/quy cách).
+   - Quét kỹ BẢNG DANH MỤC VẬT TƯ KỸ THUẬT trong ảnh hoặc văn bản.
+   - Với mỗi dòng mặt hàng:
+     + materialName: Tên và quy cách kỹ thuật đầy đủ của vật tư.
+     + quantity: Số lượng yêu cầu (số nguyên hoặc số thực dương).
+     + unit: Đơn vị tính (Cái, Bộ, Mét, Cuộn, Cây, Thùng, Hộp, Bình, Lít, Kg, v.v.).
+     + unitPrice: Đơn giá nếu có trong bảng (nếu không có thì để theo danh mục tham chiếu hoặc 0).
+     + notes: Ghi chú hoặc mục đích sử dụng cụ thể của dòng đó.
+     + materialCode: Nếu khớp với vật tư nào trong danh sách tham chiếu dưới đây (bắt đầu bằng "DN_"), hãy gán đúng mã đó. Nếu không có trong danh sách, sinh mã dạng "DN_VT_1", "DN_VT_2",...
+   - TUYỆT ĐỐI KHÔNG lấy các dòng tiêu đề cột, dòng "Tổng cộng", "Bằng chữ", "Ký tên", "Giám đốc", "Người lập" làm vật tư!
 
-${fileText ? `Nội dung văn bản nhận diện được:\n${fileText}\n` : ""}
-${docHtml ? `Cấu trúc bảng HTML:\n${docHtml.slice(0, 10000)}\n` : ""}
+${fileText ? `Văn bản đính kèm:\n${fileText}\n` : ""}
+${docHtml ? `Cấu trúc bảng Word/HTML:\n${docHtml.slice(0, 10000)}\n` : ""}
 
 Danh sách mã vật tư tham chiếu của hệ thống:
 ${Array.isArray(availableMaterials) ? availableMaterials.slice(0, 300).map((m: any) => `${m.code}: ${m.name} (${m.unit || 'Cái'})`).join("\n") : "Mã DN_..."}
 
-Trả về định dạng JSON duy nhất:
+Trả về DUY NHẤT định dạng JSON (không thêm markdown ngoài json):
 {
   "success": true,
-  "proposalNumber": "29-DNCT/PKT",
+  "proposalNumber": "17-DNCT/PKT",
   "title": "Tiêu đề đề xuất",
   "partner": "Đội Điện Nước Công Trình",
   "reason": "Lý do nhập kho",
-  "date": "YYYY-MM-DD",
+  "date": "2026-09-07",
   "items": [
     {
       "materialCode": "DN_VT_...",
@@ -549,24 +563,38 @@ Trả về định dạng JSON duy nhất:
   ]
 }`;
 
-      contents.push(promptText);
+      parts.push({ text: promptText });
 
-      const response = await ai.models.generateContent({
-        model: "gemini-3.7-flash",
-        contents: contents,
-        config: {
-          responseMimeType: "application/json",
-          systemInstruction:
-            "Bạn là chuyên gia OCR và bóc tách tài liệu kỹ thuật AHT. CHỈ trích xuất danh sách hàng hóa/vật tư thực tế, không lấy các trường thông tin hành chính hay tiêu đề.",
-        },
-      });
+      let response: any = null;
+      const candidateModels = ["gemini-3.1-flash-lite", "gemini-3.6-flash", "gemini-3.8-flash"];
+      for (const modelName of candidateModels) {
+        try {
+          response = await ai.models.generateContent({
+            model: modelName,
+            contents: parts,
+            config: {
+              responseMimeType: "application/json",
+              systemInstruction:
+                "Bạn là chuyên gia OCR và phân tích tài liệu kỹ thuật AHT. Đọc kỹ văn bản và ảnh chụp tờ trình đề xuất vật tư. CHỈ trích xuất danh sách hàng hóa/vật tư thực tế từ bảng, không lấy tiêu đề hành chính hay chữ ký.",
+            },
+          });
+          if (response && response.text) {
+            break;
+          }
+        } catch (modelErr: any) {
+          console.warn(`Model ${modelName} scan-proposal attempt failed, trying fallback:`, modelErr?.message || modelErr);
+        }
+      }
 
-      const outputText = response.text || "{}";
-      const parsed = JSON.parse(outputText);
-      if (parsed && parsed.items && Array.isArray(parsed.items) && parsed.items.length > 0) {
-        // Filter out any non-material headers, cost centers (CP*), or category rows
-        parsed.items = parsed.items.filter((it: any) => !isInvalidOrCategoryHeader(it));
-        if (parsed.items.length > 0) {
+      if (response && response.text) {
+        const outputText = response.text || "{}";
+        const parsed = JSON.parse(outputText);
+        if (parsed && parsed.items && Array.isArray(parsed.items) && parsed.items.length > 0) {
+          parsed.items = parsed.items.filter((it: any) => !isInvalidOrCategoryHeader(it));
+          if (parsed.items.length > 0) {
+            return res.json(parsed);
+          }
+        } else if (parsed && parsed.proposalNumber) {
           return res.json(parsed);
         }
       }
@@ -673,15 +701,23 @@ YÊU CẦU ĐẦU RA JSON CHUẨN:
 
       contents.push(promptText);
 
-      const response = await ai.models.generateContent({
-        model: "gemini-3.7-flash",
-        contents: contents,
-        config: {
-          responseMimeType: "application/json",
-          systemInstruction:
-            "Bạn là chuyên gia OCR, chuẩn hóa dữ liệu và phân loại ngành hàng vật tư kỹ thuật nhà ga quốc tế AHT. Chỉ trả về danh mục vật tư thực tế, không lấy tiêu đề hành chính hay chữ ký.",
-        },
-      });
+      let response: any = null;
+      for (const mName of ["gemini-3.1-flash-lite", "gemini-3.6-flash", "gemini-3.8-flash"]) {
+        try {
+          response = await ai.models.generateContent({
+            model: mName,
+            contents: contents,
+            config: {
+              responseMimeType: "application/json",
+              systemInstruction:
+                "Bạn là chuyên gia OCR, chuẩn hóa dữ liệu và phân loại ngành hàng vật tư kỹ thuật nhà ga quốc tế AHT. Chỉ trả về danh mục vật tư thực tế, không lấy tiêu đề hành chính hay chữ ký.",
+            },
+          });
+          if (response && response.text) break;
+        } catch (mErr: any) {
+          console.warn(`Model ${mName} smart-material-import attempt failed:`, mErr?.message || mErr);
+        }
+      }
 
       const outputText = response.text || "{}";
       const parsed = JSON.parse(outputText);
