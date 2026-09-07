@@ -613,6 +613,7 @@ export const TransactionManagementView: React.FC<TransactionManagementViewProps>
       }
 
       // 2. Server Gemini API for OCR / advanced layout recognition (multimodal images & docs)
+      let apiErrorMsg = '';
       try {
         const res = await fetch('/api/ai/scan-proposal', {
           method: 'POST',
@@ -633,6 +634,9 @@ export const TransactionManagementView: React.FC<TransactionManagementViewProps>
 
         if (res.ok) {
           const data = await res.json();
+          if (data.error) {
+            apiErrorMsg = data.message || 'Lỗi khi quét ảnh AI.';
+          }
           if (data.proposalNumber) detectedPropNum = data.proposalNumber;
           if (data.title) detectedTitle = data.title;
           if (data.reason) detectedReason = data.reason;
@@ -659,9 +663,16 @@ export const TransactionManagementView: React.FC<TransactionManagementViewProps>
               detectedItems = validScannedItems;
             }
           }
+        } else {
+          if (res.status === 404) {
+            apiErrorMsg = 'Máy chủ chưa khởi chạy Express backend (/api/ai/scan-proposal trả về 404). Hãy chạy bằng lệnh "npm run dev".';
+          } else {
+            apiErrorMsg = `Máy chủ phản hồi mã lỗi HTTP ${res.status}.`;
+          }
         }
-      } catch (err) {
+      } catch (err: any) {
         console.warn('Scan proposal API call error:', err);
+        apiErrorMsg = 'Không thể kết nối tới dịch vụ AI phân tích. Vui lòng kiểm tra kết nối mạng và máy chủ.';
       }
 
       // Check if matches an existing system proposal
@@ -709,8 +720,14 @@ export const TransactionManagementView: React.FC<TransactionManagementViewProps>
         setScanFeedback(
           `✨ Quét ${isImg ? 'ảnh' : 'file'} thành công! Đã tự động nhận diện Tờ trình "${detectedPropNum || file.name}" và nạp chính xác ${detectedItems.length} mặt hàng.`
         );
+      } else if (apiErrorMsg) {
+        setScanFeedback(`⚠️ ${apiErrorMsg}`);
+      } else if (isImg) {
+        setScanFeedback(
+          `⚠️ Không tìm thấy bảng vật tư nào từ ảnh này. Hãy kiểm tra lại ảnh chụp rõ nét hoặc kiểm tra file .env đã cấu hình GEMINI_API_KEY chưa.`
+        );
       } else {
-        setScanFeedback(`✨ Đã gắn ${isImg ? 'ảnh' : 'tệp'} "${file.name}". Bạn có thể chọn tiếp các mặt hàng cần nhập hoặc nạp từ danh mục.`);
+        setScanFeedback(`✨ Đã gắn tệp "${file.name}". Bạn có thể chọn tiếp các mặt hàng cần nhập hoặc nạp từ danh mục.`);
       }
     } catch (err: any) {
       console.error('Scan error:', err);
@@ -1506,6 +1523,24 @@ export const TransactionManagementView: React.FC<TransactionManagementViewProps>
                     {/* Actions */}
                     <td className="py-3 px-4 text-right">
                       <div className="flex items-center justify-end gap-1.5">
+                        {/* View Attached Doc / Photo if present */}
+                        {tx.attachmentUrl && (
+                          <button
+                            id={`btn-view-doc-${tx.id}`}
+                            onClick={() =>
+                              setViewingDoc({
+                                url: tx.attachmentUrl!,
+                                html: tx.attachmentHtml,
+                                name: tx.attachmentName || `Chung_tu_${tx.code}`,
+                              })
+                            }
+                            className="p-1.5 rounded-lg bg-indigo-950/70 hover:bg-indigo-900 border border-indigo-700/60 text-indigo-300 hover:text-white transition-colors"
+                            title={`Xem ảnh / tờ trình đính kèm (${tx.attachmentName || 'Tài liệu'})`}
+                          >
+                            <ImageIcon className="w-3.5 h-3.5 text-indigo-400" />
+                          </button>
+                        )}
+
                         <button
                           id={`btn-view-voucher-${tx.id}`}
                           onClick={() => setSelectedTxForView(tx)}
@@ -2595,6 +2630,37 @@ export const TransactionManagementView: React.FC<TransactionManagementViewProps>
                   <div className="h-20 w-48 border-b border-dashed border-slate-300 mt-2"></div>
                 </div>
               </div>
+
+              {/* Attached Proposal Document / Image Section (No-Print) */}
+              {selectedTxForView.attachmentUrl && (
+                <div className="mt-6 pt-4 border-t border-slate-200 no-print flex items-center justify-between bg-blue-50/80 p-3 rounded-xl border border-blue-200">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center text-blue-600">
+                      <ImageIcon className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <div className="text-xs font-bold text-slate-900">
+                        {selectedTxForView.attachmentName || 'Tài liệu / Ảnh Tờ trình đính kèm'}
+                      </div>
+                      <div className="text-[11px] text-slate-500">
+                        Chứng từ gốc đính kèm cùng phiếu kho này
+                      </div>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() =>
+                      setViewingDoc({
+                        url: selectedTxForView.attachmentUrl!,
+                        html: selectedTxForView.attachmentHtml,
+                        name: selectedTxForView.attachmentName || `Chung_tu_${selectedTxForView.code}`,
+                      })
+                    }
+                    className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-sm"
+                  >
+                    <Eye className="w-3.5 h-3.5" /> Xem Ảnh / Chứng Từ Gốc
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </div>
