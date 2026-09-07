@@ -373,7 +373,6 @@ export function subscribeToProposals(
   let latestProposalDocs: any[] = [];
 
   const emitFilteredProposals = () => {
-    const localDeleted = getLocalDeletedProposals();
     const proposalsMap = new Map<string, PurchaseProposal>();
 
     latestProposalDocs.forEach((d) => {
@@ -384,18 +383,20 @@ export function subscribeToProposals(
       const rawNumLower = (data.proposalNumber || '').toLowerCase().trim();
       const docIdLower = (d.id || '').toLowerCase().trim();
 
-      // Check if this proposal has been permanently deleted
+      // Check if this proposal has been permanently deleted in Cloud Firestore
       const isDeleted =
         globalCloudDeletedProposalKeys.has(normKeyLower) ||
         globalCloudDeletedProposalKeys.has(rawNumLower) ||
-        globalCloudDeletedProposalKeys.has(docIdLower) ||
-        localDeleted.has(normKeyLower) ||
-        localDeleted.has(rawNumLower) ||
-        localDeleted.has(docIdLower);
+        globalCloudDeletedProposalKeys.has(docIdLower);
 
       if (isDeleted) {
         return; // Strictly discard deleted proposals
       }
+
+      // Auto-heal: active in Cloud Firestore means any stale local tombstone is purged
+      if (rawNumLower) removeLocalDeletedProposal(rawNumLower);
+      if (normKeyLower) removeLocalDeletedProposal(normKeyLower);
+      if (docIdLower) removeLocalDeletedProposal(docIdLower);
 
       if (!proposalsMap.has(normKey)) {
         proposalsMap.set(normKey, data);
@@ -643,8 +644,6 @@ export function subscribeToTransactions(
       onUpdate([]);
       return;
     }
-    const localDelTx = getLocalDeletedTransactions();
-    const localDelProps = getLocalDeletedProposals();
     const txMap = new Map<string, InventoryTransaction>();
 
     latestTxDocs.forEach((d) => {
@@ -654,23 +653,25 @@ export function subscribeToTransactions(
       const codeLower = codeKey.toLowerCase();
       const docIdLower = (d.id || '').toLowerCase().trim();
 
-      if (cloudDeletedTxCodes.has(codeLower) || cloudDeletedTxCodes.has(docIdLower) || localDelTx.has(codeLower) || localDelTx.has(docIdLower)) {
+      if (cloudDeletedTxCodes.has(codeLower) || cloudDeletedTxCodes.has(docIdLower)) {
         return; // Discard deleted transactions
       }
 
-      // Check if transaction references a deleted proposal
+      // Check if transaction references a deleted proposal in Cloud Firestore
       if (data.proposalNumber && data.proposalNumber.trim()) {
         const propRaw = data.proposalNumber.trim().toLowerCase();
         const propNorm = normalizeProposalNumber(propRaw);
         if (
-          localDelProps.has(propRaw) ||
-          (propNorm && localDelProps.has(propNorm.toLowerCase())) ||
           globalCloudDeletedProposalKeys.has(propRaw) ||
           (propNorm && globalCloudDeletedProposalKeys.has(propNorm.toLowerCase()))
         ) {
           return; // Discard transactions referencing deleted proposals
         }
       }
+
+      // Auto-heal local storage for active transactions
+      removeLocalDeletedTransaction(codeLower);
+      if (docIdLower) removeLocalDeletedTransaction(docIdLower);
 
       if (!txMap.has(codeKey)) {
         txMap.set(codeKey, data);
@@ -981,8 +982,8 @@ export async function refreshAllFromCloud(): Promise<{
     fetchServerCollection(DELETED_TRANSACTIONS_COL),
   ]);
 
-  // Load deleted tombstones
-  const deletedPropsSet = getLocalDeletedProposals();
+  // Load deleted tombstones strictly from Cloud Firestore collections
+  const deletedPropsSet = new Set<string>();
   if (delPropsSnap) {
     delPropsSnap.forEach((d) => {
       const data = d.data();
@@ -993,7 +994,7 @@ export async function refreshAllFromCloud(): Promise<{
     });
   }
 
-  const deletedTxSet = getLocalDeletedTransactions();
+  const deletedTxSet = new Set<string>();
   if (delTxsSnap) {
     delTxsSnap.forEach((d) => {
       const code = (d.data().code || d.id || '').trim().toLowerCase();
@@ -1045,6 +1046,10 @@ export async function refreshAllFromCloud(): Promise<{
       if (!propsMap.has(norm)) {
         propsMap.set(norm, p);
       }
+      // Purge any stale local tombstones matching active proposals
+      if (rawLower) removeLocalDeletedProposal(rawLower);
+      if (normLower) removeLocalDeletedProposal(normLower);
+      if (docIdLower) removeLocalDeletedProposal(docIdLower);
     });
   }
   const proposals = Array.from(propsMap.values()).sort((a, b) => new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime());
@@ -1074,6 +1079,10 @@ export async function refreshAllFromCloud(): Promise<{
           return;
         }
       }
+
+      // Purge any stale local tombstones matching active transactions
+      removeLocalDeletedTransaction(codeLower);
+      if (docIdLower) removeLocalDeletedTransaction(docIdLower);
 
       if (!txMap.has(code)) {
         txMap.set(code, tx);
