@@ -57,7 +57,6 @@ import {
 import { formatVND, formatNumber, formatDisplayDate, isProposalMatch, normalizeProposalNumber } from '../utils/inventoryEngine';
 import { SearchableMaterialSelect } from './SearchableMaterialSelect';
 import { AHTLogo } from './AHTLogo';
-import { getLocalDeletedProposals } from '../services/firebaseSync';
 import { printCleanDocument } from '../utils/printHelper';
 
 interface ProposalReconciliationViewProps {
@@ -272,19 +271,7 @@ export const ProposalReconciliationView: React.FC<ProposalReconciliationViewProp
 
   // Effective proposals ensuring deleted proposals are strictly excluded and never synthesized
   const effectiveProposals = useMemo(() => {
-    const localDeleted = getLocalDeletedProposals();
-    const activeProposals = proposals.filter((p) => {
-      const raw = (p.proposalNumber || '').toLowerCase().trim();
-      const norm = normalizeProposalNumber(raw);
-      const id = (p.id || '').toLowerCase().trim();
-      return (
-        !localDeleted.has(raw) &&
-        (!norm || !localDeleted.has(norm.toLowerCase())) &&
-        !localDeleted.has(id)
-      );
-    });
-
-    return activeProposals.map((p) => {
+    return proposals.map((p) => {
       const relTxs = transactions.filter((tx) => isProposalMatch(tx.proposalNumber, p.proposalNumber));
       const foundHtml =
         p.attachmentHtml ||
