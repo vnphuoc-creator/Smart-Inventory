@@ -483,7 +483,22 @@ function isInvalidOrCategoryHeader(it: any): boolean {
 app.post("/api/ai/scan-proposal", async (req, res) => {
   const { fileData, fileName, fileText, docHtml, availableMaterials } = req.body;
 
+  const isImg =
+    (fileData && typeof fileData === "string" && (fileData.startsWith("data:image/") || fileData.includes("image/"))) ||
+    /\.(png|jpe?g|webp|gif|bmp)$/i.test(fileName || "");
+
   const ai = getGemini();
+
+  if (!ai && isImg) {
+    return res.status(200).json({
+      success: false,
+      error: "MISSING_GEMINI_API_KEY",
+      message:
+        "Máy chủ chưa cấu hình GEMINI_API_KEY trong file .env! Vui lòng thêm dòng GEMINI_API_KEY=AIzaSy... vào file .env trên máy của bạn rồi khởi động lại (npm run dev) để AI thực hiện nhận diện ảnh OCR.",
+      proposalNumber: "",
+      items: [],
+    });
+  }
 
   if (ai && (fileData || fileText || docHtml)) {
     try {
@@ -598,12 +613,32 @@ Trả về DUY NHẤT định dạng JSON (không thêm markdown ngoài json):
           return res.json(parsed);
         }
       }
-    } catch (err: unknown) {
-      console.warn("Gemini Proposal Scan error, switching to heuristic parsing:", err);
+    } catch (err: any) {
+      console.warn("Gemini Proposal Scan error:", err);
+      if (isImg) {
+        return res.status(200).json({
+          success: false,
+          error: "AI_PROCESSING_ERROR",
+          message: `Lỗi AI khi đọc ảnh: ${err?.message || "Không thể phân tích ảnh"}. Vui lòng kiểm tra lại GEMINI_API_KEY.`,
+          proposalNumber: "",
+          items: [],
+        });
+      }
     }
   }
 
-  // Heuristic Fallback
+  // If this is an image and AI didn't find items
+  if (isImg) {
+    return res.status(200).json({
+      success: false,
+      error: "NO_ITEMS_FOUND",
+      message: "AI đã quét ảnh nhưng không tìm thấy bảng danh mục vật tư trong ảnh này. Bạn hãy kiểm tra lại ảnh có rõ nét bảng vật tư không nhé!",
+      proposalNumber: "",
+      items: [],
+    });
+  }
+
+  // Heuristic Fallback for text/docx
   const fullText = (fileText || fileName || "").toString();
   const proposalMatch = fullText.match(/(\d{1,4}[-\/][A-Za-z0-9_\/Đđ]+)/i);
   let detectedProposalNumber = proposalMatch ? proposalMatch[1].toUpperCase() : '';
