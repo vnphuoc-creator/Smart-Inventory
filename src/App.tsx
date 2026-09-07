@@ -62,7 +62,7 @@ import {
   seedProposals,
   seedTransactions,
   seedUsers,
-  getLocalDeletedProposals,
+  clearLocalDeletedProposals,
 } from './services/firebaseSync';
 import {
   CheckCircle,
@@ -190,21 +190,18 @@ export function App() {
     return () => unsubscribe();
   }, []);
 
+  // Startup cleanup: purge stale local tombstones so Cloud Firestore is always the single source of truth across all devices
+  useEffect(() => {
+    clearLocalDeletedProposals();
+  }, []);
+
   // Transactions State
   const [transactions, setTransactions] = useState<InventoryTransaction[]>(() => {
     const saved = safeStorage.getItem('smart_transactions_v9');
     if (saved !== null) {
       try {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) {
-          const deletedProps = getLocalDeletedProposals();
-          return parsed.filter((tx: InventoryTransaction) => {
-            if (!tx.proposalNumber) return true;
-            const norm = tx.proposalNumber.toLowerCase().replace(/[^a-z0-9]/g, '');
-            const raw = tx.proposalNumber.toLowerCase().trim();
-            return !deletedProps.has(raw) && (!norm || !deletedProps.has(norm));
-          });
-        }
+        if (Array.isArray(parsed)) return parsed;
       } catch {
         return [];
       }
