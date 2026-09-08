@@ -1,6 +1,6 @@
 import React, { useState, useRef, useMemo, useEffect } from 'react';
 import { safeStorage } from '../utils/safeStorage';
-import { subscribeToSystemSettings, saveSystemSettingsToCloud } from '../services/firebaseSync';
+import { subscribeToSystemSettings, saveSystemSettingsToCloud, saveUserToCloud } from '../services/firebaseSync';
 import {
   Settings,
   Building2,
@@ -81,6 +81,8 @@ interface SettingsViewProps {
   onClearActivityLogs?: () => void;
   onUpdateMaterials?: (materials: Material[]) => void;
   onUpdateUsers?: (users: User[]) => void;
+  onUpdateUser?: (user: User) => void;
+  onLogout?: () => void;
   onUpdateProposal?: (proposal: PurchaseProposal) => void;
   onUpdateTransaction?: (transaction: InventoryTransaction) => void;
   onDeleteProposal?: (proposalId: string) => void;
@@ -103,6 +105,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   onClearActivityLogs,
   onUpdateMaterials,
   onUpdateUsers,
+  onUpdateUser,
+  onLogout,
   onUpdateProposal,
   onUpdateTransaction,
   onDeleteProposal,
@@ -139,10 +143,13 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
 
   // --- PASSWORD CHANGE STATE ---
   const [selectedUserToChangePass, setSelectedUserToChangePass] = useState<string>(currentUser.id);
+  const [currentPasswordInput, setCurrentPasswordInput] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [passwordSuccess, setPasswordSuccess] = useState(false);
+  const [passwordSuccessMessage, setPasswordSuccessMessage] = useState<string>('');
   const [passwordError, setPasswordError] = useState<string | null>(null);
   const [resetSuccessMsg, setResetSuccessMsg] = useState<string | null>(null);
 
@@ -419,27 +426,90 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     e.preventDefault();
     setPasswordError(null);
     setPasswordSuccess(false);
+    setPasswordSuccessMessage('');
 
-    if (newPassword.length < 4) {
+    const targetUser = allUsers.find((u) => u.id === selectedUserToChangePass) || currentUser;
+    const isChangingSelf = targetUser.id === currentUser.id;
+    const cleanCurrent = currentPasswordInput.trim();
+    const cleanNew = newPassword.trim();
+    const cleanConfirm = confirmPassword.trim();
+
+    // If changing own password, verify current password
+    if (isChangingSelf) {
+      if (!cleanCurrent) {
+        setPasswordError('Vui lòng nhập mật khẩu hiện tại của bạn.');
+        return;
+      }
+      const originalDefault = getOriginalDefaultPassword(currentUser);
+      const validCurrentPasswords = [
+        currentUser.password,
+        currentUser.defaultPassword,
+        originalDefault,
+        `${currentUser.username}12345`,
+        `${currentUser.email.split('@')[0]}12345`,
+      ].filter(Boolean);
+
+      const isCurrentCorrect = validCurrentPasswords.some(
+        (p) => p?.toLowerCase() === cleanCurrent.toLowerCase()
+      );
+
+      if (!isCurrentCorrect) {
+        setPasswordError('Mật khẩu hiện tại không đúng. Vui lòng kiểm tra lại.');
+        return;
+      }
+
+      if (cleanNew === cleanCurrent) {
+        setPasswordError('Mật khẩu mới không được trùng với mật khẩu hiện tại.');
+        return;
+      }
+    }
+
+    if (cleanNew.length < 4) {
       setPasswordError('Mật khẩu mới phải có ít nhất 4 ký tự!');
       return;
     }
-    if (newPassword !== confirmPassword) {
+    if (cleanNew !== cleanConfirm) {
       setPasswordError('Mật khẩu xác nhận không trùng khớp!');
       return;
     }
 
+    const updatedUser: User = {
+      ...targetUser,
+      password: cleanNew,
+      defaultPassword: cleanNew,
+    };
+
+    if (onUpdateUser) {
+      onUpdateUser(updatedUser);
+    }
     if (onUpdateUsers) {
-      const updatedUsers = allUsers.map((u) => {
-        if (u.id === selectedUserToChangePass) {
-          return { ...u, password: newPassword };
-        }
-        return u;
-      });
+      const updatedUsers = allUsers.map((u) => (u.id === updatedUser.id ? updatedUser : u));
       onUpdateUsers(updatedUsers);
-      setPasswordSuccess(true);
-      setNewPassword('');
-      setConfirmPassword('');
+    }
+    saveUserToCloud(updatedUser);
+
+    setCurrentPasswordInput('');
+    setNewPassword('');
+    setConfirmPassword('');
+    setPasswordSuccess(true);
+
+    if (isChangingSelf) {
+      const msg = 'Đã đổi mật khẩu thành công! Hệ thống đang tự động đăng xuất để bạn đăng nhập lại với mật khẩu mới...';
+      setPasswordSuccessMessage(msg);
+      if (onShowToast) {
+        onShowToast(msg, 'success');
+      }
+      setTimeout(() => {
+        if (onLogout) {
+          onLogout();
+        }
+      }, 1500);
+    } else {
+      const msg = `Đã đổi mật khẩu cho tài khoản ${targetUser.fullName} thành công và đồng bộ lên Cloud!`;
+      setPasswordSuccessMessage(msg);
+      if (onShowToast) {
+        onShowToast(msg, 'success');
+      }
       setTimeout(() => setPasswordSuccess(false), 4000);
     }
   };
@@ -447,19 +517,36 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   // Master Admin handler: Reset a user's password back to original default format "tên.họ12345"
   const handleResetUserToDefaultPassword = (targetUser: User) => {
     const originalPass = getOriginalDefaultPassword(targetUser);
+    const updatedUser: User = {
+      ...targetUser,
+      password: originalPass,
+      defaultPassword: originalPass,
+    };
+    if (onUpdateUser) {
+      onUpdateUser(updatedUser);
+    }
     if (onUpdateUsers) {
       const updatedUsers = allUsers.map((u) => {
         if (u.id === targetUser.id) {
-          return { ...u, password: originalPass, defaultPassword: originalPass };
+          return updatedUser;
         }
         return u;
       });
       onUpdateUsers(updatedUsers);
     }
+    saveUserToCloud(updatedUser);
+
+    const isResettingSelf = targetUser.id === currentUser.id;
     const msg = `Đã khôi phục thành công mật khẩu gốc cho ${targetUser.fullName}: ${originalPass}`;
     setResetSuccessMsg(msg);
     if (onShowToast) {
       onShowToast(msg, 'success');
+    }
+
+    if (isResettingSelf && onLogout) {
+      setTimeout(() => {
+        onLogout();
+      }, 1500);
     }
     setTimeout(() => setResetSuccessMsg(null), 6000);
   };
@@ -1060,14 +1147,21 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
 
           {/* Password Security Box */}
           <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-lg space-y-4">
-            <div className="border-b border-slate-800 pb-3">
-              <h2 className="text-sm font-bold text-white flex items-center gap-2">
-                <Lock className="w-4 h-4 text-amber-400" />
-                Đổi Mật Khẩu Đăng Nhập
-              </h2>
-              <p className="text-[11px] text-slate-400 mt-0.5">
-                Cập nhật mật khẩu cho tài khoản cá nhân hoặc các tài khoản nhân viên trong hệ thống
-              </p>
+            <div className="border-b border-slate-800 pb-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div>
+                <h2 className="text-sm font-bold text-white flex items-center gap-2">
+                  <Lock className="w-4 h-4 text-amber-400" />
+                  <span>Đổi Mật Khẩu Đăng Nhập</span>
+                </h2>
+                <p className="text-[11px] text-slate-400 mt-0.5">
+                  Đồng bộ chuẩn xác với tính năng Đổi Mật Khẩu ở góc trên bên phải thanh điều hướng
+                </p>
+              </div>
+              {selectedUserToChangePass === currentUser.id && (
+                <span className="text-[10px] font-medium bg-blue-500/20 text-blue-300 border border-blue-500/30 px-2.5 py-1 rounded-full self-start sm:self-auto">
+                  Tài khoản của bạn ({currentUser.fullName})
+                </span>
+              )}
             </div>
 
             <form onSubmit={handleSavePassword} className="space-y-3.5">
@@ -1077,34 +1171,75 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 </label>
                 <select
                   value={selectedUserToChangePass}
-                  onChange={(e) => setSelectedUserToChangePass(e.target.value)}
+                  onChange={(e) => {
+                    setSelectedUserToChangePass(e.target.value);
+                    setPasswordError(null);
+                    setPasswordSuccess(false);
+                    setCurrentPasswordInput('');
+                    setNewPassword('');
+                    setConfirmPassword('');
+                  }}
                   className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-blue-500"
                 >
                   {allUsers.map((u) => (
                     <option key={u.id} value={u.id}>
-                      {u.fullName} ({u.email}) - {u.role}
+                      {u.fullName} ({u.email}) - {u.role === 'ADMIN' ? 'Quản lý' : 'Nhân viên'} {u.id === currentUser.id ? '★ (Bạn)' : ''}
                     </option>
                   ))}
                 </select>
               </div>
 
+              {/* Current Password Field (Required when changing own account) */}
+              {selectedUserToChangePass === currentUser.id && (
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1">
+                    Mật Khẩu Hiện Tại <span className="text-rose-400">*</span>:
+                  </label>
+                  <div className="relative">
+                    <input
+                      type={showCurrentPassword ? 'text' : 'password'}
+                      required
+                      value={currentPasswordInput}
+                      onChange={(e) => {
+                        setCurrentPasswordInput(e.target.value);
+                        if (passwordError) setPasswordError(null);
+                      }}
+                      placeholder="Nhập mật khẩu bạn đang dùng..."
+                      className="w-full pl-3 pr-10 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 font-mono"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowCurrentPassword(!showCurrentPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white"
+                      title={showCurrentPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
+                    >
+                      {showCurrentPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                </div>
+              )}
+
               <div>
                 <label className="block text-xs font-semibold text-slate-300 mb-1">
-                  Mật Khẩu Mới:
+                  Mật Khẩu Mới <span className="text-rose-400">*</span>:
                 </label>
                 <div className="relative">
                   <input
                     type={showPassword ? 'text' : 'password'}
                     required
                     value={newPassword}
-                    onChange={(e) => setNewPassword(e.target.value)}
+                    onChange={(e) => {
+                      setNewPassword(e.target.value);
+                      if (passwordError) setPasswordError(null);
+                    }}
                     placeholder="Nhập ít nhất 4 ký tự..."
-                    className="w-full pl-3 pr-10 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
+                    className="w-full pl-3 pr-10 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 font-mono"
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white"
+                    title={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
                   >
                     {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
@@ -1113,17 +1248,29 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
 
               <div>
                 <label className="block text-xs font-semibold text-slate-300 mb-1">
-                  Xác Nhận Mật Khẩu Mới:
+                  Xác Nhận Mật Khẩu Mới <span className="text-rose-400">*</span>:
                 </label>
                 <input
                   type={showPassword ? 'text' : 'password'}
                   required
                   value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  onChange={(e) => {
+                    setConfirmPassword(e.target.value);
+                    if (passwordError) setPasswordError(null);
+                  }}
                   placeholder="Nhập lại mật khẩu mới..."
-                  className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
+                  className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 font-mono"
                 />
               </div>
+
+              {selectedUserToChangePass === currentUser.id && (
+                <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-[11px] text-amber-300 flex items-start gap-2 leading-relaxed">
+                  <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-amber-400" />
+                  <span>
+                    <strong>Lưu ý bảo mật:</strong> Sau khi đổi mật khẩu xong, hệ thống sẽ tự động đăng xuất để bạn đăng nhập lại với mật khẩu mới.
+                  </span>
+                </div>
+              )}
 
               {passwordError && (
                 <div className="p-2.5 bg-rose-500/10 border border-rose-500/30 rounded-xl text-xs text-rose-400 flex items-center gap-2">
@@ -1133,13 +1280,13 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               )}
 
               {passwordSuccess && (
-                <div className="p-2.5 bg-emerald-500/10 border border-emerald-500/30 rounded-xl text-xs text-emerald-400 flex items-center gap-2">
-                  <CheckCircle2 className="w-4 h-4 shrink-0" />
-                  <span>Đã đổi mật khẩu thành công!</span>
+                <div className="p-2.5 bg-emerald-500/10 border border-emerald-500/30 rounded-xl text-xs text-emerald-300 flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-400" />
+                  <span>{passwordSuccessMessage || 'Đã đổi mật khẩu thành công!'}</span>
                 </div>
               )}
 
-              <div className="pt-2 flex items-center justify-between gap-2">
+              <div className="pt-2 flex flex-wrap items-center justify-between gap-2">
                 {isMasterAdmin && (
                   <button
                     type="button"
