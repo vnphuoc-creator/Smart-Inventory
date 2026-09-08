@@ -13,7 +13,40 @@ import { SmartSearchBar } from './components/SmartSearchBar';
 import { LoginView } from './components/LoginView';
 import { ChangePasswordModal } from './components/ChangePasswordModal';
 import { UserGuideModal } from './components/UserGuideModal';
-import { TrainingSlidesModal } from './components/TrainingSlidesModal';
+
+// Safe dynamic glob import: guarantees vite build on Vercel/GitHub NEVER fails even if TrainingSlidesModal.tsx wasn't pushed yet
+const slideModules = import.meta.glob<{ TrainingSlidesModal: React.FC<{ isOpen: boolean; onClose: () => void }> }>(
+  './components/TrainingSlidesModal.tsx'
+);
+
+const TrainingSlidesModal = React.lazy(async () => {
+  const loader = slideModules['./components/TrainingSlidesModal.tsx'];
+  if (loader) {
+    const mod = await loader();
+    return { default: mod.TrainingSlidesModal };
+  }
+  return {
+    default: ({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) => {
+      if (!isOpen) return null;
+      return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 backdrop-blur-xs">
+          <div className="bg-slate-900 border border-slate-700 rounded-2xl p-6 max-w-md w-full text-center shadow-2xl">
+            <h3 className="text-base font-bold text-white mb-2">Slide Đào Tạo Trực Quan</h3>
+            <p className="text-xs text-slate-300 mb-4 leading-relaxed">
+              Tính năng đang được kích hoạt. Hãy thêm tệp TrainingSlidesModal.tsx vào thư mục src/components trên GitHub nếu bạn muốn sử dụng bộ slide trình chiếu tương tác đầy đủ.
+            </p>
+            <button
+              onClick={onClose}
+              className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-semibold transition"
+            >
+              Đóng
+            </button>
+          </div>
+        </div>
+      );
+    },
+  };
+});
 import {
   INITIAL_USERS,
   INITIAL_MATERIALS,
@@ -1296,10 +1329,12 @@ export function App() {
       )}
 
       {/* Interactive PowerPoint Training Slide Deck Modal */}
-      <TrainingSlidesModal
-        isOpen={isTrainingSlidesOpen}
-        onClose={() => setIsTrainingSlidesOpen(false)}
-      />
+      <React.Suspense fallback={null}>
+        <TrainingSlidesModal
+          isOpen={isTrainingSlidesOpen}
+          onClose={() => setIsTrainingSlidesOpen(false)}
+        />
+      </React.Suspense>
 
       {/* Global Toast Alerts */}
       {toast && (
