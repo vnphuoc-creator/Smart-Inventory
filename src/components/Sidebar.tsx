@@ -10,10 +10,10 @@ import {
   Settings,
   LogOut,
   X,
-  KeyRound,
   BookOpen,
   Clock,
   Calendar,
+  Presentation,
 } from 'lucide-react';
 import { User } from '../types';
 import { AHTLogo } from './AHTLogo';
@@ -27,6 +27,7 @@ interface SidebarProps {
   onLogout: () => void;
   onOpenChangePassword?: () => void;
   onOpenUserGuide?: () => void;
+  onOpenTrainingSlides?: () => void;
   isOpenMobile: boolean;
   onToggleMobile: () => void;
 }
@@ -39,6 +40,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onLogout,
   onOpenChangePassword,
   onOpenUserGuide,
+  onOpenTrainingSlides,
   isOpenMobile,
   onToggleMobile,
 }) => {
@@ -386,6 +388,32 @@ export const Sidebar: React.FC<SidebarProps> = ({
               </button>
             </div>
           )}
+
+          {/* Training Slides Deck Button */}
+          {onOpenTrainingSlides && (
+            <div className="pt-1.5">
+              <button
+                type="button"
+                id="btn-sidebar-training-slides"
+                onClick={() => {
+                  onOpenTrainingSlides();
+                  if (isOpenMobile) onToggleMobile();
+                }}
+                className="w-full flex items-center justify-between px-3 py-2 rounded-xl bg-gradient-to-r from-blue-950/80 to-indigo-950/80 hover:from-blue-900/90 hover:to-indigo-900/90 border border-blue-600/40 text-blue-200 hover:text-white transition-all shadow-sm group"
+                title="Mở Slide PowerPoint đào tạo nhân viên kho"
+              >
+                <div className="flex items-center gap-2 min-w-0">
+                  <Presentation className="w-3.5 h-3.5 text-cyan-300 group-hover:scale-110 transition-transform" />
+                  <span className="text-[11px] font-bold truncate">
+                    Slide Đào Tạo (PPTX)
+                  </span>
+                </div>
+                <span className="text-[9px] bg-blue-500/30 text-cyan-300 border border-cyan-400/40 px-1.5 py-0.5 rounded-full font-bold font-mono">
+                  16:9
+                </span>
+              </button>
+            </div>
+          )}
         </nav>
 
         {/* Bottom User Box matching Original Screenshot */}
@@ -417,21 +445,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
               </span>
 
               <div className="flex items-center gap-1 shrink-0">
-                {onOpenChangePassword && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (isOpenMobile) onToggleMobile();
-                      onOpenChangePassword();
-                    }}
-                    className="text-amber-400 hover:text-amber-300 hover:bg-amber-950/30 px-2 py-1 rounded-lg flex items-center gap-1 font-medium transition text-[11px]"
-                    title="Đổi mật khẩu tài khoản"
-                  >
-                    <KeyRound className="w-3.5 h-3.5" />
-                    <span>Đổi MK</span>
-                  </button>
-                )}
-
                 <button
                   type="button"
                   onClick={() => {
