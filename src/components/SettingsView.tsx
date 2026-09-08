@@ -42,6 +42,8 @@ import {
   ShieldAlert,
   Palette,
   Sparkles,
+  RotateCcw,
+  KeyRound,
 } from 'lucide-react';
 import { STANDARD_UNITS } from '../data/seedData';
 import {
@@ -58,7 +60,7 @@ import {
   UIThemeConfig,
   DEFAULT_THEME_CONFIG,
 } from '../types';
-import { formatVND, formatNumber, formatDisplayDate } from '../utils/inventoryEngine';
+import { formatVND, formatNumber, formatDisplayDate, getOriginalDefaultPassword } from '../utils/inventoryEngine';
 import { AHTLogo } from './AHTLogo';
 import { ExcelStockImportModal } from './ExcelStockImportModal';
 import { SearchableMaterialSelect } from './SearchableMaterialSelect';
@@ -142,6 +144,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   const [showPassword, setShowPassword] = useState(false);
   const [passwordSuccess, setPasswordSuccess] = useState(false);
   const [passwordError, setPasswordError] = useState<string | null>(null);
+  const [resetSuccessMsg, setResetSuccessMsg] = useState<string | null>(null);
 
   // --- LOGO & COMPANY INFO STATE ---
   const [companyName, setCompanyName] = useState(() => {
@@ -439,6 +442,26 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       setConfirmPassword('');
       setTimeout(() => setPasswordSuccess(false), 4000);
     }
+  };
+
+  // Master Admin handler: Reset a user's password back to original default format "tên.họ12345"
+  const handleResetUserToDefaultPassword = (targetUser: User) => {
+    const originalPass = getOriginalDefaultPassword(targetUser);
+    if (onUpdateUsers) {
+      const updatedUsers = allUsers.map((u) => {
+        if (u.id === targetUser.id) {
+          return { ...u, password: originalPass, defaultPassword: originalPass };
+        }
+        return u;
+      });
+      onUpdateUsers(updatedUsers);
+    }
+    const msg = `Đã khôi phục thành công mật khẩu gốc cho ${targetUser.fullName}: ${originalPass}`;
+    setResetSuccessMsg(msg);
+    if (onShowToast) {
+      onShowToast(msg, 'success');
+    }
+    setTimeout(() => setResetSuccessMsg(null), 6000);
   };
 
   // Company info handler
@@ -1116,10 +1139,24 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 </div>
               )}
 
-              <div className="pt-2 flex justify-end">
+              <div className="pt-2 flex items-center justify-between gap-2">
+                {isMasterAdmin && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const target = allUsers.find((u) => u.id === selectedUserToChangePass);
+                      if (target) handleResetUserToDefaultPassword(target);
+                    }}
+                    className="px-3 py-2 bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/40 rounded-xl text-xs font-bold transition flex items-center gap-1.5"
+                    title="Khôi phục tài khoản đang chọn về mật khẩu gốc tên.họ12345"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5" />
+                    <span>Reset MK Gốc ({allUsers.find((u) => u.id === selectedUserToChangePass) ? getOriginalDefaultPassword(allUsers.find((u) => u.id === selectedUserToChangePass)!) : ''})</span>
+                  </button>
+                )}
                 <button
                   type="submit"
-                  className="px-5 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold transition shadow-lg shadow-blue-600/30 flex items-center gap-2"
+                  className="px-5 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold transition shadow-lg shadow-blue-600/30 flex items-center gap-2 ml-auto"
                 >
                   <Save className="w-3.5 h-3.5" />
                   Cập Nhật Mật Khẩu
@@ -1127,6 +1164,111 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               </div>
             </form>
           </div>
+
+          {/* Master Admin: Khôi Phục Mật Khẩu Gốc Mặc Định (tên.họ12345) */}
+          {isMasterAdmin && (
+            <div className="col-span-full bg-slate-900 border border-amber-500/40 rounded-2xl p-6 shadow-xl space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800 pb-4">
+                <div>
+                  <div className="flex items-center gap-2.5">
+                    <span className="p-2 rounded-xl bg-amber-500/15 text-amber-400 border border-amber-500/30">
+                      <KeyRound className="w-5 h-5" />
+                    </span>
+                    <div>
+                      <h2 className="text-sm font-bold text-white flex items-center gap-2">
+                        <span>Khôi Phục Mật Khẩu Gốc Mặc Định Cho Mọi Người (Quyền Master)</span>
+                        <span className="text-[10px] bg-amber-500/20 text-amber-300 border border-amber-500/40 px-2 py-0.5 rounded-full font-mono font-bold">
+                          vn.phuoc235@gmail.com
+                        </span>
+                      </h2>
+                      <p className="text-xs text-slate-400 mt-0.5">
+                        Khi nhân viên quên mật khẩu đã đổi trước đó, Master có thể khôi phục lại mật khẩu gốc mặc định theo chuẩn:{' '}
+                        <span className="text-cyan-300 font-mono font-bold">tên.họ12345</span> (Ví dụ: Nguyễn Văn Đức ➔ <span className="text-emerald-400 font-mono font-bold">duc.nguyen12345</span>, Vy Ngọc Phước ➔ <span className="text-emerald-400 font-mono font-bold">phuoc.vy12345</span>).
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {resetSuccessMsg && (
+                <div className="p-3.5 bg-emerald-500/10 border border-emerald-500/30 rounded-xl text-xs text-emerald-300 flex items-center gap-2.5 animate-in fade-in">
+                  <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
+                  <span className="font-semibold">{resetSuccessMsg}</span>
+                </div>
+              )}
+
+              <div className="overflow-x-auto rounded-xl border border-slate-800 bg-slate-950/80">
+                <table className="w-full text-left border-collapse text-xs">
+                  <thead>
+                    <tr className="border-b border-slate-800 bg-slate-900/90 text-[11px] text-slate-400 font-semibold uppercase tracking-wider">
+                      <th className="py-2.5 px-3">STT</th>
+                      <th className="py-2.5 px-3">Họ và Tên</th>
+                      <th className="py-2.5 px-3">Email</th>
+                      <th className="py-2.5 px-3">Vai Trò</th>
+                      <th className="py-2.5 px-3">Mật Khẩu Gốc Chuẩn (tên.họ12345)</th>
+                      <th className="py-2.5 px-3">Trạng Thái Hiện Tại</th>
+                      <th className="py-2.5 px-3 text-right">Thao Tác Khôi Phục</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-800/60">
+                    {allUsers.map((u, i) => {
+                      const defaultPass = getOriginalDefaultPassword(u);
+                      const isUsingDefault = (u.password || '') === defaultPass;
+                      return (
+                        <tr key={u.id} className="hover:bg-slate-900/60 transition-colors">
+                          <td className="py-2.5 px-3 text-slate-500 font-mono text-[11px]">{i + 1}</td>
+                          <td className="py-2.5 px-3 font-semibold text-white">
+                            {u.fullName}
+                          </td>
+                          <td className="py-2.5 px-3 text-slate-400 font-mono text-[11px]">
+                            {u.email}
+                          </td>
+                          <td className="py-2.5 px-3">
+                            <span
+                              className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
+                                u.role === 'ADMIN'
+                                  ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
+                                  : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                              }`}
+                            >
+                              {u.roleName || (u.role === 'ADMIN' ? 'Quản lý' : 'Nhân viên')}
+                            </span>
+                          </td>
+                          <td className="py-2.5 px-3">
+                            <code className="text-cyan-300 font-mono font-bold bg-slate-900 px-2 py-0.5 rounded border border-slate-800 text-[11px]">
+                              {defaultPass}
+                            </code>
+                          </td>
+                          <td className="py-2.5 px-3">
+                            {isUsingDefault ? (
+                              <span className="inline-flex items-center gap-1 text-[11px] text-emerald-400 font-medium">
+                                <CheckCircle2 className="w-3.5 h-3.5" /> Đang dùng MK gốc
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 text-[11px] text-amber-400 font-medium">
+                                <AlertCircle className="w-3.5 h-3.5" /> Đã đổi MK khác
+                              </span>
+                            )}
+                          </td>
+                          <td className="py-2.5 px-3 text-right">
+                            <button
+                              type="button"
+                              onClick={() => handleResetUserToDefaultPassword(u)}
+                              className="px-3 py-1.5 rounded-lg bg-amber-500/10 hover:bg-amber-500/25 text-amber-300 border border-amber-500/40 text-xs font-bold transition flex items-center gap-1.5 ml-auto shadow-sm"
+                              title={`Reset mật khẩu của ${u.fullName} về "${defaultPass}"`}
+                            >
+                              <RotateCcw className="w-3.5 h-3.5" />
+                              <span>Khôi Phục MK Gốc</span>
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
