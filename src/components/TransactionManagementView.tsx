@@ -2519,7 +2519,9 @@ export const TransactionManagementView: React.FC<TransactionManagementViewProps>
                   </div>
                 </div>
                 <div className="text-right shrink-0">
-                  <div className="text-xs font-bold text-slate-700 font-mono">Mẫu số: 01-VT</div>
+                  <div className="text-xs font-bold text-slate-700 font-mono">
+                    Mẫu số: {selectedTxForView.type === 'IMPORT' ? '01-VT' : '02-VT'}
+                  </div>
                   <div className="text-xs font-bold text-blue-800 mt-1 font-mono">Số: {selectedTxForView.code}</div>
                   {selectedTxForView.type === 'IMPORT' && selectedTxForView.proposalNumber && (
                     <div className="text-[11px] font-semibold text-slate-700 font-mono mt-0.5">
