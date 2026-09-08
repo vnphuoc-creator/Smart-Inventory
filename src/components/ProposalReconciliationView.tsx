@@ -45,6 +45,8 @@ import {
   FileCode,
   FileUp,
   RefreshCw,
+  ClipboardPaste,
+  Loader2,
 } from 'lucide-react';
 import {
   PurchaseProposal,
@@ -55,6 +57,8 @@ import {
   ProposalItem,
 } from '../types';
 import { formatVND, formatNumber, formatDisplayDate, isProposalMatch, normalizeProposalNumber } from '../utils/inventoryEngine';
+import { parseDocxHtml } from '../utils/docxProposalParser';
+import { isNonMaterialOrCategoryRow } from '../utils/materialValidation';
 import { SearchableMaterialSelect } from './SearchableMaterialSelect';
 import { AHTLogo } from './AHTLogo';
 import { printCleanDocument } from '../utils/printHelper';
@@ -115,6 +119,9 @@ export const ProposalReconciliationView: React.FC<ProposalReconciliationViewProp
   const [newPropAttachmentName, setNewPropAttachmentName] = useState('');
   const [newPropAttachmentUrl, setNewPropAttachmentUrl] = useState('');
   const [newPropAttachmentHtml, setNewPropAttachmentHtml] = useState('');
+  const [isScanningProposal, setIsScanningProposal] = useState(false);
+  const [scanFeedback, setScanFeedback] = useState<string | null>(null);
+  const [isDraggingFile, setIsDraggingFile] = useState(false);
 
   // High fidelity docx-preview & mammoth parser when viewing attachment
   useEffect(() => {
@@ -499,40 +506,327 @@ export const ProposalReconciliationView: React.FC<ProposalReconciliationViewProp
     });
   }, [reconciliationData, statusFilter, searchQuery]);
 
-  // Handle file upload for new proposal
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      setNewPropAttachmentName(file.name);
-      let docHtml = '';
-      if (file.name.endsWith('.docx') || file.name.endsWith('.doc')) {
-        try {
-          const arrayBuffer = await file.arrayBuffer();
-          const resMammothHtml = await mammoth.convertToHtml({ arrayBuffer });
-          docHtml = resMammothHtml.value || '';
-          setNewPropAttachmentHtml(docHtml);
-        } catch (err) {
-          console.warn('Mammoth parse error:', err);
+  // Helper to extract file content for OCR / text parsing
+  const processFileForScan = async (
+    file: File
+  ): Promise<{ dataUrl: string; rawText: string; docHtml: string }> => {
+    let rawText = '';
+    let docHtml = '';
+
+    // Check if it's Word Document
+    if (file.name.endsWith('.docx') || file.name.endsWith('.doc')) {
+      try {
+        const arrayBuffer = await file.arrayBuffer();
+        const resMammothHtml = await mammoth.convertToHtml({ arrayBuffer });
+        docHtml = resMammothHtml.value || '';
+        const resMammothText = await mammoth.extractRawText({ arrayBuffer });
+        rawText = resMammothText.value || '';
+      } catch (e) {
+        console.warn('Mammoth docx parse error:', e);
+      }
+      const dataUrl = await new Promise<string>((resolve) => {
+        const r = new FileReader();
+        r.onload = () => resolve((r.result as string) || '');
+        r.readAsDataURL(file);
+      });
+      return { dataUrl, rawText, docHtml };
+    }
+
+    // Check if it's text file
+    if (file.name.endsWith('.txt')) {
+      try {
+        rawText = await file.text();
+        docHtml = `<pre style="white-space: pre-wrap;">${rawText}</pre>`;
+      } catch (e) {
+        console.warn('Text file read error:', e);
+      }
+      const dataUrl = await new Promise<string>((resolve) => {
+        const r = new FileReader();
+        r.onload = () => resolve((r.result as string) || '');
+        r.readAsDataURL(file);
+      });
+      return { dataUrl, rawText, docHtml };
+    }
+
+    // Check if it's an image file
+    const isImage = file.type.startsWith('image/') || /\.(png|jpe?g|webp|gif|bmp)$/i.test(file.name);
+    if (isImage) {
+      const dataUrl = await new Promise<string>((resolve) => {
+        const img = new Image();
+        const objectUrl = URL.createObjectURL(file);
+        img.onload = () => {
+          URL.revokeObjectURL(objectUrl);
+          const maxDim = 2048;
+          let { width, height } = img;
+          if (width > maxDim || height > maxDim) {
+            if (width > height) {
+              height = Math.round((height * maxDim) / width);
+              width = maxDim;
+            } else {
+              width = Math.round((width * maxDim) / height);
+              height = maxDim;
+            }
+          }
+          const canvas = document.createElement('canvas');
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+            ctx.drawImage(img, 0, 0, width, height);
+            resolve(canvas.toDataURL('image/jpeg', 0.9));
+          } else {
+            const r = new FileReader();
+            r.onload = () => resolve((r.result as string) || '');
+            r.readAsDataURL(file);
+          }
+        };
+        img.onerror = () => {
+          URL.revokeObjectURL(objectUrl);
+          const r = new FileReader();
+          r.onload = () => resolve((r.result as string) || '');
+          r.readAsDataURL(file);
+        };
+        img.src = objectUrl;
+      });
+      return { dataUrl, rawText, docHtml };
+    }
+
+    // General fallback
+    const dataUrl = await new Promise<string>((resolve) => {
+      const r = new FileReader();
+      r.onload = () => resolve((r.result as string) || '');
+      r.readAsDataURL(file);
+    });
+    return { dataUrl, rawText, docHtml };
+  };
+
+  // Handle scanning and parsing proposal file/image for creating a new proposal
+  const handleScanProposalFile = async (file: File) => {
+    setIsScanningProposal(true);
+    const isImg = file.type.startsWith('image/') || /\.(png|jpe?g|webp|gif|bmp)$/i.test(file.name);
+    setScanFeedback(
+      isImg
+        ? `📸 Đang phân tích và quét OCR ảnh tờ trình "${file.name}" bằng AI...`
+        : `📄 Đang phân tích và quét thông tin từ tệp "${file.name}"...`
+    );
+    setNewPropAttachmentName(file.name);
+
+    try {
+      const { dataUrl, rawText, docHtml } = await processFileForScan(file);
+      setNewPropAttachmentUrl(dataUrl);
+      if (docHtml) setNewPropAttachmentHtml(docHtml);
+
+      let detectedItems: ProposalItem[] = [];
+      let detectedPropNum = '';
+      let detectedTitle = '';
+      let detectedReason = '';
+
+      // 1. High-precision client-side extraction from HTML & rawText (Mammoth / DOM Parser)
+      if (docHtml || rawText) {
+        const clientParsed = parseDocxHtml(docHtml, rawText, materials);
+        if (clientParsed.proposalNumber) detectedPropNum = clientParsed.proposalNumber;
+        if (clientParsed.title) detectedTitle = clientParsed.title;
+        if (clientParsed.reason) detectedReason = clientParsed.reason;
+        if (clientParsed.items && clientParsed.items.length > 0) {
+          detectedItems = clientParsed.items.map((it) => {
+            const matchedMat = materials.find((m) => m.code === it.materialCode);
+            return {
+              materialCode: it.materialCode,
+              materialName: matchedMat ? matchedMat.name : it.materialName || 'Vật tư',
+              unit: matchedMat ? matchedMat.unit : it.unit || 'Cái',
+              requestedQuantity: Math.max(1, Number(it.quantity) || 1),
+              unitPrice: Number(it.unitPrice) || (matchedMat ? matchedMat.unitPrice : 0),
+            };
+          });
         }
-      } else if (file.name.endsWith('.txt')) {
-        try {
-          const text = await file.text();
-          docHtml = `<pre style="white-space: pre-wrap;">${text}</pre>`;
-          setNewPropAttachmentHtml(docHtml);
-        } catch (err) {
-          console.warn('Text file read error:', err);
-        }
-      } else {
-        setNewPropAttachmentHtml('');
       }
 
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        setNewPropAttachmentUrl(event.target?.result as string);
-      };
-      reader.readAsDataURL(file);
+      // 2. Server Gemini API for OCR / multimodal image analysis
+      let apiErrorMsg = '';
+      try {
+        const res = await fetch('/api/ai/scan-proposal', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            fileData: dataUrl,
+            fileName: file.name,
+            fileText: rawText,
+            docHtml: docHtml,
+            availableMaterials: materials.map((m) => ({
+              code: m.code,
+              name: m.name,
+              unit: m.unit,
+              unitPrice: m.unitPrice,
+            })),
+          }),
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          if (data.error) {
+            apiErrorMsg = data.message || 'Lỗi khi quét ảnh AI.';
+          }
+          if (data.proposalNumber) detectedPropNum = data.proposalNumber;
+          if (data.title) detectedTitle = data.title;
+          if (data.reason) detectedReason = data.reason;
+          if (Array.isArray(data.items) && data.items.length > 0) {
+            const validScannedItems = data.items
+              .filter((it: any) => !isNonMaterialOrCategoryRow({ name: it.materialName, code: it.materialCode, unit: it.unit }))
+              .map((it: any, idx: number) => {
+                const searchName = (it.materialName || '').toLowerCase().trim();
+                const matchedMat =
+                  materials.find((m) => m.code === it.materialCode) ||
+                  materials.find((m) => m.name.toLowerCase() === searchName) ||
+                  (searchName.length > 3 && materials.find((m) => m.name.toLowerCase().includes(searchName)));
+
+                return {
+                  materialCode: matchedMat ? matchedMat.code : it.materialCode || `DN_VT_${idx + 1}`,
+                  materialName: matchedMat ? matchedMat.name : it.materialName || `Vật tư ${idx + 1}`,
+                  unit: matchedMat ? matchedMat.unit : it.unit || 'Cái',
+                  requestedQuantity: Math.max(1, Number(it.quantity) || 1),
+                  unitPrice: Number(it.unitPrice) || (matchedMat ? matchedMat.unitPrice : 0),
+                };
+              })
+              .filter((it: any) => !isNonMaterialOrCategoryRow({ code: it.materialCode }));
+
+            if (validScannedItems.length > 0) {
+              detectedItems = validScannedItems;
+            }
+          }
+        }
+      } catch (err) {
+        console.warn('Scan proposal API call error:', err);
+      }
+
+      // Auto-populate form fields
+      if (detectedPropNum) {
+        setNewPropNumber(detectedPropNum);
+      } else if (!newPropNumber && file.name) {
+        const cleanedName = file.name.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ');
+        if (cleanedName.length < 30) setNewPropNumber(cleanedName);
+      }
+
+      if (detectedTitle) {
+        setNewPropTitle(detectedTitle);
+      }
+
+      if (detectedReason) {
+        setNewPropNotes(detectedReason);
+      }
+
+      if (detectedItems.length > 0) {
+        setNewPropItems(detectedItems);
+        setScanFeedback(
+          `✨ Quét OCR thành công! Đã trích xuất số tờ trình: "${detectedPropNum || file.name}" và tự động điền ${detectedItems.length} danh mục vật tư.`
+        );
+      } else {
+        setScanFeedback(
+          `📄 Đã nạp tệp "${file.name}". Bạn có thể bổ sung danh sách vật tư bên dưới.`
+        );
+      }
+    } catch (err: any) {
+      console.error('Error scanning proposal file:', err);
+      setScanFeedback(`❌ Lỗi khi đọc tệp: ${err.message || 'Không thể xử lý định dạng này'}`);
+    } finally {
+      setIsScanningProposal(false);
     }
   };
+
+  // Handle Paste from Clipboard button in new proposal modal
+  const handlePasteProposal = async () => {
+    try {
+      if (!navigator.clipboard) {
+        setScanFeedback('💡 Mẹo: Bạn hãy bấm tổ hợp phím Ctrl + V (hoặc Cmd + V trên Mac) trực tiếp trên màn hình để dán ảnh!');
+        return;
+      }
+
+      if (navigator.clipboard.read) {
+        try {
+          const clipboardItems = await navigator.clipboard.read();
+          for (const item of clipboardItems) {
+            const imageType = item.types.find((t) => t.startsWith('image/'));
+            if (imageType) {
+              const blob = await item.getType(imageType);
+              const ext = imageType.split('/')[1]?.replace('jpeg', 'jpg') || 'png';
+              const file = new File([blob], `anh-to-trinh-dan-${Date.now()}.${ext}`, { type: imageType });
+              await handleScanProposalFile(file);
+              return;
+            }
+          }
+        } catch (clipErr) {
+          console.warn('clipboard.read() failed, fallback to readText:', clipErr);
+        }
+      }
+
+      if (navigator.clipboard.readText) {
+        try {
+          const text = await navigator.clipboard.readText();
+          if (text && text.trim().length > 15) {
+            const file = new File([text], `to-trinh-van-ban-${Date.now()}.txt`, { type: 'text/plain' });
+            await handleScanProposalFile(file);
+            return;
+          }
+        } catch (textErr) {
+          console.warn('readText failed:', textErr);
+        }
+      }
+
+      setScanFeedback('⚠️ Chưa tìm thấy ảnh hoặc văn bản tờ trình trong bộ nhớ tạm. Hãy dùng Win + Shift + S chụp màn hình hoặc Copy ảnh, rồi bấm lại nút này hoặc nhấn Ctrl + V.');
+    } catch (err: any) {
+      console.warn('handlePasteProposal error:', err);
+      setScanFeedback('💡 Mẹo: Nhấn trực tiếp tổ hợp phím Ctrl + V trên bàn phím để dán ảnh tức thì!');
+    }
+  };
+
+  // Global Ctrl+V paste listener while Create New Proposal Modal is open
+  useEffect(() => {
+    if (!isNewProposalModalOpen) return;
+
+    const handleWindowPaste = (e: ClipboardEvent) => {
+      // Check if files exist in clipboardData
+      if (e.clipboardData?.files && e.clipboardData.files.length > 0) {
+        const file = e.clipboardData.files[0];
+        if (file.type.startsWith('image/') || /\.(png|jpe?g|webp|gif|pdf|docx?|txt)$/i.test(file.name)) {
+          e.preventDefault();
+          handleScanProposalFile(file);
+          return;
+        }
+      }
+
+      // Check if image item exists in clipboardData.items
+      if (e.clipboardData?.items) {
+        for (let i = 0; i < e.clipboardData.items.length; i++) {
+          const item = e.clipboardData.items[i];
+          if (item.type.startsWith('image/')) {
+            const blob = item.getAsFile();
+            if (blob) {
+              e.preventDefault();
+              const ext = item.type.split('/')[1]?.replace('jpeg', 'jpg') || 'png';
+              const file = new File([blob], `anh-to-trinh-dan-${Date.now()}.${ext}`, { type: item.type });
+              handleScanProposalFile(file);
+              return;
+            }
+          }
+        }
+      }
+
+      const activeEl = document.activeElement as HTMLElement;
+      const isInput = activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA');
+      if (!isInput && e.clipboardData) {
+        const text = e.clipboardData.getData('text');
+        if (text && text.length > 30 && (text.includes('DNCT') || text.includes('ĐNCT') || text.includes('Tờ trình') || text.includes('Đề xuất'))) {
+          e.preventDefault();
+          const file = new File([text], `to-trinh-dan-${Date.now()}.txt`, { type: 'text/plain' });
+          handleScanProposalFile(file);
+        }
+      }
+    };
+
+    window.addEventListener('paste', handleWindowPaste);
+    return () => {
+      window.removeEventListener('paste', handleWindowPaste);
+    };
+  }, [isNewProposalModalOpen]);
 
   // Add Item to new proposal
   const handleAddNewItemRow = () => {
@@ -2205,39 +2499,142 @@ export const ProposalReconciliationView: React.FC<ProposalReconciliationViewProp
                 />
               </div>
 
-              {/* Upload File / Image Proposal Attachment */}
-              <div className="bg-slate-850 p-3.5 rounded-xl border border-slate-800 space-y-2">
-                <label className="block text-slate-300 font-medium">
-                  Đính Kèm File / Ảnh Tờ Trình Đã Ký Duyệt <span className="text-slate-400 font-normal">(Không bắt buộc)</span>
-                </label>
-                <div className="flex items-center gap-3">
-                  <label className="bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 px-3 py-2 rounded-xl text-xs font-semibold cursor-pointer flex items-center gap-2 transition-colors">
-                    <Upload className="w-4 h-4 text-blue-400" />
-                    <span>Chọn File hoặc Ảnh Tờ Trình (.png, .jpg, .pdf)</span>
+              {/* OCR Scanning / Drag-Drop / Paste Proposal Attachment */}
+              <div
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  setIsDraggingFile(true);
+                }}
+                onDragLeave={() => setIsDraggingFile(false)}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  setIsDraggingFile(false);
+                  const f = e.dataTransfer.files?.[0];
+                  if (f) handleScanProposalFile(f);
+                }}
+                className={`border rounded-xl p-3.5 space-y-3 transition-all ${
+                  isDraggingFile
+                    ? 'bg-blue-900/40 border-blue-400 ring-2 ring-blue-500/50'
+                    : 'bg-gradient-to-r from-blue-950/40 via-indigo-950/30 to-purple-950/30 border-blue-800/40'
+                }`}
+              >
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="w-4 h-4 text-blue-400" />
+                    <span className="text-xs font-bold text-blue-200">
+                      Quét File / Ảnh Tờ Trình Để Tự Động Điền
+                    </span>
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 font-semibold border border-blue-500/30">
+                      AI Multimodal OCR
+                    </span>
+                  </div>
+                  {isScanningProposal && (
+                    <span className="text-[11px] text-amber-300 animate-pulse flex items-center gap-1.5 font-medium bg-amber-950/50 px-2 py-0.5 rounded-full border border-amber-800/40">
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" /> Đang nhận diện OCR...
+                    </span>
+                  )}
+                </div>
+
+                {/* Action buttons: Upload file & Paste from clipboard */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  <label className="flex items-center justify-center gap-2 px-3.5 py-2.5 bg-slate-900/90 hover:bg-slate-850 border border-dashed border-blue-500/60 hover:border-blue-400 rounded-xl cursor-pointer text-blue-300 hover:text-white text-xs font-medium transition-all shadow-sm group">
+                    <Upload className="w-4 h-4 text-blue-400 group-hover:scale-110 transition-transform shrink-0" />
+                    <span>Tải Tệp / Ảnh Tờ Trình</span>
                     <input
                       type="file"
-                      accept="image/*,application/pdf"
-                      onChange={handleFileUpload}
+                      accept="image/*,.pdf,.doc,.docx,.txt"
+                      onChange={(e) => {
+                        const f = e.target.files?.[0];
+                        if (f) handleScanProposalFile(f);
+                      }}
                       className="hidden"
                     />
                   </label>
-                  {newPropAttachmentName && (
-                    <div className="flex items-center gap-2 text-xs text-emerald-400 bg-emerald-500/10 px-3 py-1.5 rounded-lg border border-emerald-500/30">
-                      <FileCheck className="w-4 h-4" />
-                      <span>{newPropAttachmentName}</span>
+
+                  <button
+                    type="button"
+                    onClick={handlePasteProposal}
+                    className="flex items-center justify-center gap-2 px-3.5 py-2.5 bg-indigo-950/70 hover:bg-indigo-900/80 border border-indigo-500/50 hover:border-indigo-400 rounded-xl text-indigo-200 hover:text-white text-xs font-medium transition-all shadow-sm group"
+                    title="Dán trực tiếp ảnh chụp màn hình từ Clipboard (hoặc nhấn phím Ctrl + V)"
+                  >
+                    <ClipboardPaste className="w-4 h-4 text-indigo-400 group-hover:scale-110 transition-transform shrink-0" />
+                    <span>Dán Ảnh (Ctrl + V)</span>
+                  </button>
+                </div>
+
+                {/* Scan Feedback Banner */}
+                {scanFeedback && (
+                  <div className="p-2.5 rounded-lg bg-blue-950/60 border border-blue-500/30 text-xs text-blue-200 flex items-start gap-2 animate-in fade-in">
+                    <Info className="w-4 h-4 text-blue-400 shrink-0 mt-0.5" />
+                    <div className="flex-1 text-[11px] leading-relaxed">{scanFeedback}</div>
+                    <button
+                      type="button"
+                      onClick={() => setScanFeedback(null)}
+                      className="text-slate-400 hover:text-white shrink-0"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                )}
+
+                {/* Attached Image or Document Preview Bar */}
+                {newPropAttachmentUrl && (
+                  <div className="flex items-center justify-between bg-slate-900/90 border border-slate-700/80 rounded-xl p-2.5 gap-2">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      {newPropAttachmentUrl.startsWith('data:image/') || /\.(png|jpe?g|webp|gif)$/i.test(newPropAttachmentName) ? (
+                        <img
+                          src={newPropAttachmentUrl}
+                          alt="Ảnh tờ trình"
+                          className="w-10 h-10 object-cover rounded-lg border border-blue-500/50 shrink-0 cursor-pointer hover:opacity-85 shadow-sm"
+                          onClick={() => setViewingAttachment({ url: newPropAttachmentUrl, name: newPropAttachmentName, type: 'image' })}
+                          title="Bấm để xem ảnh phóng to"
+                        />
+                      ) : (
+                        <div className="w-10 h-10 rounded-lg bg-blue-950/70 border border-blue-600/40 flex items-center justify-center text-blue-400 shrink-0">
+                          <FileText className="w-5 h-5" />
+                        </div>
+                      )}
+                      <div className="min-w-0">
+                        <p className="text-xs font-semibold text-slate-200 truncate" title={newPropAttachmentName}>
+                          {newPropAttachmentName || 'Tờ trình đính kèm'}
+                        </p>
+                        <p className="text-[10px] text-emerald-400 flex items-center gap-1 mt-0.5">
+                          <CheckCircle2 className="w-3 h-3 shrink-0" />
+                          {newPropAttachmentUrl.startsWith('data:image/') ? 'Ảnh tờ trình đã nạp vào hồ sơ' : 'Đã nạp nội dung tờ trình'}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setViewingAttachment({
+                            url: newPropAttachmentUrl,
+                            name: newPropAttachmentName,
+                            type: newPropAttachmentUrl.startsWith('data:image/') ? 'image' : 'document',
+                          })
+                        }
+                        className="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium border border-slate-700 flex items-center gap-1 transition"
+                        title="Xem tài liệu"
+                      >
+                        <Eye className="w-3.5 h-3.5 text-blue-400" />
+                        <span className="hidden sm:inline">Xem</span>
+                      </button>
                       <button
                         type="button"
                         onClick={() => {
                           setNewPropAttachmentName('');
                           setNewPropAttachmentUrl('');
+                          setNewPropAttachmentHtml('');
                         }}
-                        className="text-slate-400 hover:text-rose-400 ml-1"
+                        className="p-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 transition"
+                        title="Xóa tệp đính kèm"
                       >
-                        <X className="w-3.5 h-3.5" />
+                        <X className="w-4 h-4" />
                       </button>
                     </div>
-                  )}
-                </div>
+                  </div>
+                )}
               </div>
 
               {/* Items in Proposal with Top Scrollbar & Sticky Header */}
