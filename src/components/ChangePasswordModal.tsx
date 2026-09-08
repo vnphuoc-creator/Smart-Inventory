@@ -10,6 +10,7 @@ import {
   ShieldCheck,
 } from 'lucide-react';
 import { User } from '../types';
+import { getOriginalDefaultPassword } from '../utils/inventoryEngine';
 
 interface ChangePasswordModalProps {
   isOpen: boolean;
@@ -17,6 +18,7 @@ interface ChangePasswordModalProps {
   currentUser: User;
   onUpdateUser: (updatedUser: User) => void;
   onSuccessToast?: (msg: string) => void;
+  onLogout?: () => void;
 }
 
 export const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({
@@ -25,6 +27,7 @@ export const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({
   currentUser,
   onUpdateUser,
   onSuccessToast,
+  onLogout,
 }) => {
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -50,9 +53,11 @@ export const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({
     }
 
     // Verify current password against known valid values
+    const originalDefault = getOriginalDefaultPassword(currentUser);
     const validCurrentPasswords = [
       currentUser.password,
       currentUser.defaultPassword,
+      originalDefault,
       `${currentUser.username}12345`,
       `${currentUser.email.split('@')[0]}12345`,
     ].filter(Boolean);
@@ -91,7 +96,7 @@ export const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({
     onUpdateUser(updatedUser);
     setIsSuccess(true);
     if (onSuccessToast) {
-      onSuccessToast(`Đã đổi mật khẩu thành công cho tài khoản ${currentUser.fullName}!`);
+      onSuccessToast(`Đã đổi mật khẩu thành công! Hệ thống đang tự động đăng xuất...`);
     }
 
     setTimeout(() => {
@@ -100,6 +105,9 @@ export const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({
       setNewPassword('');
       setConfirmPassword('');
       onClose();
+      if (onLogout) {
+        onLogout();
+      }
     }, 1500);
   };
 
@@ -147,8 +155,8 @@ export const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({
                 <CheckCircle2 className="w-6 h-6" />
               </div>
               <h4 className="text-sm font-bold text-white">Đổi Mật Khẩu Thành Công!</h4>
-              <p className="text-xs text-slate-400">
-                Mật khẩu mới đã được cập nhật an toàn vào hệ thống.
+              <p className="text-xs text-slate-300">
+                Mật khẩu mới đã được cập nhật an toàn. Hệ thống đang tự động đăng xuất để bạn đăng nhập lại với mật khẩu mới...
               </p>
             </div>
           ) : (
