@@ -19,8 +19,10 @@ import {
   AlertCircle,
   Eye,
   EyeOff,
+  RotateCcw,
 } from 'lucide-react';
 import { User } from '../types';
+import { getOriginalDefaultPassword } from '../utils/inventoryEngine';
 import seagullWelcoming from '../assets/images/danang_seagull_welcoming_1788356485133.jpg';
 
 interface UserManagementViewProps {
@@ -38,9 +40,34 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({
   onUpdateUser,
   onAddUser,
 }) => {
+  const [searchTerm, setSearchTerm] = useState('');
+  const [roleFilter, setRoleFilter] = useState<'ALL' | 'ADMIN' | 'STAFF'>('ALL');
+  const [resetSuccessBanner, setResetSuccessBanner] = useState<string | null>(null);
+
+  // Security Password Protection State
+  const [isUnlocked, setIsUnlocked] = useState(false);
+  const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
+  const [adminPasswordInput, setAdminPasswordInput] = useState('');
+  const [passwordError, setPasswordError] = useState('');
+
   const isMasterAdmin =
     currentUser.email?.toLowerCase().trim() === 'vn.phuoc235@gmail.com' ||
-    currentUser.username?.toLowerCase().trim() === 'vn.phuoc235';
+    currentUser.username?.toLowerCase().trim() === 'vn.phuoc235' ||
+    currentUser.email?.toLowerCase().trim().includes('vn.phuoc235');
+
+  const handleResetUserToDefaultPassword = (targetUser: User) => {
+    const originalPass = getOriginalDefaultPassword(targetUser);
+    const updatedUser: User = {
+      ...targetUser,
+      password: originalPass,
+      defaultPassword: originalPass,
+    };
+    if (onUpdateUser) {
+      onUpdateUser(updatedUser);
+    }
+    setResetSuccessBanner(`Đã khôi phục mật khẩu gốc cho "${targetUser.fullName}" thành: ${originalPass}`);
+    setTimeout(() => setResetSuccessBanner(null), 5000);
+  };
 
   if (!isMasterAdmin) {
     return (
@@ -55,14 +82,6 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({
       </div>
     );
   }
-  const [searchTerm, setSearchTerm] = useState('');
-  const [roleFilter, setRoleFilter] = useState<'ALL' | 'ADMIN' | 'STAFF'>('ALL');
-
-  // Security Password Protection State
-  const [isUnlocked, setIsUnlocked] = useState(false);
-  const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
-  const [adminPasswordInput, setAdminPasswordInput] = useState('');
-  const [passwordError, setPasswordError] = useState('');
   const [showPasswordText, setShowPasswordText] = useState(false);
 
   // Edit User State (When Unlocked)
@@ -266,6 +285,13 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({
           )}
         </div>
       </div>
+
+      {resetSuccessBanner && (
+        <div className="p-3.5 bg-emerald-500/10 border border-emerald-500/30 rounded-2xl text-xs text-emerald-300 flex items-center gap-2.5 animate-in fade-in">
+          <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
+          <span className="font-semibold">{resetSuccessBanner}</span>
+        </div>
+      )}
 
       {/* Security Status Alert Banner */}
       {!isUnlocked && (
@@ -477,11 +503,24 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({
                 </div>
 
                 <div className="mt-3 pt-3 border-t border-slate-800 text-xs space-y-1.5">
-                  <div className="text-[11px] text-slate-400">
-                    <span className="text-slate-500">Mật khẩu đăng nhập: </span>
-                    <code className="text-amber-400 bg-slate-950 px-1.5 py-0.5 rounded border border-slate-800 font-mono text-[10px]">
-                      {user.defaultPassword || user.password || `${user.username}12345`}
-                    </code>
+                  <div className="flex items-center justify-between gap-2 text-[11px] text-slate-400">
+                    <div>
+                      <span className="text-slate-500">Mật khẩu: </span>
+                      <code className="text-amber-400 bg-slate-950 px-1.5 py-0.5 rounded border border-slate-800 font-mono text-[10px]">
+                        {user.password || user.defaultPassword || `${user.username}12345`}
+                      </code>
+                    </div>
+                    {(isMasterAdmin || isUnlocked) && (
+                      <button
+                        type="button"
+                        onClick={() => handleResetUserToDefaultPassword(user)}
+                        className="px-2 py-0.5 rounded bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[10px] font-semibold flex items-center gap-1 transition shrink-0"
+                        title={`Reset về mật khẩu gốc chuẩn: ${getOriginalDefaultPassword(user)}`}
+                      >
+                        <RotateCcw className="w-3 h-3" />
+                        <span>Reset MK gốc</span>
+                      </button>
+                    )}
                   </div>
                   <div className="text-[11px] text-slate-400">
                     <span className="text-slate-500">Ghi chú quyền: </span>
