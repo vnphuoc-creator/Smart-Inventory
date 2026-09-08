@@ -8,7 +8,55 @@ import {
   PurchaseProposal,
   ProposalReconciliation,
   ReconciledProposalItem,
+  User,
 } from '../types';
+
+/**
+ * Calculates or retrieves the default original password for a user
+ * following the standard rule: "tên.họ12345" (e.g. "duc.nguyen12345")
+ */
+export function getOriginalDefaultPassword(user: {
+  fullName?: string;
+  username?: string;
+  email?: string;
+  defaultPassword?: string;
+}): string {
+  if (user.defaultPassword && user.defaultPassword.trim()) {
+    return user.defaultPassword.trim();
+  }
+
+  const removeVietnameseTones = (str: string) => {
+    return str
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[đĐ]/g, 'd')
+      .toLowerCase()
+      .trim();
+  };
+
+  const name = (user.fullName || '').trim();
+  const nameParts = name ? name.split(/\s+/) : [];
+
+  if (nameParts.length >= 2) {
+    const ho = removeVietnameseTones(nameParts[0]);
+    const ten = removeVietnameseTones(nameParts[nameParts.length - 1]);
+    return `${ten}.${ho}12345`;
+  } else if (nameParts.length === 1 && nameParts[0]) {
+    const ten = removeVietnameseTones(nameParts[0]);
+    return `${ten}12345`;
+  }
+
+  if (user.username) {
+    return `${removeVietnameseTones(user.username)}12345`;
+  }
+
+  if (user.email) {
+    const prefix = user.email.split('@')[0];
+    return `${removeVietnameseTones(prefix)}12345`;
+  }
+
+  return 'aht12345';
+}
 
 /**
  * Validates material code
