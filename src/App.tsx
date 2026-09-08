@@ -13,6 +13,7 @@ import { SmartSearchBar } from './components/SmartSearchBar';
 import { LoginView } from './components/LoginView';
 import { ChangePasswordModal } from './components/ChangePasswordModal';
 import { UserGuideModal } from './components/UserGuideModal';
+import { TrainingSlidesModal } from './components/TrainingSlidesModal';
 import {
   INITIAL_USERS,
   INITIAL_MATERIALS,
@@ -257,6 +258,7 @@ export function App() {
   const [isSmartSearchOpen, setIsSmartSearchOpen] = useState(false);
   const [isChangePasswordOpen, setIsChangePasswordOpen] = useState(false);
   const [isUserGuideOpen, setIsUserGuideOpen] = useState(false);
+  const [isTrainingSlidesOpen, setIsTrainingSlidesOpen] = useState(false);
   const [appliedFilters, setAppliedFilters] = useState<NaturalSearchFilters | null>(null);
   const [filterExplanation, setFilterExplanation] = useState<string | null>(null);
   const [preselectedMaterialCode, setPreselectedMaterialCode] = useState<string | undefined>(undefined);
@@ -1033,6 +1035,7 @@ export function App() {
         onLogout={handleLogout}
         onOpenChangePassword={() => setIsChangePasswordOpen(true)}
         onOpenUserGuide={() => setIsUserGuideOpen(true)}
+        onOpenTrainingSlides={() => setIsTrainingSlidesOpen(true)}
         isOpenMobile={isMobileSidebarOpen}
         onToggleMobile={() => setIsMobileSidebarOpen(!isMobileSidebarOpen)}
       />
@@ -1049,6 +1052,7 @@ export function App() {
           onLogout={handleLogout}
           onOpenChangePassword={() => setIsChangePasswordOpen(true)}
           onOpenUserGuide={() => setIsUserGuideOpen(true)}
+          onOpenTrainingSlides={() => setIsTrainingSlidesOpen(true)}
           onToggleSidebar={() => setIsMobileSidebarOpen(!isMobileSidebarOpen)}
           theme={themeConfig.canvasMode === 'light-modern' || themeConfig.canvasMode === 'danang-ibms' ? 'light' : 'dark'}
           onToggleTheme={handleToggleTheme}
@@ -1078,6 +1082,7 @@ export function App() {
               onOpenCreateTransaction={handleOpenCreateTransaction}
               onApproveTransaction={handleApproveTransaction}
               onRejectTransaction={handleRejectTransaction}
+              onOpenTrainingSlides={() => setIsTrainingSlidesOpen(true)}
             />
           )}
 
@@ -1215,6 +1220,8 @@ export function App() {
                 onDeleteTransaction={handleDeleteTransaction}
                 onResetDemoData={handleResetDemoData}
                 onClearAllTransactionsAndProposals={handleClearAllTransactionsAndProposals}
+                onUpdateUser={handleUpdateUser}
+                onLogout={handleLogout}
                 onUpdateMaterials={(newMats) => {
                   setMaterials(newMats);
                   seedMaterials(newMats);
@@ -1275,6 +1282,7 @@ export function App() {
         currentUser={currentUser}
         onUpdateUser={handleUpdateUser}
         onSuccessToast={(msg) => showToast(msg, 'success')}
+        onLogout={handleLogout}
       />
 
       {/* Comprehensive In-App User Guide Modal */}
@@ -1283,8 +1291,15 @@ export function App() {
           isOpen={isUserGuideOpen}
           onClose={() => setIsUserGuideOpen(false)}
           currentUser={currentUser}
+          onOpenTrainingSlides={() => setIsTrainingSlidesOpen(true)}
         />
       )}
+
+      {/* Interactive PowerPoint Training Slide Deck Modal */}
+      <TrainingSlidesModal
+        isOpen={isTrainingSlidesOpen}
+        onClose={() => setIsTrainingSlidesOpen(false)}
+      />
 
       {/* Global Toast Alerts */}
       {toast && (
