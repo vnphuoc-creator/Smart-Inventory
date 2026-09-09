@@ -35,6 +35,10 @@ export interface Material {
   allocatedStaffEmails?: string[]; // Phân bổ quyền theo dõi/quản lý cho nhân viên cụ thể
   notes?: string;
   image?: string;
+  brand?: string; // Hãng sản xuất (ABB, Schneider, Omron, Bosch, Cadivi, Panasonic...)
+  barcode?: string; // Mã vạch 1D
+  qrCode?: string; // Mã QR
+  differentiator?: string; // Điểm nhận diện đặc biệt: Đầu bằng/đầu dù, 24VDC/220VAC, SC10-6/SC16-6
   updatedAt?: string;
 }
 

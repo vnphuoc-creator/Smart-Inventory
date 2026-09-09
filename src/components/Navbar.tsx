@@ -13,6 +13,8 @@ import {
   Clock,
   Calendar,
   Presentation,
+  Camera,
+  QrCode,
 } from 'lucide-react';
 import { User } from '../types';
 import { SeagullMascotWelcome } from './SeagullMascotWelcome';
@@ -24,6 +26,7 @@ interface NavbarProps {
   onTabChange: (tab: string) => void;
   pendingApprovalsCount: number;
   onOpenAiSearch: () => void;
+  onOpenQrScanner?: () => void;
   onLogout?: () => void;
   onOpenChangePassword?: () => void;
   onOpenUserGuide?: () => void;
@@ -39,6 +42,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   onTabChange,
   pendingApprovalsCount,
   onOpenAiSearch,
+  onOpenQrScanner,
   onLogout,
   onOpenChangePassword,
   onOpenUserGuide,
@@ -179,6 +183,21 @@ export const Navbar: React.FC<NavbarProps> = ({
 
           {/* Right Section: Theme toggle & User Menu */}
           <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+            {/* Quick Barcode/QR & Visual Identification Scanner Button */}
+            {onOpenQrScanner && (
+              <button
+                type="button"
+                id="btn-header-visual-qr-scan"
+                onClick={onOpenQrScanner}
+                className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl bg-gradient-to-r from-purple-950/80 via-indigo-950/80 to-blue-950/80 hover:from-purple-900 hover:to-indigo-900 border border-purple-500/50 text-purple-200 hover:text-white text-xs font-bold transition shadow-sm group"
+                title="Quét mã QR / Barcode và xem Thẻ Nhận Diện Ảnh Thật"
+              >
+                <Camera className="w-3.5 h-3.5 text-purple-400 group-hover:scale-110 transition-transform" />
+                <span className="hidden sm:inline">Ảnh Thật &amp; Quét Mã</span>
+                <span className="sm:hidden font-mono text-[11px]">Quét QR</span>
+              </button>
+            )}
+
             {/* Quick Training Slides Button */}
             {onOpenTrainingSlides && (
               <button

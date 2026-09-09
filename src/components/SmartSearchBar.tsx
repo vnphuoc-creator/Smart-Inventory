@@ -10,15 +10,20 @@ import {
   Send,
   Loader2,
   Package,
+  Eye,
+  Camera,
+  ShieldAlert,
 } from 'lucide-react';
 import { NaturalSearchFilters, Material, InventoryTransaction } from '../types';
 import { parseNaturalLanguageQuery } from '../utils/inventoryEngine';
 import { MATERIAL_CATEGORIES } from '../data/seedData';
+import { extractBrand, extractDifferentiators } from '../utils/materialDifferentiator';
 
 interface SmartSearchBarProps {
   isOpen: boolean;
   onClose: () => void;
   onApplyFilters: (filters: NaturalSearchFilters, explanation: string, targetTab?: string) => void;
+  onOpenVisualCard?: (material: Material) => void;
   materials: Material[];
   transactions: InventoryTransaction[];
 }
@@ -27,6 +32,7 @@ export const SmartSearchBar: React.FC<SmartSearchBarProps> = ({
   isOpen,
   onClose,
   onApplyFilters,
+  onOpenVisualCard,
   materials,
   transactions,
 }) => {
@@ -35,6 +41,19 @@ export const SmartSearchBar: React.FC<SmartSearchBarProps> = ({
   const [aiResponseText, setAiResponseText] = useState<string | null>(null);
 
   if (!isOpen) return null;
+
+  // Live matching materials when user types
+  const liveMatches = query.trim().length >= 2
+    ? materials.filter((m) => {
+        const q = query.toLowerCase().trim();
+        return (
+          m.code.toLowerCase().includes(q) ||
+          m.name.toLowerCase().includes(q) ||
+          (m.brand && m.brand.toLowerCase().includes(q)) ||
+          (m.specification && m.specification.toLowerCase().includes(q))
+        );
+      }).slice(0, 4)
+    : [];
 
   const quickPrompts = [
     { label: '⚠️ Vật tư sắp hết (dưới định mức an toàn)', q: 'vật tư dưới mức an toàn cần nhập bổ sung' },
@@ -199,6 +218,78 @@ export const SmartSearchBar: React.FC<SmartSearchBarProps> = ({
           <div className="p-3 bg-blue-950/40 border-b border-blue-800/40 text-blue-200 text-xs flex items-start gap-2">
             <Sparkles className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
             <p className="flex-1">{aiResponseText}</p>
+          </div>
+        )}
+
+        {/* Live Matching Material Cards with Photo & Brand */}
+        {liveMatches.length > 0 && (
+          <div className="p-3 sm:p-4 bg-slate-950 border-b border-slate-800 space-y-2 animate-in fade-in">
+            <div className="text-[11px] font-bold text-cyan-400 uppercase tracking-wider flex items-center justify-between">
+              <span className="flex items-center gap-1.5">
+                <Camera className="w-3.5 h-3.5" />
+                Vật Tư Khớp Trực Tiếp ({liveMatches.length})
+              </span>
+              <span className="text-[10px] text-slate-400 font-normal">
+                Bấm vào xem Thẻ Nhận Diện Ảnh Thật
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              {liveMatches.map((m) => {
+                const brand = extractBrand(m);
+                const diffs = extractDifferentiators(m);
+                return (
+                  <div
+                    key={m.id}
+                    onClick={() => {
+                      if (onOpenVisualCard) {
+                        onClose();
+                        onOpenVisualCard(m);
+                      } else {
+                        handleSearchSubmit(m.code);
+                      }
+                    }}
+                    className="p-2.5 rounded-xl bg-slate-900 hover:bg-slate-850 border border-slate-800 hover:border-cyan-500/50 transition cursor-pointer flex items-center gap-2.5 group"
+                  >
+                    <div className="w-11 h-11 rounded-lg bg-slate-950 border border-slate-800 overflow-hidden shrink-0 flex items-center justify-center">
+                      {m.image ? (
+                        <img
+                          src={m.image}
+                          alt={m.name}
+                          referrerPolicy="no-referrer"
+                          className="w-full h-full object-cover group-hover:scale-110 transition-transform"
+                        />
+                      ) : (
+                        <Package className="w-5 h-5 text-slate-600" />
+                      )}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="font-mono text-[10px] font-bold text-cyan-300 bg-blue-950 px-1.5 py-0.2 rounded border border-blue-700/60">
+                          {m.code}
+                        </span>
+                        <span className={`text-[9px] px-1 py-0.2 rounded font-bold border ${brand.color}`}>
+                          {brand.name}
+                        </span>
+                      </div>
+                      <p className="text-xs font-semibold text-white truncate mt-0.5 group-hover:text-cyan-300 transition-colors">
+                        {m.name}
+                      </p>
+                      {diffs.length > 0 ? (
+                        <p className="text-[10px] text-amber-300 truncate flex items-center gap-1">
+                          <ShieldAlert className="w-2.5 h-2.5 shrink-0 text-amber-400" />
+                          {diffs[0]}
+                        </p>
+                      ) : (
+                        <p className="text-[10px] text-slate-400 truncate">
+                          {m.specification || m.location}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         )}
 

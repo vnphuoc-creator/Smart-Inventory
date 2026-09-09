@@ -33,6 +33,9 @@ import {
   ExternalLink,
   MapPin,
   Tag,
+  Camera,
+  QrCode,
+  ShieldAlert,
 } from 'lucide-react';
 import {
   Material,
@@ -43,6 +46,8 @@ import {
 import { formatVND, formatNumber, validateMaterialCode } from '../utils/inventoryEngine';
 import { MATERIAL_CATEGORIES, STANDARD_UNITS } from '../data/seedData';
 import { exportMaterialCatalogueToExcel } from '../utils/excelExporter';
+import { extractBrand, extractDifferentiators } from '../utils/materialDifferentiator';
+import { BarcodeQrScanModal } from './BarcodeQrScanModal';
 import { resolveMaterialImageUrl, getMaterialVisualDossier } from '../utils/materialImageResolver';
 import { MaterialImageModal } from './MaterialImageModal';
 
@@ -81,6 +86,8 @@ export const MaterialCatalogueView: React.FC<MaterialCatalogueViewProps> = ({
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
   const [viewMode, setViewMode] = useState<'TABLE' | 'GRID'>('TABLE');
   const [selectedImageModalMaterial, setSelectedImageModalMaterial] = useState<Material | null>(null);
+  const [isBarcodeQrModalOpen, setIsBarcodeQrModalOpen] = useState(false);
+  const [filterOnlyWithImage, setFilterOnlyWithImage] = useState(false);
 
   // Modal State for adding/editing material
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -218,6 +225,11 @@ export const MaterialCatalogueView: React.FC<MaterialCatalogueViewProps> = ({
           }
         }
 
+        // Only with images filter
+        if (filterOnlyWithImage && (!mat.image || !mat.image.trim())) {
+          return false;
+        }
+
         return true;
       })
       .sort((a, b) => {
@@ -228,7 +240,7 @@ export const MaterialCatalogueView: React.FC<MaterialCatalogueViewProps> = ({
         else if (sortBy === 'value') cmp = a.totalValue - b.totalValue;
         return sortOrder === 'asc' ? cmp : -cmp;
       });
-  }, [calculatedStocks, searchTerm, selectedCategory, selectedUnit, selectedStatus, sortBy, sortOrder]);
+  }, [calculatedStocks, searchTerm, selectedCategory, selectedUnit, selectedStatus, filterOnlyWithImage, sortBy, sortOrder]);
 
   // Dynamically update scrollWidth when filtered materials change
   useEffect(() => {
@@ -539,7 +551,31 @@ export const MaterialCatalogueView: React.FC<MaterialCatalogueViewProps> = ({
             ))}
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            <button
+              type="button"
+              onClick={() => setIsBarcodeQrModalOpen(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-purple-900/80 via-indigo-900/80 to-blue-900/80 hover:from-purple-800 hover:to-indigo-800 border border-purple-500/50 text-purple-200 hover:text-white font-bold text-xs transition shadow-sm"
+              title="Quét mã QR / Barcode để đối chiếu ảnh thật"
+            >
+              <Camera className="w-3.5 h-3.5 text-purple-300" />
+              <span>Ảnh Thật &amp; Quét Mã</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setFilterOnlyWithImage(!filterOnlyWithImage)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition ${
+                filterOnlyWithImage
+                  ? 'bg-blue-600 border-blue-500 text-white shadow-sm'
+                  : 'bg-slate-800 hover:bg-slate-750 border-slate-700 text-slate-300'
+              }`}
+              title="Lọc các mã đã có ảnh chụp thực tế trong kho"
+            >
+              <Eye className="w-3.5 h-3.5 text-cyan-400" />
+              <span>Có Ảnh Thật ({calculatedStocks.filter((m) => m.image && m.image.trim()).length})</span>
+            </button>
+
             <select
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value as any)}
@@ -785,11 +821,14 @@ export const MaterialCatalogueView: React.FC<MaterialCatalogueViewProps> = ({
                   <th className="sticky top-0 z-30 bg-slate-900 py-3.5 px-3 text-center font-semibold text-slate-200 uppercase tracking-wider border-b border-slate-700 w-12">
                     STT
                   </th>
+                  <th className="sticky top-0 z-30 bg-slate-900 py-3.5 px-2 text-center font-semibold text-cyan-400 uppercase tracking-wider border-b border-slate-700 w-14">
+                    Ảnh Thật
+                  </th>
                   <th className="sticky top-0 z-30 bg-slate-900 py-3.5 px-4 font-semibold text-slate-200 uppercase tracking-wider border-b border-slate-700">
                     Mã Vật Tư
                   </th>
-                  <th className="sticky top-0 z-30 bg-slate-900 py-3.5 px-4 min-w-[220px] font-semibold text-slate-200 uppercase tracking-wider border-b border-slate-700">
-                    Tên & Quy Cách Vật Tư
+                  <th className="sticky top-0 z-30 bg-slate-900 py-3.5 px-4 min-w-[240px] font-semibold text-slate-200 uppercase tracking-wider border-b border-slate-700">
+                    Tên &amp; Quy Cách Vật Tư
                   </th>
                   <th className="sticky top-0 z-30 bg-slate-900 py-3.5 px-3 font-semibold text-slate-200 uppercase tracking-wider border-b border-slate-700">
                     Nhóm / Vị Trí
@@ -826,7 +865,7 @@ export const MaterialCatalogueView: React.FC<MaterialCatalogueViewProps> = ({
               <tbody className="divide-y divide-slate-800 font-normal">
                 {filteredMaterials.length === 0 ? (
                   <tr>
-                    <td colSpan={13} className="py-12 text-center text-slate-400">
+                    <td colSpan={14} className="py-12 text-center text-slate-400">
                       <Package className="w-8 h-8 text-slate-600 mx-auto mb-2 opacity-50" />
                       Không tìm thấy vật tư nào phù hợp với điều kiện tìm kiếm.
                     </td>
@@ -834,6 +873,8 @@ export const MaterialCatalogueView: React.FC<MaterialCatalogueViewProps> = ({
                 ) : (
                   filteredMaterials.map((mat, index) => {
                     const isLow = mat.stockStatus === 'LOW_STOCK' || mat.stockStatus === 'OUT_OF_STOCK';
+                    const brandInfo = extractBrand(mat);
+                    const diffs = extractDifferentiators(mat);
                     return (
                       <tr
                         key={mat.id}
@@ -844,6 +885,31 @@ export const MaterialCatalogueView: React.FC<MaterialCatalogueViewProps> = ({
                           {index + 1}
                         </td>
 
+                        {/* Ảnh Thật Thumbnail */}
+                        <td className="py-2 px-2 text-center">
+                          <div
+                            onClick={() => setSelectedImageModalMaterial(mat)}
+                            className="w-10 h-10 mx-auto rounded-lg bg-slate-950 border border-slate-700/80 hover:border-cyan-400 overflow-hidden cursor-pointer flex items-center justify-center group/thumb relative transition shadow-sm"
+                            title="Bấm để mở Thẻ Nhận Diện Ảnh Thật & Hồ Sơ Kỹ Thuật"
+                          >
+                            {mat.image ? (
+                              <img
+                                src={mat.image}
+                                alt={mat.name}
+                                referrerPolicy="no-referrer"
+                                className="w-full h-full object-cover group-hover/thumb:scale-110 transition-transform"
+                              />
+                            ) : (
+                              <div className="text-slate-500 group-hover/thumb:text-cyan-400 transition-colors">
+                                <Camera className="w-4 h-4 opacity-50" />
+                              </div>
+                            )}
+                            <div className="absolute inset-0 bg-blue-600/30 opacity-0 group-hover/thumb:opacity-100 transition-opacity flex items-center justify-center">
+                              <ZoomIn className="w-3.5 h-3.5 text-white drop-shadow" />
+                            </div>
+                          </div>
+                        </td>
+
                         {/* Material Code */}
                         <td className="py-3 px-4 font-mono font-bold">
                           <span className="material-code-badge inline-block font-mono font-bold px-2.5 py-0.5 rounded-md text-[11px] bg-blue-950/90 border border-blue-700/80 text-cyan-300 shadow-sm tracking-wide">
@@ -851,13 +917,31 @@ export const MaterialCatalogueView: React.FC<MaterialCatalogueViewProps> = ({
                           </span>
                         </td>
 
-                        {/* Name & Specification */}
+                        {/* Name & Specification & Brand & Differentiators */}
                         <td className="py-3 px-4">
-                          <div
-                            className="material-table-name font-semibold text-white text-xs hover:text-blue-400 cursor-pointer transition-colors"
-                            onClick={() => setSelectedImageModalMaterial(mat)}
-                          >
-                            {mat.name}
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <div
+                              className="material-table-name font-semibold text-white text-xs hover:text-cyan-300 cursor-pointer transition-colors"
+                              onClick={() => setSelectedImageModalMaterial(mat)}
+                              title="Bấm xem Thẻ Nhận Diện Ảnh Thật"
+                            >
+                              {mat.name}
+                            </div>
+                            {brandInfo.name && (
+                              <span className={`px-1.5 py-0.2 rounded text-[10px] font-bold border ${brandInfo.color}`}>
+                                {brandInfo.name}
+                              </span>
+                            )}
+                            {diffs.length > 0 && (
+                              <span
+                                className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.2 rounded bg-amber-950/70 border border-amber-500/40 text-amber-300 font-semibold cursor-pointer"
+                                onClick={() => setSelectedImageModalMaterial(mat)}
+                                title={diffs.join(' | ')}
+                              >
+                                <ShieldAlert className="w-3 h-3 text-amber-400 shrink-0" />
+                                <span className="max-w-[150px] truncate">{diffs[0]}</span>
+                              </span>
+                            )}
                           </div>
                           <div className="text-[11px] text-slate-400 truncate max-w-xs mt-0.5" title={mat.specification}>
                             {mat.specification}
@@ -1285,13 +1369,26 @@ export const MaterialCatalogueView: React.FC<MaterialCatalogueViewProps> = ({
         </div>
       )}
 
-      {/* Material Technical Detail & Dossier Modal */}
+      {/* Material Technical Detail & Visual Identification Card Modal */}
       {selectedImageModalMaterial && (
         <MaterialImageModal
           material={selectedImageModalMaterial}
           isOpen={true}
           onClose={() => setSelectedImageModalMaterial(null)}
           onOpenStockCard={onOpenStockCard}
+          onCreateExport={(code) => onOpenCreateTransaction('EXPORT', code)}
+        />
+      )}
+
+      {/* Real-time Barcode / QR Camera & Súng Bắn Scanner Modal */}
+      {isBarcodeQrModalOpen && (
+        <BarcodeQrScanModal
+          isOpen={isBarcodeQrModalOpen}
+          onClose={() => setIsBarcodeQrModalOpen(false)}
+          materials={materials}
+          onSelectMaterial={(mat) => {
+            setSelectedImageModalMaterial(mat);
+          }}
         />
       )}
     </div>

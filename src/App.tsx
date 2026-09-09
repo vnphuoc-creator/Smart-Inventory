@@ -13,6 +13,8 @@ import { SmartSearchBar } from './components/SmartSearchBar';
 import { LoginView } from './components/LoginView';
 import { ChangePasswordModal } from './components/ChangePasswordModal';
 import { UserGuideModal } from './components/UserGuideModal';
+import { MaterialImageModal } from './components/MaterialImageModal';
+import { BarcodeQrScanModal } from './components/BarcodeQrScanModal';
 
 // Safe dynamic glob import: guarantees vite build on Vercel/GitHub NEVER fails even if TrainingSlidesModal.tsx wasn't pushed yet
 const slideModules = import.meta.glob<{ TrainingSlidesModal: React.FC<{ isOpen: boolean; onClose: () => void }> }>(
@@ -289,6 +291,8 @@ export function App() {
   const [activeTab, setActiveTab] = useState<string>('dashboard');
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [isSmartSearchOpen, setIsSmartSearchOpen] = useState(false);
+  const [isBarcodeQrModalOpen, setIsBarcodeQrModalOpen] = useState(false);
+  const [selectedVisualCardMaterial, setSelectedVisualCardMaterial] = useState<Material | null>(null);
   const [isChangePasswordOpen, setIsChangePasswordOpen] = useState(false);
   const [isUserGuideOpen, setIsUserGuideOpen] = useState(false);
   const [isTrainingSlidesOpen, setIsTrainingSlidesOpen] = useState(false);
@@ -1082,6 +1086,7 @@ export function App() {
           onTabChange={setActiveTab}
           pendingApprovalsCount={transactions.filter((t) => t.status === 'PENDING').length}
           onOpenAiSearch={() => setIsSmartSearchOpen(true)}
+          onOpenQrScanner={() => setIsBarcodeQrModalOpen(true)}
           onLogout={handleLogout}
           onOpenChangePassword={() => setIsChangePasswordOpen(true)}
           onOpenUserGuide={() => setIsUserGuideOpen(true)}
@@ -1304,9 +1309,33 @@ export function App() {
         isOpen={isSmartSearchOpen}
         onClose={() => setIsSmartSearchOpen(false)}
         onApplyFilters={handleApplyNaturalFilters}
+        onOpenVisualCard={(mat) => setSelectedVisualCardMaterial(mat)}
         materials={materials}
         transactions={transactions}
       />
+
+      {/* Global Real-time Barcode / QR Camera & Súng Bắn Scanner Modal */}
+      {isBarcodeQrModalOpen && (
+        <BarcodeQrScanModal
+          isOpen={isBarcodeQrModalOpen}
+          onClose={() => setIsBarcodeQrModalOpen(false)}
+          materials={materials}
+          onSelectMaterial={(mat) => {
+            setSelectedVisualCardMaterial(mat);
+          }}
+        />
+      )}
+
+      {/* Global Visual Identification Card & Dossier Modal */}
+      {selectedVisualCardMaterial && (
+        <MaterialImageModal
+          material={selectedVisualCardMaterial}
+          isOpen={true}
+          onClose={() => setSelectedVisualCardMaterial(null)}
+          onOpenStockCard={handleOpenStockCard}
+          onCreateExport={(code) => handleOpenCreateTransaction('EXPORT', code)}
+        />
+      )}
 
       {/* Change Password Modal for Current User */}
       <ChangePasswordModal

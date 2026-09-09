@@ -209,6 +209,8 @@ export function parseGoogleSheetToMaterials(
   const stockIdx = findColIndex(headers, ['tồn kho', 'tồn đầu kỳ', 'số lượng', 'sl tồn', 'tồn', 'initial stock', 'stock', 'ton kho']);
   const priceIdx = findColIndex(headers, ['đơn giá', 'giá', 'giá tiêu chuẩn', 'price', 'unit price', 'don gia']);
   const specIdx = findColIndex(headers, ['quy cách', 'thông số', 'mô tả', 'specification', 'quy cach', 'thong so']);
+  const brandIdx = findColIndex(headers, ['hãng', 'hãng sản xuất', 'nhà sản xuất', 'brand', 'nsx', 'manufacturer', 'hang']);
+  const diffIdx = findColIndex(headers, ['điểm nhận diện', 'đặc điểm', 'phân biệt', 'chú ý', 'loại đầu', 'điện áp', 'differentiator', 'loai']);
   const noteIdx = findColIndex(headers, ['ghi chú', 'từ khóa', 'từ khóa tìm kiếm', 'notes', 'keywords', 'ghi chu']);
 
   // Map of existing materials by code
@@ -241,6 +243,8 @@ export function parseGoogleSheetToMaterials(
     const imageUrl = normalizeImageSourceUrl(rawImage);
     const location = locationIdx !== -1 && row[locationIdx] ? row[locationIdx].trim() : 'Kho Tổng';
     const spec = specIdx !== -1 && row[specIdx] ? row[specIdx].trim() : '';
+    const rawBrand = brandIdx !== -1 && row[brandIdx] ? row[brandIdx].trim() : '';
+    const rawDiff = diffIdx !== -1 && row[diffIdx] ? row[diffIdx].trim() : '';
     const notes = noteIdx !== -1 && row[noteIdx] ? row[noteIdx].trim() : '';
 
     let initialStock = 0;
@@ -273,16 +277,12 @@ export function parseGoogleSheetToMaterials(
       allocatedStaffEmails: existing?.allocatedStaffEmails || [],
       notes: notes || existing?.notes || '',
       image: imageUrl || existing?.image || '',
+      brand: rawBrand || existing?.brand || '',
+      differentiator: rawDiff || existing?.differentiator || '',
+      barcode: rawBarcode || (existing as any)?.barcode || '',
+      qrCode: rawQr || (existing as any)?.qrCode || '',
       updatedAt: new Date().toISOString(),
     };
-
-    // Store custom barcode & qr if present
-    if (rawBarcode) {
-      (materialObj as any).barcode = rawBarcode;
-    }
-    if (rawQr) {
-      (materialObj as any).qrCode = rawQr;
-    }
 
     parsedMaterials.push(materialObj);
 
