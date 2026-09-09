@@ -19,7 +19,6 @@ import {
   Lock,
   Download,
   Lightbulb,
-  Presentation,
 } from 'lucide-react';
 import { User } from '../types';
 import { printCleanDocument } from '../utils/printHelper';
@@ -28,14 +27,12 @@ interface UserGuideModalProps {
   isOpen: boolean;
   onClose: () => void;
   currentUser: User;
-  onOpenTrainingSlides?: () => void;
 }
 
 export const UserGuideModal: React.FC<UserGuideModalProps> = ({
   isOpen,
   onClose,
   currentUser,
-  onOpenTrainingSlides,
 }) => {
   const [activeRoleTab, setActiveRoleTab] = useState<'EMPLOYEE' | 'MANAGER' | 'SCENARIOS' | 'TIPS'>(
     currentUser.role === 'ADMIN' ? 'MANAGER' : 'EMPLOYEE'
@@ -73,19 +70,6 @@ export const UserGuideModal: React.FC<UserGuideModalProps> = ({
           </div>
 
           <div className="flex items-center gap-2 shrink-0 no-print">
-            {onOpenTrainingSlides && (
-              <button
-                onClick={() => {
-                  onClose();
-                  onOpenTrainingSlides();
-                }}
-                className="bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white border border-blue-400/40 px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-md transition-all"
-                title="Mở Slide PowerPoint đào tạo nhân viên"
-              >
-                <Presentation className="w-4 h-4 text-cyan-200 animate-pulse" />
-                <span>Mở Slide Đào Tạo (PPTX)</span>
-              </button>
-            )}
             <button
               onClick={handlePrint}
               className="bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors"

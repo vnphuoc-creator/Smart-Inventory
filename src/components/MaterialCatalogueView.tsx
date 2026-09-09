@@ -554,12 +554,13 @@ export const MaterialCatalogueView: React.FC<MaterialCatalogueViewProps> = ({
           <div className="flex items-center gap-2 flex-wrap">
             <button
               type="button"
+              id="btn-catalogue-scan-qr"
               onClick={() => setIsBarcodeQrModalOpen(true)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-purple-900/80 via-indigo-900/80 to-blue-900/80 hover:from-purple-800 hover:to-indigo-800 border border-purple-500/50 text-purple-200 hover:text-white font-bold text-xs transition shadow-sm"
-              title="Quét mã QR / Barcode để đối chiếu ảnh thật"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-750 border border-slate-700 text-slate-200 hover:text-cyan-300 font-semibold text-xs transition shadow-sm"
+              title="Quét mã QR / Barcode để tra cứu thông số & ảnh thật"
             >
-              <Camera className="w-3.5 h-3.5 text-purple-300" />
-              <span>Ảnh Thật &amp; Quét Mã</span>
+              <QrCode className="w-3.5 h-3.5 text-cyan-400" />
+              <span>Quét mã tra cứu</span>
             </button>
 
             <button

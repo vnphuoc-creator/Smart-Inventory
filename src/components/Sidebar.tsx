@@ -25,7 +25,6 @@ interface SidebarProps {
   onLogout: () => void;
   onOpenChangePassword?: () => void;
   onOpenUserGuide?: () => void;
-  onOpenTrainingSlides?: () => void;
   isOpenMobile: boolean;
   onToggleMobile: () => void;
 }
@@ -38,7 +37,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onLogout,
   onOpenChangePassword,
   onOpenUserGuide,
-  onOpenTrainingSlides,
   isOpenMobile,
   onToggleMobile,
 }) => {

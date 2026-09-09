@@ -12,7 +12,6 @@ import {
   BookOpen,
   Clock,
   Calendar,
-  Presentation,
   Camera,
   QrCode,
 } from 'lucide-react';
@@ -30,7 +29,6 @@ interface NavbarProps {
   onLogout?: () => void;
   onOpenChangePassword?: () => void;
   onOpenUserGuide?: () => void;
-  onOpenTrainingSlides?: () => void;
   onToggleSidebar?: () => void;
   theme?: 'dark' | 'light';
   onToggleTheme?: () => void;
@@ -46,7 +44,6 @@ export const Navbar: React.FC<NavbarProps> = ({
   onLogout,
   onOpenChangePassword,
   onOpenUserGuide,
-  onOpenTrainingSlides,
   onToggleSidebar,
   theme = 'dark',
   onToggleTheme,
@@ -163,54 +160,62 @@ export const Navbar: React.FC<NavbarProps> = ({
             </div>
           </div>
 
-          {/* Center: AI Search Trigger Bar (Exact match with screenshot) */}
-          <div className="hidden md:flex flex-1 max-w-md mx-4">
+          {/* Center: Search & Scan Toolbar */}
+          <div className="hidden md:flex flex-1 max-w-lg mx-3 lg:mx-6 items-center gap-2">
             <button
               type="button"
               id="btn-ai-search-quick"
               onClick={onOpenAiSearch}
-              className="w-full flex items-center justify-between bg-slate-950/80 hover:bg-slate-950 border border-slate-700/80 hover:border-blue-500/80 text-slate-400 hover:text-slate-200 px-4 py-2 rounded-xl text-xs transition-all shadow-inner group"
+              className="flex-1 flex items-center justify-between bg-slate-950/70 hover:bg-slate-950 border border-slate-700/80 hover:border-cyan-500/60 text-slate-400 hover:text-slate-200 px-3.5 py-2 rounded-xl text-xs transition-all shadow-inner group"
             >
               <div className="flex items-center gap-2 truncate">
-                <Sparkles className="w-3.5 h-3.5 text-amber-400 group-hover:rotate-12 transition-transform" />
-                <span className="truncate">Tìm kiếm nhanh mã DN_* bằng AI...</span>
+                <Sparkles className="w-3.5 h-3.5 text-cyan-400 group-hover:rotate-12 transition-transform shrink-0" />
+                <span className="truncate text-slate-400 group-hover:text-slate-200">Tìm kiếm vật tư, mã DN_*, vị trí kho...</span>
               </div>
-              <span className="text-[10px] bg-purple-900/60 text-purple-300 border border-purple-500/40 px-1.5 py-0.5 rounded font-mono font-bold">
-                AI
+              <span className="text-[10px] bg-slate-900 text-cyan-300 border border-cyan-500/30 px-1.5 py-0.5 rounded font-mono font-bold shrink-0">
+                Tìm nhanh
               </span>
             </button>
-          </div>
 
-          {/* Right Section: Theme toggle & User Menu */}
-          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
-            {/* Quick Barcode/QR & Visual Identification Scanner Button */}
             {onOpenQrScanner && (
               <button
                 type="button"
-                id="btn-header-visual-qr-scan"
+                id="btn-header-qr-scanner"
                 onClick={onOpenQrScanner}
-                className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl bg-gradient-to-r from-purple-950/80 via-indigo-950/80 to-blue-950/80 hover:from-purple-900 hover:to-indigo-900 border border-purple-500/50 text-purple-200 hover:text-white text-xs font-bold transition shadow-sm group"
-                title="Quét mã QR / Barcode và xem Thẻ Nhận Diện Ảnh Thật"
+                className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-slate-700/80 hover:border-cyan-500/60 text-slate-300 hover:text-cyan-300 text-xs font-semibold transition-all shadow-sm shrink-0 group"
+                title="Quét mã vạch Barcode hoặc QR bằng Camera / Máy quét súng"
               >
-                <Camera className="w-3.5 h-3.5 text-purple-400 group-hover:scale-110 transition-transform" />
-                <span className="hidden sm:inline">Ảnh Thật &amp; Quét Mã</span>
-                <span className="sm:hidden font-mono text-[11px]">Quét QR</span>
+                <QrCode className="w-3.5 h-3.5 text-cyan-400 group-hover:scale-110 transition-transform" />
+                <span>Quét mã</span>
+              </button>
+            )}
+          </div>
+
+          {/* Right Section: Mobile search/scan & Theme toggle & User Menu */}
+          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+            {/* Mobile Scan Button */}
+            {onOpenQrScanner && (
+              <button
+                type="button"
+                id="btn-header-qr-mobile"
+                onClick={onOpenQrScanner}
+                className="md:hidden flex items-center justify-center p-2 rounded-xl bg-slate-800 hover:bg-slate-750 border border-slate-700 text-slate-300 hover:text-cyan-300 text-xs transition shadow-sm"
+                title="Quét mã QR / Barcode"
+              >
+                <QrCode className="w-4 h-4 text-cyan-400" />
               </button>
             )}
 
-            {/* Quick Training Slides Button */}
-            {onOpenTrainingSlides && (
-              <button
-                type="button"
-                id="btn-header-training-slides"
-                onClick={onOpenTrainingSlides}
-                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-gradient-to-r from-blue-900/60 to-indigo-900/60 hover:from-blue-800 hover:to-indigo-800 border border-blue-500/40 text-cyan-300 hover:text-white text-xs font-bold transition shadow-sm"
-                title="Mở Slide PowerPoint đào tạo nhân viên kho"
-              >
-                <Presentation className="w-3.5 h-3.5 text-cyan-400 animate-pulse" />
-                <span className="hidden sm:inline">Slide Đào Tạo (PPTX)</span>
-              </button>
-            )}
+            {/* Mobile Search Button */}
+            <button
+              type="button"
+              id="btn-header-search-mobile"
+              onClick={onOpenAiSearch}
+              className="md:hidden flex items-center justify-center p-2 rounded-xl bg-slate-800 hover:bg-slate-750 border border-slate-700 text-slate-300 hover:text-cyan-300 text-xs transition shadow-sm"
+              title="Tìm kiếm thông minh"
+            >
+              <Sparkles className="w-4 h-4 text-cyan-400" />
+            </button>
 
             {/* Light / Dark Mode Toggle Button */}
             {onToggleTheme && (
@@ -303,21 +308,6 @@ export const Navbar: React.FC<NavbarProps> = ({
                   </div>
 
                   <div className="space-y-1">
-                    {onOpenTrainingSlides && (
-                      <button
-                        type="button"
-                        id="btn-user-dropdown-training-slides"
-                        onClick={() => {
-                          setShowUserDropdown(false);
-                          onOpenTrainingSlides();
-                        }}
-                        className="w-full flex items-center gap-2.5 px-3 py-2 text-xs text-cyan-300 hover:text-white hover:bg-blue-900/40 rounded-xl transition-colors text-left font-bold"
-                      >
-                        <Presentation className="w-4 h-4 text-cyan-400" />
-                        <span>Slide Đào Tạo PowerPoint (.pptx)</span>
-                      </button>
-                    )}
-
                     {onOpenUserGuide && (
                       <button
                         type="button"
