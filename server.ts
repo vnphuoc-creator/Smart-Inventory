@@ -41,6 +41,60 @@ app.get("/api/health", (req, res) => {
   });
 });
 
+// Proxy for fetching Google Sheet CSV to avoid browser CORS restrictions
+app.post("/api/sync/google-sheet", async (req, res) => {
+  const { sheetUrl } = req.body;
+  if (!sheetUrl || typeof sheetUrl !== "string") {
+    return res.status(400).json({ error: "sheetUrl is required" });
+  }
+
+  try {
+    const idMatch = sheetUrl.match(/\/spreadsheets\/(?:d|u\/\d+\/d)\/([a-zA-Z0-9-_]+)/i);
+    const sheetId = idMatch ? idMatch[1] : null;
+    const gidMatch = sheetUrl.match(/[#&?]gid=([0-9]+)/i);
+    const gid = gidMatch ? gidMatch[1] : "0";
+
+    if (!sheetId) {
+      return res.status(400).json({ error: "Không tìm thấy Sheet ID hợp lệ từ URL được cung cấp" });
+    }
+
+    // Try standard export URL
+    const csvUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=csv&gid=${gid}`;
+    const response = await fetch(csvUrl, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+      },
+      redirect: "follow",
+    });
+
+    if (response.ok) {
+      const csvText = await response.text();
+      return res.json({ success: true, csvText, sheetId, gid });
+    }
+
+    // Secondary fallback: GViz API
+    const gvizUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:csv&gid=${gid}`;
+    const gvizRes = await fetch(gvizUrl, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+      },
+      redirect: "follow",
+    });
+
+    if (gvizRes.ok) {
+      const csvText = await gvizRes.text();
+      return res.json({ success: true, csvText, sheetId, gid });
+    }
+
+    return res.status(response.status).json({
+      error: `Google trả về mã ${response.status}. Vui lòng kiểm tra quyền chia sẻ "Bất kỳ ai có đường liên kết đều có thể xem" trên Google Sheet.`,
+    });
+  } catch (err: any) {
+    console.error("Error fetching Google Sheet in server:", err);
+    return res.status(500).json({ error: err?.message || "Lỗi máy chủ khi đọc Google Sheet" });
+  }
+});
+
 // Natural Language Search and Query interpretation for materials & transactions
 app.post("/api/ai/query", async (req, res) => {
   const { query, materialsSummary, transactionsSummary, proposalsSummary } = req.body;

@@ -17,6 +17,7 @@ import {
   FileSpreadsheet,
   Check,
   XCircle,
+  Presentation,
 } from 'lucide-react';
 import {
   BarChart,
@@ -48,6 +49,7 @@ interface DashboardViewProps {
   onApproveTransaction: (txId: string) => void;
   onRejectTransaction: (txId: string) => void;
   onOpenStockCard: (materialCode: string) => void;
+  onOpenTrainingSlides?: () => void;
 }
 
 const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#06b6d4', '#64748b'];
@@ -61,6 +63,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   onApproveTransaction,
   onRejectTransaction,
   onOpenStockCard,
+  onOpenTrainingSlides,
 }) => {
   // Aggregate Metrics
   const totalMaterialCount = calculatedStocks.length;
@@ -135,6 +138,40 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Featured Training Slide Presentation Banner for Staff & Managers */}
+      {onOpenTrainingSlides && (
+        <div className="bg-gradient-to-r from-blue-950/90 via-indigo-950/80 to-slate-900 border border-blue-500/40 rounded-2xl p-4 sm:p-5 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-xl shadow-blue-950/30 animate-in fade-in">
+          <div className="flex items-center gap-3.5 min-w-0">
+            <div className="w-11 h-11 rounded-2xl bg-blue-600/20 text-cyan-400 border border-blue-500/40 flex items-center justify-center shrink-0 shadow-inner">
+              <Presentation className="w-6 h-6 animate-pulse" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h4 className="text-sm sm:text-base font-bold text-white tracking-tight">
+                  Chương Trình Đào Tạo Vận Hành Kho Thông Minh (Slide PowerPoint)
+                </h4>
+                <span className="text-[10px] bg-gradient-to-r from-cyan-500/20 to-blue-500/20 text-cyan-300 border border-cyan-400/40 px-2 py-0.5 rounded-full font-bold">
+                  Khóa 2026
+                </span>
+              </div>
+              <p className="text-xs text-slate-300 mt-0.5 leading-relaxed">
+                Tài liệu huấn luyện trực quan 16:9 dành cho Thủ kho & Kỹ thuật viên: Lập phiếu, quét ảnh Tờ trình AI OCR, theo dõi Thẻ kho và đối soát tiến độ mua sắm.
+              </p>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            id="btn-dashboard-open-training-slides"
+            onClick={onOpenTrainingSlides}
+            className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 via-indigo-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white text-xs font-bold flex items-center gap-2 shadow-lg shadow-blue-900/40 shrink-0 transition-all border border-blue-400/30 cursor-pointer group"
+          >
+            <Presentation className="w-4 h-4 text-cyan-200 group-hover:scale-110 transition-transform" />
+            <span>Mở Slide Trình Chiếu (PPTX)</span>
+          </button>
+        </div>
+      )}
 
       {/* 3 Quick Action Hub Cards for New & Regular Users */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

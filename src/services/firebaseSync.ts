@@ -12,7 +12,7 @@ import {
   limit,
 } from 'firebase/firestore';
 import { db } from '../firebase';
-import { User, Material, PurchaseProposal, InventoryTransaction, ActivityLog } from '../types';
+import { User, Material, PurchaseProposal, InventoryTransaction, ActivityLog, ActivityActionType } from '../types';
 import { normalizeProposalNumber, isProposalMatch } from '../utils/inventoryEngine';
 
 // Collection references
@@ -859,6 +859,36 @@ export async function saveLogToCloud(log: ActivityLog) {
   }
 }
 
+export async function logActivityToCloud(params: {
+  userId?: string;
+  userEmail?: string;
+  userName?: string;
+  userRole?: any;
+  action: ActivityActionType;
+  actionTitle?: string;
+  details?: string;
+  description?: string;
+  targetType?: 'TRANSACTION' | 'PROPOSAL' | 'MATERIAL' | 'SYSTEM' | 'AUTH';
+  documentCode?: string;
+  proposalNumber?: string;
+  amount?: number;
+  timestamp?: string;
+}) {
+  const log: ActivityLog = {
+    id: `log_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+    userId: params.userId || '',
+    userEmail: params.userEmail || '',
+    userName: params.userName || '',
+    userRole: params.userRole || 'ADMIN',
+    action: params.action,
+    actionTitle: params.actionTitle || params.description || 'Thao tác hệ thống',
+    details: params.details || params.description || '',
+    targetType: params.targetType || 'MATERIAL',
+    timestamp: params.timestamp || new Date().toISOString(),
+  };
+  return saveLogToCloud(log);
+}
+
 export async function deleteLogFromCloud(logId: string) {
   try {
     const ref = doc(db, LOGS_COL, logId);
@@ -905,6 +935,10 @@ export interface SystemSettingsConfig {
   themeConfig?: any;
   updatedAt?: string;
   updatedBy?: string;
+  googleSheetUrl?: string;
+  googleSheetAutoSync?: boolean;
+  googleSheetLastSyncedAt?: string;
+  googleSheetTotalItems?: number;
 }
 
 const SETTINGS_DOC_ID = 'general_config';

@@ -66,6 +66,7 @@ import { ExcelStockImportModal } from './ExcelStockImportModal';
 import { SearchableMaterialSelect } from './SearchableMaterialSelect';
 import { ThemeCustomizerView } from './ThemeCustomizerView';
 import { SmartMaterialImportSection } from './SmartMaterialImportSection';
+import { GoogleSheetSyncSection } from './GoogleSheetSyncSection';
 
 interface SettingsViewProps {
   currentUser: User;
@@ -120,8 +121,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     currentUser.email.toLowerCase().trim() === 'vn.phuoc235';
 
   const [activeTab, setActiveTab] = useState<
-    'ACTIVITY_LOGS' | 'CUSTOMIZE_UI' | 'IMPORT_SMART' | 'UNITS_PASSWORD' | 'LOGO_COMPANY' | 'IMPORT_STOCK' | 'BACKUP'
-  >(isMasterAdmin ? 'ACTIVITY_LOGS' : 'IMPORT_SMART');
+    'SHEET_SYNC' | 'ACTIVITY_LOGS' | 'CUSTOMIZE_UI' | 'IMPORT_SMART' | 'UNITS_PASSWORD' | 'LOGO_COMPANY' | 'IMPORT_STOCK' | 'BACKUP'
+  >(isMasterAdmin ? 'SHEET_SYNC' : 'IMPORT_SMART');
 
   // --- UNIT MANAGEMENT STATE ---
   const [units, setUnits] = useState<string[]>(() => {
@@ -605,126 +606,174 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   return (
     <div className="space-y-6 pb-12">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-lg flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <div className="flex items-center gap-2.5">
+          <div className="flex items-center gap-2.5 flex-wrap">
             <h1 className="text-xl font-bold text-white tracking-tight flex items-center gap-2">
               <Settings className="w-5 h-5 text-blue-400" />
-              Cài Đặt Hệ Thống
+              Cài Đặt Hệ Thống &amp; Quản Trị Kho
             </h1>
-            <span className="bg-blue-600/30 text-blue-300 border border-blue-500/40 text-xs px-2.5 py-0.5 rounded-full font-bold">
+            <span
+              className={`text-xs px-2.5 py-0.5 rounded-full font-bold border ${
+                isMasterAdmin
+                  ? 'bg-amber-500/20 text-amber-300 border-amber-500/40 shadow-xs'
+                  : 'bg-blue-600/30 text-blue-300 border-blue-500/40'
+              }`}
+            >
               {isMasterAdmin ? 'Master Admin' : 'Quản Trị Viên'}
             </span>
           </div>
           <p className="text-xs text-slate-400 mt-1">
-            Theo dõi nhật ký nhân viên nhập/xuất kho real-time, cấu hình đơn vị tính, bảo mật và mẫu biểu AHT
+            Đồng bộ Google Sheet 2 chiều, theo dõi nhật ký hoạt động, bảo mật tài khoản và cấu hình mẫu biểu AHT
           </p>
         </div>
 
-        {/* Quick button to open Smart Material Importer */}
-        <button
-          onClick={() => setActiveTab('IMPORT_SMART')}
-          className="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2 transition-all shadow-md shadow-emerald-600/30 shrink-0"
-        >
-          <Sparkles className="w-4 h-4" />
-          <span>Import Vật Tư Đa Năng (AI / Excel / Word / Ảnh)</span>
-        </button>
+        {/* User Badge & Cloud Status */}
+        <div className="flex items-center gap-3 self-start md:self-auto bg-slate-950/70 border border-slate-800 px-3.5 py-2 rounded-xl text-xs">
+          <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></div>
+          <div className="text-left">
+            <div className="text-white font-semibold text-[11px] leading-tight flex items-center gap-1.5">
+              <span>{currentUser.fullName}</span>
+              <span className="text-[10px] text-slate-400 font-mono">({currentUser.email})</span>
+            </div>
+            <div className="text-[10px] text-emerald-400 font-medium">Cloud Firestore Real-time</div>
+          </div>
+        </div>
       </div>
 
-      {/* Navigation Tabs */}
-      <div className="flex border-b border-slate-800 gap-2 overflow-x-auto no-scrollbar">
-        {/* Tab 1: Real-time Activity Logs (Restricted to vn.phuoc235) */}
-        {isMasterAdmin && (
+      {/* Streamlined Navigation Tabs Bar */}
+      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-1.5 shadow-md">
+        <div className="flex gap-1.5 overflow-x-auto no-scrollbar py-0.5">
+          {/* Master Only: Google Sheet Sync */}
+          {isMasterAdmin && (
+            <button
+              type="button"
+              id="tab-sheet-sync"
+              onClick={() => setActiveTab('SHEET_SYNC')}
+              className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition-all whitespace-nowrap ${
+                activeTab === 'SHEET_SYNC'
+                  ? 'bg-emerald-600 text-white shadow-md shadow-emerald-950/50'
+                  : 'text-slate-300 hover:text-white hover:bg-slate-800/80'
+              }`}
+            >
+              <FileSpreadsheet className="w-4 h-4 text-emerald-300" />
+              <span>Đồng Bộ Google Sheet</span>
+              <span className="px-1.5 py-0.2 rounded-md text-[9px] font-extrabold bg-amber-400/20 text-amber-300 border border-amber-400/40 uppercase">
+                Master
+              </span>
+            </button>
+          )}
+
+          {/* Master Only: Activity Logs */}
+          {isMasterAdmin && (
+            <button
+              type="button"
+              id="tab-activity-logs"
+              onClick={() => setActiveTab('ACTIVITY_LOGS')}
+              className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition-all whitespace-nowrap ${
+                activeTab === 'ACTIVITY_LOGS'
+                  ? 'bg-amber-600 text-white shadow-md shadow-amber-950/50'
+                  : 'text-slate-300 hover:text-white hover:bg-slate-800/80'
+              }`}
+            >
+              <Activity className="w-4 h-4 text-amber-300" />
+              <span>Nhật Ký Thao Tác</span>
+              <span className="px-1.5 py-0.2 rounded-md text-[9px] font-mono bg-slate-950/60 text-amber-200">
+                {activityLogs.length}
+              </span>
+            </button>
+          )}
+
+          {/* Smart Importer */}
           <button
-            onClick={() => setActiveTab('ACTIVITY_LOGS')}
-            className={`px-4 py-3 text-xs font-bold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${
-              activeTab === 'ACTIVITY_LOGS'
-                ? 'border-amber-500 text-amber-400 bg-amber-500/10 rounded-t-xl'
-                : 'border-transparent text-slate-400 hover:text-slate-200'
+            type="button"
+            id="tab-import-smart"
+            onClick={() => setActiveTab('IMPORT_SMART')}
+            className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition-all whitespace-nowrap ${
+              activeTab === 'IMPORT_SMART'
+                ? 'bg-blue-600 text-white shadow-md shadow-blue-950/50'
+                : 'text-slate-300 hover:text-white hover:bg-slate-800/80'
             }`}
           >
-            <Activity className="w-4 h-4 text-amber-400" />
-            <span>Lịch Sử Thao Tác Real-Time</span>
-            <span className="px-1.5 py-0.5 rounded-full text-[10px] bg-amber-500/20 text-amber-300 font-mono">
-              {activityLogs.length}
-            </span>
+            <Sparkles className="w-4 h-4 text-cyan-400" />
+            <span>Nhập Vật Tư Đa Năng</span>
           </button>
-        )}
 
-        <button
-          onClick={() => setActiveTab('IMPORT_SMART')}
-          className={`px-4 py-3 text-xs font-bold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${
-            activeTab === 'IMPORT_SMART'
-              ? 'border-emerald-500 text-emerald-400 bg-emerald-500/10 rounded-t-xl'
-              : 'border-transparent text-slate-400 hover:text-slate-200'
-          }`}
-        >
-          <Sparkles className="w-4 h-4 text-emerald-400" />
-          <span>Import Vật Tư Đa Năng</span>
-          <span className="px-1.5 py-0.5 rounded-full text-[10px] bg-emerald-500/20 text-emerald-300 font-bold">
-            Excel/Word/Ảnh/Sheets
-          </span>
-        </button>
+          {/* Excel Stock Importer */}
+          <button
+            type="button"
+            id="tab-import-stock"
+            onClick={() => setActiveTab('IMPORT_STOCK')}
+            className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition-all whitespace-nowrap ${
+              activeTab === 'IMPORT_STOCK'
+                ? 'bg-blue-600 text-white shadow-md shadow-blue-950/50'
+                : 'text-slate-300 hover:text-white hover:bg-slate-800/80'
+            }`}
+          >
+            <Upload className="w-4 h-4 text-emerald-400" />
+            <span>Tồn Đầu Kỳ (Excel)</span>
+          </button>
 
-        <button
-          onClick={() => setActiveTab('CUSTOMIZE_UI')}
-          className={`px-4 py-3 text-xs font-bold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${
-            activeTab === 'CUSTOMIZE_UI'
-              ? 'border-blue-500 text-blue-400 bg-blue-500/10 rounded-t-xl'
-              : 'border-transparent text-slate-400 hover:text-slate-200'
-          }`}
-        >
-          <Palette className="w-4 h-4 text-blue-400" />
-          <span>Tùy Biến Thiết Kế Giao Diện</span>
-        </button>
+          {/* Units & Password */}
+          <button
+            type="button"
+            id="tab-units-password"
+            onClick={() => setActiveTab('UNITS_PASSWORD')}
+            className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition-all whitespace-nowrap ${
+              activeTab === 'UNITS_PASSWORD'
+                ? 'bg-blue-600 text-white shadow-md shadow-blue-950/50'
+                : 'text-slate-300 hover:text-white hover:bg-slate-800/80'
+            }`}
+          >
+            <KeyRound className="w-4 h-4 text-indigo-400" />
+            <span>Đơn Vị &amp; Đổi Mật Khẩu</span>
+          </button>
 
-        <button
-          onClick={() => setActiveTab('UNITS_PASSWORD')}
-          className={`px-4 py-3 text-xs font-bold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${
-            activeTab === 'UNITS_PASSWORD'
-              ? 'border-blue-500 text-blue-400 bg-blue-500/10 rounded-t-xl'
-              : 'border-transparent text-slate-400 hover:text-slate-200'
-          }`}
-        >
-          <Layers className="w-4 h-4" />
-          <span>Đơn Vị Tính &amp; Đổi Mật Khẩu</span>
-        </button>
+          {/* Organization & Logo */}
+          <button
+            type="button"
+            id="tab-logo-company"
+            onClick={() => setActiveTab('LOGO_COMPANY')}
+            className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition-all whitespace-nowrap ${
+              activeTab === 'LOGO_COMPANY'
+                ? 'bg-blue-600 text-white shadow-md shadow-blue-950/50'
+                : 'text-slate-300 hover:text-white hover:bg-slate-800/80'
+            }`}
+          >
+            <Building2 className="w-4 h-4 text-blue-400" />
+            <span>Đơn Vị &amp; Logo AHT</span>
+          </button>
 
-        <button
-          onClick={() => setActiveTab('LOGO_COMPANY')}
-          className={`px-4 py-3 text-xs font-bold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${
-            activeTab === 'LOGO_COMPANY'
-              ? 'border-blue-500 text-blue-400 bg-blue-500/10 rounded-t-xl'
-              : 'border-transparent text-slate-400 hover:text-slate-200'
-          }`}
-        >
-          <Building2 className="w-4 h-4" />
-          <span>Logo &amp; Doanh Nghiệp (AHT)</span>
-        </button>
+          {/* UI Customizer */}
+          <button
+            type="button"
+            id="tab-customize-ui"
+            onClick={() => setActiveTab('CUSTOMIZE_UI')}
+            className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition-all whitespace-nowrap ${
+              activeTab === 'CUSTOMIZE_UI'
+                ? 'bg-blue-600 text-white shadow-md shadow-blue-950/50'
+                : 'text-slate-300 hover:text-white hover:bg-slate-800/80'
+            }`}
+          >
+            <Palette className="w-4 h-4 text-pink-400" />
+            <span>Giao Diện &amp; Màu Sắc</span>
+          </button>
 
-        <button
-          onClick={() => setActiveTab('IMPORT_STOCK')}
-          className={`px-4 py-3 text-xs font-bold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${
-            activeTab === 'IMPORT_STOCK'
-              ? 'border-blue-500 text-blue-400 bg-blue-500/10 rounded-t-xl'
-              : 'border-transparent text-slate-400 hover:text-slate-200'
-          }`}
-        >
-          <FileSpreadsheet className="w-4 h-4 text-emerald-400" />
-          <span>Import File Tồn Kho (Excel / CSV)</span>
-        </button>
-
-        <button
-          onClick={() => setActiveTab('BACKUP')}
-          className={`px-4 py-3 text-xs font-bold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${
-            activeTab === 'BACKUP'
-              ? 'border-blue-500 text-blue-400 bg-blue-500/10 rounded-t-xl'
-              : 'border-transparent text-slate-400 hover:text-slate-200'
-          }`}
-        >
-          <Database className="w-4 h-4" />
-          <span>Sao Lưu &amp; Dữ Liệu</span>
-        </button>
+          {/* Backup */}
+          <button
+            type="button"
+            id="tab-backup"
+            onClick={() => setActiveTab('BACKUP')}
+            className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition-all whitespace-nowrap ${
+              activeTab === 'BACKUP'
+                ? 'bg-blue-600 text-white shadow-md shadow-blue-950/50'
+                : 'text-slate-300 hover:text-white hover:bg-slate-800/80'
+            }`}
+          >
+            <Database className="w-4 h-4 text-slate-400" />
+            <span>Sao Lưu Dữ Liệu</span>
+          </button>
+        </div>
       </div>
 
       {/* Toast Notification */}
@@ -733,6 +782,16 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
           <CheckCircle2 className="w-4 h-4 shrink-0 text-blue-400" />
           <span>{unitToast}</span>
         </div>
+      )}
+
+      {/* ===================== TAB: MASTER GOOGLE SHEET LIVE SYNC ===================== */}
+      {activeTab === 'SHEET_SYNC' && isMasterAdmin && (
+        <GoogleSheetSyncSection
+          currentUser={currentUser}
+          currentMaterials={materials}
+          onApplyMaterialsUpdate={onUpdateMaterials || (() => {})}
+          onShowToast={onShowToast}
+        />
       )}
 
       {/* ===================== TAB: REAL-TIME AUDIT LOGS ===================== */}
@@ -1027,6 +1086,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                           ) : log.action.includes('PROPOSAL') ? (
                             <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-purple-500/10 text-purple-400 border border-purple-500/20">
                               <FileText className="w-3 h-3" /> Tờ trình
+                            </span>
+                          ) : log.action === 'SHEET_SYNC' ? (
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
+                              <FileSpreadsheet className="w-3 h-3 text-emerald-400" /> Đồng bộ Sheet
                             </span>
                           ) : (
                             <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-slate-800 text-slate-300 border border-slate-700">

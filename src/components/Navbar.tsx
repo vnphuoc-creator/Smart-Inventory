@@ -12,6 +12,7 @@ import {
   BookOpen,
   Clock,
   Calendar,
+  Presentation,
 } from 'lucide-react';
 import { User } from '../types';
 import { SeagullMascotWelcome } from './SeagullMascotWelcome';
@@ -26,6 +27,7 @@ interface NavbarProps {
   onLogout?: () => void;
   onOpenChangePassword?: () => void;
   onOpenUserGuide?: () => void;
+  onOpenTrainingSlides?: () => void;
   onToggleSidebar?: () => void;
   theme?: 'dark' | 'light';
   onToggleTheme?: () => void;
@@ -40,6 +42,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   onLogout,
   onOpenChangePassword,
   onOpenUserGuide,
+  onOpenTrainingSlides,
   onToggleSidebar,
   theme = 'dark',
   onToggleTheme,
@@ -175,7 +178,21 @@ export const Navbar: React.FC<NavbarProps> = ({
           </div>
 
           {/* Right Section: Theme toggle & User Menu */}
-          <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
+          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+            {/* Quick Training Slides Button */}
+            {onOpenTrainingSlides && (
+              <button
+                type="button"
+                id="btn-header-training-slides"
+                onClick={onOpenTrainingSlides}
+                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-gradient-to-r from-blue-900/60 to-indigo-900/60 hover:from-blue-800 hover:to-indigo-800 border border-blue-500/40 text-cyan-300 hover:text-white text-xs font-bold transition shadow-sm"
+                title="Mở Slide PowerPoint đào tạo nhân viên kho"
+              >
+                <Presentation className="w-3.5 h-3.5 text-cyan-400 animate-pulse" />
+                <span className="hidden sm:inline">Slide Đào Tạo (PPTX)</span>
+              </button>
+            )}
+
             {/* Light / Dark Mode Toggle Button */}
             {onToggleTheme && (
               <button
@@ -192,12 +209,12 @@ export const Navbar: React.FC<NavbarProps> = ({
                 {theme === 'dark' ? (
                   <>
                     <Sun className="w-3.5 h-3.5 text-amber-400" />
-                    <span className="hidden sm:inline text-xs">Giao diện Sáng</span>
+                    <span className="hidden lg:inline text-xs">Giao diện Sáng</span>
                   </>
                 ) : (
                   <>
                     <Moon className="w-3.5 h-3.5 text-blue-600" />
-                    <span className="hidden sm:inline text-xs">Giao diện Tối</span>
+                    <span className="hidden lg:inline text-xs">Giao diện Tối</span>
                   </>
                 )}
               </button>
@@ -267,6 +284,21 @@ export const Navbar: React.FC<NavbarProps> = ({
                   </div>
 
                   <div className="space-y-1">
+                    {onOpenTrainingSlides && (
+                      <button
+                        type="button"
+                        id="btn-user-dropdown-training-slides"
+                        onClick={() => {
+                          setShowUserDropdown(false);
+                          onOpenTrainingSlides();
+                        }}
+                        className="w-full flex items-center gap-2.5 px-3 py-2 text-xs text-cyan-300 hover:text-white hover:bg-blue-900/40 rounded-xl transition-colors text-left font-bold"
+                      >
+                        <Presentation className="w-4 h-4 text-cyan-400" />
+                        <span>Slide Đào Tạo PowerPoint (.pptx)</span>
+                      </button>
+                    )}
+
                     {onOpenUserGuide && (
                       <button
                         type="button"

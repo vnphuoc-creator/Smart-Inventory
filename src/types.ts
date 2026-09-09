@@ -185,6 +185,7 @@ export type ActivityActionType =
   | 'UPDATE_PROPOSAL'
   | 'DELETE_PROPOSAL'
   | 'EXCEL_IMPORT'
+  | 'SHEET_SYNC'
   | 'UPDATE_MATERIAL'
   | 'DELETE_MATERIAL'
   | 'CLEAR_DATA'
