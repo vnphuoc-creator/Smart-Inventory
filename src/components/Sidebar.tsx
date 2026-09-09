@@ -10,10 +10,8 @@ import {
   Settings,
   LogOut,
   X,
-  BookOpen,
   Clock,
   Calendar,
-  Presentation,
 } from 'lucide-react';
 import { User } from '../types';
 import { AHTLogo } from './AHTLogo';
@@ -363,57 +361,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
               })}
             </div>
           </div>
-
-          {/* Quick User Guide Button */}
-          {onOpenUserGuide && (
-            <div className="pt-1">
-              <button
-                type="button"
-                id="btn-sidebar-user-guide"
-                onClick={() => {
-                  onOpenUserGuide();
-                  if (isOpenMobile) onToggleMobile();
-                }}
-                className="w-full flex items-center justify-between px-3 py-2 rounded-xl bg-slate-900/80 hover:bg-slate-800 border border-slate-800 text-slate-300 hover:text-white transition-all group"
-              >
-                <div className="flex items-center gap-2 min-w-0">
-                  <BookOpen className="w-3.5 h-3.5 text-cyan-400" />
-                  <span className="text-[11px] font-semibold truncate">
-                    Hướng dẫn sử dụng
-                  </span>
-                </div>
-                <span className="text-[10px] bg-slate-800 text-slate-400 px-1.5 py-0.2 rounded font-mono">
-                  v2.5
-                </span>
-              </button>
-            </div>
-          )}
-
-          {/* Training Slides Deck Button */}
-          {onOpenTrainingSlides && (
-            <div className="pt-1.5">
-              <button
-                type="button"
-                id="btn-sidebar-training-slides"
-                onClick={() => {
-                  onOpenTrainingSlides();
-                  if (isOpenMobile) onToggleMobile();
-                }}
-                className="w-full flex items-center justify-between px-3 py-2 rounded-xl bg-gradient-to-r from-blue-950/80 to-indigo-950/80 hover:from-blue-900/90 hover:to-indigo-900/90 border border-blue-600/40 text-blue-200 hover:text-white transition-all shadow-sm group"
-                title="Mở Slide PowerPoint đào tạo nhân viên kho"
-              >
-                <div className="flex items-center gap-2 min-w-0">
-                  <Presentation className="w-3.5 h-3.5 text-cyan-300 group-hover:scale-110 transition-transform" />
-                  <span className="text-[11px] font-bold truncate">
-                    Slide Đào Tạo (PPTX)
-                  </span>
-                </div>
-                <span className="text-[9px] bg-blue-500/30 text-cyan-300 border border-cyan-400/40 px-1.5 py-0.5 rounded-full font-bold font-mono">
-                  16:9
-                </span>
-              </button>
-            </div>
-          )}
         </nav>
 
         {/* Bottom User Box matching Original Screenshot */}
