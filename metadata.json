@@ -1,6 +1,6 @@
 {
   "name": "Hệ Thống Quản Lý Kho Vật Tư ĐNCT | Cảng HKQT Đà Nẵng",
-  "description": "Hệ thống Quản lý Xuất - Nhập - Tồn Vật tư thuộc đội ĐNCT",
+  "description": "Hệ thống Quản lý Xuất - Nhập - Tồn Vật tư, Sơ đồ kho thông minh và Quét mã QR/Barcode thuộc đội ĐNCT - Cảng HKQT Đà Nẵng",
   "requestFramePermissions": ["camera"],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

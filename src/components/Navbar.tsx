@@ -14,6 +14,7 @@ import {
   Calendar,
   Camera,
   QrCode,
+  Map,
 } from 'lucide-react';
 import { User } from '../types';
 import { SeagullMascotWelcome } from './SeagullMascotWelcome';
@@ -175,6 +176,21 @@ export const Navbar: React.FC<NavbarProps> = ({
               <span className="text-[10px] bg-slate-900 text-cyan-300 border border-cyan-500/30 px-1.5 py-0.5 rounded font-mono font-bold shrink-0">
                 Tìm nhanh
               </span>
+            </button>
+
+            <button
+              type="button"
+              id="btn-header-warehouse-map"
+              onClick={() => onTabChange('warehouse_map')}
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-xl border text-xs font-semibold transition-all shadow-sm shrink-0 group ${
+                activeTab === 'warehouse_map'
+                  ? 'bg-blue-600 text-white border-blue-500 shadow-blue-500/20'
+                  : 'bg-slate-900/90 hover:bg-slate-800 border-slate-700/80 hover:border-blue-500/60 text-slate-300 hover:text-blue-300'
+              }`}
+              title="Xem sơ đồ phòng kỹ thuật và 5 kệ vật tư 4 tầng"
+            >
+              <Map className="w-3.5 h-3.5 text-blue-400 group-hover:scale-110 transition-transform" />
+              <span>Sơ đồ kho</span>
             </button>
 
             {onOpenQrScanner && (

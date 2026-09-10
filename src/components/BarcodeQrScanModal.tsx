@@ -29,6 +29,7 @@ interface BarcodeQrScanModalProps {
   onClose: () => void;
   materials: Material[];
   onSelectMaterial: (material: Material) => void;
+  onOpenWarehouseMap?: (shelfCode: string) => void;
 }
 
 export const BarcodeQrScanModal: React.FC<BarcodeQrScanModalProps> = ({
@@ -36,6 +37,7 @@ export const BarcodeQrScanModal: React.FC<BarcodeQrScanModalProps> = ({
   onClose,
   materials,
   onSelectMaterial,
+  onOpenWarehouseMap,
 }) => {
   const [cameraActive, setCameraActive] = useState(false);
   const [isStartingCamera, setIsStartingCamera] = useState(false);
@@ -869,12 +871,56 @@ export const BarcodeQrScanModal: React.FC<BarcodeQrScanModalProps> = ({
               </button>
             </div>
           ) : scannedCode ? (
-            <div className="p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-center space-y-1">
-              <p className="font-semibold text-xs">Không tìm thấy mã "{scannedCode}" trong danh mục kho</p>
-              <p className="text-[11px] text-slate-400">
-                Hãy kiểm tra lại mã hoặc bấm vào một trong các món thử nghiệm bên dưới.
-              </p>
-            </div>
+            (() => {
+              const codeUp = scannedCode.toUpperCase().trim();
+              const isShelfMatch =
+                codeUp.includes('SHELF') ||
+                codeUp.includes('KE-0') ||
+                codeUp.includes('KE-') ||
+                codeUp.includes('TDN-') ||
+                codeUp.includes('CABINET') ||
+                codeUp.includes('KỆ');
+              
+              if (isShelfMatch) {
+                return (
+                  <div className="p-4 rounded-2xl bg-blue-950/50 border-2 border-blue-500/60 text-blue-200 text-center space-y-2 shadow-xl animate-in zoom-in-95">
+                    <div className="flex items-center justify-center gap-2 text-blue-300 font-bold text-xs">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                      <span>ĐÃ QUÉT THÀNH CÔNG MÃ QR KỆ KHO / TỦ ĐỒ NGHỀ:</span>
+                    </div>
+                    <div className="font-mono text-base font-black text-amber-300 bg-slate-900 px-3 py-1 rounded-xl border border-slate-700 inline-block">
+                      {scannedCode}
+                    </div>
+                    <p className="text-xs text-slate-300">
+                      Mã này là tem định danh vị trí khay kệ 4 tầng hoặc tủ kỹ thuật trong phòng kho ĐNCT.
+                    </p>
+                    {onOpenWarehouseMap && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          stopCamera();
+                          onOpenWarehouseMap(scannedCode);
+                          onClose();
+                        }}
+                        className="w-full py-2.5 px-4 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-lg shadow-blue-600/30 transition mt-2"
+                      >
+                        <Eye className="w-4 h-4" />
+                        <span>Mở Sơ Đồ Kho &amp; Xem Danh Sách Vật Tư Tại Kệ Này</span>
+                      </button>
+                    )}
+                  </div>
+                );
+              }
+
+              return (
+                <div className="p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-center space-y-1">
+                  <p className="font-semibold text-xs">Không tìm thấy mã "{scannedCode}" trong danh mục kho</p>
+                  <p className="text-[11px] text-slate-400">
+                    Hãy kiểm tra lại mã hoặc bấm vào một trong các món thử nghiệm bên dưới.
+                  </p>
+                </div>
+              );
+            })()
           ) : null}
 
           {/* Quick Demo Test Chips */}

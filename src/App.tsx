@@ -15,6 +15,7 @@ import { ChangePasswordModal } from './components/ChangePasswordModal';
 import { UserGuideModal } from './components/UserGuideModal';
 import { MaterialImageModal } from './components/MaterialImageModal';
 import { BarcodeQrScanModal } from './components/BarcodeQrScanModal';
+import { WarehouseMapView } from './components/WarehouseMapView';
 import {
   INITIAL_USERS,
   INITIAL_MATERIALS,
@@ -1168,6 +1169,24 @@ export function App() {
             />
           )}
 
+          {activeTab === 'warehouse_map' && (
+            <WarehouseMapView
+              materials={materials}
+              calculatedStocks={calculatedStocks}
+              onSelectMaterial={(mat) => {
+                setSelectedVisualCardMaterial(mat);
+              }}
+              onUpdateMaterialLocation={async (matCode, newLocation) => {
+                const targetMat = materials.find((m) => m.code === matCode);
+                if (targetMat) {
+                  const updated: Material = { ...targetMat, location: newLocation, updatedAt: new Date().toISOString() };
+                  handleSaveMaterial(updated);
+                  showToast(`Đã cập nhật vị trí cho vật tư ${targetMat.code}: "${newLocation}"`);
+                }
+              }}
+            />
+          )}
+
           {(activeTab === 'transactions' || activeTab === 'transfers' || activeTab === 'requests') && (
             <TransactionManagementView
               currentUser={currentUser}
@@ -1350,6 +1369,10 @@ export function App() {
           materials={materials}
           onSelectMaterial={(mat) => {
             setSelectedVisualCardMaterial(mat);
+          }}
+          onOpenWarehouseMap={(shelfCode) => {
+            setActiveTab('warehouse_map');
+            showToast(`Đã chuyển tới sơ đồ kho cho vị trí "${shelfCode}"`);
           }}
         />
       )}

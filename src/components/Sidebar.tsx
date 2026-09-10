@@ -4,6 +4,7 @@ import {
   ArrowLeftRight,
   Package,
   FileSpreadsheet,
+  Map,
   Sparkles,
   FileX2,
   ShieldCheck,
@@ -90,6 +91,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
       label: 'Tra Cứu Vật Tư',
       sublabel: 'Định mức & quy cách (>600 mã DN)',
       icon: Package,
+    },
+    {
+      id: 'warehouse_map',
+      label: 'Sơ Đồ Kho & Kệ Vật Tư',
+      sublabel: 'Bản vẽ 2D, 5 Kệ & Tủ đồ nghề',
+      icon: Map,
+      badge: 'Mới',
+      badgeColor: 'bg-emerald-500 text-slate-950 font-bold',
     },
     {
       id: 'ledger',
