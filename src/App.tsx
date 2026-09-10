@@ -368,6 +368,72 @@ export function App() {
     };
   }, []);
 
+  // Deep-linking URL QR code scanner for shelf tags (Quét mã QR trên kệ mở ngay thẻ hình ảnh & quy cách kỹ thuật)
+  useEffect(() => {
+    if (typeof window === 'undefined' || materials.length === 0) return;
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const scanCode = params.get('scan') || params.get('code') || params.get('mat') || params.get('id');
+      if (scanCode) {
+        let input = scanCode.trim();
+        const cleanUpper = input.toUpperCase();
+        const cleanAlpha = cleanUpper.replace(/[^A-Z0-9]/g, '');
+
+        // 1. Direct code, qrCode, barcode match
+        let matched = materials.find(
+          (m) =>
+            m.code.trim().toUpperCase() === cleanUpper ||
+            (m.qrCode && m.qrCode.trim().toUpperCase() === cleanUpper) ||
+            (m.barcode && m.barcode.trim().toUpperCase() === cleanUpper)
+        );
+
+        // 2. Delimited match: "Tên | Mã"
+        if (!matched && (input.includes('|') || input.includes(' - ') || input.includes(':'))) {
+          const parts = input.split(/[|\-:]/).map((p) => p.trim());
+          for (const part of parts) {
+            if (!part) continue;
+            const pUpper = part.toUpperCase();
+            const pAlpha = pUpper.replace(/[^A-Z0-9]/g, '');
+            const sub = materials.find(
+              (m) =>
+                m.code.trim().toUpperCase() === pUpper ||
+                (m.qrCode && m.qrCode.trim().toUpperCase() === pUpper) ||
+                (pAlpha.length >= 4 && m.code.toUpperCase().replace(/[^A-Z0-9]/g, '') === pAlpha)
+            );
+            if (sub) {
+              matched = sub;
+              break;
+            }
+          }
+        }
+
+        // 3. Alphanumeric match
+        if (!matched && cleanAlpha.length >= 4) {
+          matched = materials.find((m) => {
+            const mCodeAlpha = m.code.toUpperCase().replace(/[^A-Z0-9]/g, '');
+            return (
+              mCodeAlpha === cleanAlpha ||
+              (m.barcode && m.barcode.toUpperCase().replace(/[^A-Z0-9]/g, '') === cleanAlpha) ||
+              (m.qrCode && m.qrCode.toUpperCase().replace(/[^A-Z0-9]/g, '') === cleanAlpha)
+            );
+          });
+        }
+
+        // 4. Substring code match
+        if (!matched) {
+          matched = materials.find((m) => m.code.toUpperCase().includes(cleanUpper));
+        }
+
+        if (matched) {
+          setSelectedVisualCardMaterial(matched);
+          showToast(`Đã nhận diện mã QR quét kệ: ${matched.code} - ${matched.name}`, 'success');
+        }
+      }
+    } catch (e) {
+      console.warn('URL scan param handling error:', e);
+    }
+  }, [materials]);
+
   // Advanced UI Theme Configuration State
   const [themeConfig, setThemeConfig] = useState<UIThemeConfig>(() => {
     const saved = safeStorage.getItem('smart_ui_theme_config_v2');

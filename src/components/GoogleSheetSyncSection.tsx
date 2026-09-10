@@ -218,6 +218,9 @@ export const GoogleSheetSyncSection: React.FC<GoogleSheetSyncSectionProps> = ({
             image: incoming.image || mergedMaterials[existingIdx].image,
             unit: incoming.unit || mergedMaterials[existingIdx].unit,
             name: incoming.name || mergedMaterials[existingIdx].name,
+            qrCode: incoming.qrCode || (mergedMaterials[existingIdx] as any).qrCode || `${incoming.name} | ${incoming.code}`,
+            barcode: incoming.barcode || (mergedMaterials[existingIdx] as any).barcode || incoming.code.replace(/[^A-Z0-9]/gi, ''),
+            specification: incoming.specification || mergedMaterials[existingIdx].specification || incoming.name,
             updatedAt: new Date().toISOString(),
           };
         } else {

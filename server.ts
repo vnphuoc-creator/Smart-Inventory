@@ -49,45 +49,118 @@ app.post("/api/sync/google-sheet", async (req, res) => {
   }
 
   try {
-    const idMatch = sheetUrl.match(/\/spreadsheets\/(?:d|u\/\d+\/d)\/([a-zA-Z0-9-_]+)/i);
+    const trimmed = sheetUrl.trim();
+
+    // Check if it's already a direct CSV URL (e.g. pub?output=csv or raw export)
+    if (trimmed.includes("output=csv") || trimmed.includes("format=csv")) {
+      const directResp = await fetch(trimmed, {
+        headers: {
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        },
+        redirect: "follow",
+      });
+      if (directResp.ok) {
+        const text = await directResp.text();
+        const isHtml = text.includes("<!DOCTYPE html") || text.includes("<html") || text.includes("accounts.google.com");
+        if (!isHtml && text.trim().length > 0) {
+          return res.json({ success: true, csvText: text, sheetId: "direct", gid: "0" });
+        }
+      }
+    }
+
+    // Check if it's a published Google Sheet (spreadsheets/d/e/2PACX-.../pubhtml or /pub)
+    const pubMatch = trimmed.match(/\/spreadsheets\/d\/e\/(2PACX-[a-zA-Z0-9-_]+)/i);
+    if (pubMatch && pubMatch[1]) {
+      const pubId = pubMatch[1];
+      const pubCsvUrl = `https://docs.google.com/spreadsheets/d/e/${pubId}/pub?output=csv`;
+      const pubResp = await fetch(pubCsvUrl, {
+        headers: {
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+        },
+        redirect: "follow",
+      });
+      if (pubResp.ok) {
+        const text = await pubResp.text();
+        const isHtml = text.includes("<!DOCTYPE html") || text.includes("<html") || text.includes("accounts.google.com");
+        if (!isHtml && text.trim().length > 0) {
+          return res.json({ success: true, csvText: text, sheetId: pubId, gid: "0" });
+        }
+      }
+    }
+
+    // Standard Google Sheet ID extraction
+    const idMatch = trimmed.match(/\/spreadsheets\/(?:d|u\/\d+\/d)\/([a-zA-Z0-9-_]+)/i);
     const sheetId = idMatch ? idMatch[1] : null;
-    const gidMatch = sheetUrl.match(/[#&?]gid=([0-9]+)/i);
-    const gid = gidMatch ? gidMatch[1] : "0";
+    const gidMatch = trimmed.match(/[#&?]gid=([0-9]+)/i);
+    const specifiedGid = gidMatch ? gidMatch[1] : null;
 
     if (!sheetId) {
-      return res.status(400).json({ error: "Không tìm thấy Sheet ID hợp lệ từ URL được cung cấp" });
+      return res.status(400).json({
+        error: "Không tìm thấy Sheet ID hợp lệ từ URL được cung cấp. Vui lòng kiểm tra định dạng liên kết Google Sheet.",
+      });
     }
 
-    // Try standard export URL
-    const csvUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=csv&gid=${gid}`;
-    const response = await fetch(csvUrl, {
-      headers: {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-      },
-      redirect: "follow",
-    });
+    // List of candidate export URLs to try in order of precision
+    const candidateUrls: string[] = [];
+    if (specifiedGid) {
+      candidateUrls.push(`https://docs.google.com/spreadsheets/d/${sheetId}/export?format=csv&gid=${specifiedGid}`);
+      candidateUrls.push(`https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:csv&gid=${specifiedGid}`);
+    }
+    // Try without gid (Google automatically exports the first or active tab)
+    candidateUrls.push(`https://docs.google.com/spreadsheets/d/${sheetId}/export?format=csv`);
+    candidateUrls.push(`https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:csv`);
+    candidateUrls.push(`https://docs.google.com/spreadsheets/d/${sheetId}/export?format=csv&gid=0`);
 
-    if (response.ok) {
-      const csvText = await response.text();
-      return res.json({ success: true, csvText, sheetId, gid });
+    let lastError: string | null = null;
+    let sawLoginRedirect = false;
+
+    for (const testUrl of candidateUrls) {
+      try {
+        const response = await fetch(testUrl, {
+          headers: {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "Accept": "text/csv,text/plain,*/*",
+          },
+          redirect: "follow",
+        });
+
+        if (response.ok) {
+          const csvText = await response.text();
+          const isHtml =
+            csvText.includes("<!DOCTYPE html") ||
+            csvText.includes("<html") ||
+            csvText.includes("<head>") ||
+            csvText.includes("accounts.google.com") ||
+            csvText.includes("Sign in - Google Accounts");
+
+          if (isHtml) {
+            sawLoginRedirect = true;
+            continue;
+          }
+
+          if (csvText.trim().length > 0) {
+            return res.json({
+              success: true,
+              csvText,
+              sheetId,
+              gid: specifiedGid || "0",
+            });
+          }
+        }
+      } catch (fetchErr: any) {
+        lastError = fetchErr?.message || String(fetchErr);
+      }
     }
 
-    // Secondary fallback: GViz API
-    const gvizUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:csv&gid=${gid}`;
-    const gvizRes = await fetch(gvizUrl, {
-      headers: {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-      },
-      redirect: "follow",
-    });
-
-    if (gvizRes.ok) {
-      const csvText = await gvizRes.text();
-      return res.json({ success: true, csvText, sheetId, gid });
+    if (sawLoginRedirect) {
+      return res.status(403).json({
+        error:
+          'Google Sheet này đang ở chế độ Riêng tư (Private). Bạn chỉ cần mở Sheet > bấm nút "Chia sẻ" (Share) ở góc trên bên phải > đổi quyền sang "Bất kỳ ai có đường liên kết đều có thể xem" (Anyone with link can view) > sau đó bấm Đồng bộ lại là được ngay!',
+      });
     }
 
-    return res.status(response.status).json({
-      error: `Google trả về mã ${response.status}. Vui lòng kiểm tra quyền chia sẻ "Bất kỳ ai có đường liên kết đều có thể xem" trên Google Sheet.`,
+    return res.status(400).json({
+      error: `Không thể đọc dữ liệu CSV từ Google Sheet. Vui lòng kiểm tra quyền chia sẻ công khai hoặc đường link (${lastError || "không tìm thấy dữ liệu"}).`,
     });
   } catch (err: any) {
     console.error("Error fetching Google Sheet in server:", err);

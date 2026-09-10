@@ -30,6 +30,7 @@ import {
 import { Material, CalculatedMaterialStock } from '../types';
 import { formatVND, formatNumber } from '../utils/inventoryEngine';
 import { extractBrand, extractDifferentiators } from '../utils/materialDifferentiator';
+import { saveMaterialToCloud } from '../services/firebaseSync';
 
 interface MaterialDetailModalProps {
   material: Material;
@@ -52,11 +53,55 @@ export const MaterialImageModal: React.FC<MaterialDetailModalProps> = ({
   const [zoomLevel, setZoomLevel] = useState<number>(1);
   const [isFullscreenImage, setIsFullscreenImage] = useState(false);
   const [imageLoadError, setImageLoadError] = useState(false);
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
+  const photoInputRef = useRef<HTMLInputElement>(null);
   const [checkedSteps, setCheckedSteps] = useState<{ [key: string]: boolean }>({
     step1: false,
     step2: false,
     step3: false,
   });
+
+  const handleUploadPhoto = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !material) return;
+    setIsUploadingPhoto(true);
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = async () => {
+        const canvas = document.createElement('canvas');
+        const maxDim = 800;
+        let w = img.width;
+        let h = img.height;
+        if (w > maxDim || h > maxDim) {
+          if (w > h) {
+            h = Math.round((h * maxDim) / w);
+            w = maxDim;
+          } else {
+            w = Math.round((w * maxDim) / h);
+            h = maxDim;
+          }
+        }
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, w, h);
+          const optimized = canvas.toDataURL('image/jpeg', 0.85);
+          const updated: Material = {
+            ...material,
+            image: optimized,
+            updatedAt: new Date().toISOString(),
+          };
+          await saveMaterialToCloud(updated);
+          setImageLoadError(false);
+        }
+        setIsUploadingPhoto(false);
+      };
+      img.src = event.target?.result as string;
+    };
+    reader.readAsDataURL(file);
+  };
 
   if (!isOpen || !material) return null;
 
@@ -71,6 +116,82 @@ export const MaterialImageModal: React.FC<MaterialDetailModalProps> = ({
     navigator.clipboard.writeText(material.code);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handlePrintShelfLabel = () => {
+    const origin = typeof window !== 'undefined' ? window.location.origin : '';
+    const shelfScanUrl = `${origin}/?scan=${encodeURIComponent(material.code)}`;
+    const qrImgSrc = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(shelfScanUrl)}`;
+    
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      alert('Vui lòng cho phép mở cửa sổ popup để in tem dán kệ.');
+      return;
+    }
+
+    const specText = material.specification || material.name;
+
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Tem Nhãn Kệ - ${material.code}</title>
+        <style>
+          @page { size: 100mm 60mm; margin: 4mm; }
+          * { box-sizing: border-box; }
+          body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 0; padding: 0; color: #000; background: #fff; }
+          .label-box { border: 2px solid #000; padding: 6px 8px; border-radius: 6px; width: 92mm; height: 52mm; display: flex; flex-direction: column; justify-content: space-between; }
+          .head { display: flex; justify-content: space-between; align-items: center; border-bottom: 1.5px solid #000; padding-bottom: 3px; }
+          .title { font-size: 10px; font-weight: 800; letter-spacing: 0.5px; }
+          .loc { font-size: 11px; font-weight: bold; background: #000; color: #fff; padding: 1px 6px; border-radius: 3px; }
+          .middle { display: flex; gap: 8px; align-items: center; margin: 3px 0; flex: 1; min-height: 0; }
+          .photo { width: 50px; height: 50px; object-fit: cover; border: 1px solid #999; border-radius: 4px; }
+          .info { flex: 1; min-width: 0; }
+          .code { font-size: 13px; font-weight: 900; font-family: monospace; }
+          .name { font-size: 10.5px; font-weight: bold; line-height: 1.2; margin: 2px 0; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+          .spec { font-size: 9px; color: #222; line-height: 1.2; margin-top: 1px; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+          .foot { display: flex; justify-content: space-between; align-items: center; border-top: 1px dashed #666; padding-top: 3px; }
+          .qr-part { display: flex; align-items: center; gap: 5px; }
+          .qr-part img { width: 42px; height: 42px; }
+          .qr-txt { font-size: 7.5px; font-weight: bold; line-height: 1.1; }
+          .meta { font-size: 9.5px; font-weight: bold; text-align: right; line-height: 1.25; }
+        </style>
+      </head>
+      <body>
+        <div class="label-box">
+          <div class="head">
+            <span class="title">TEM ĐỊNH DANH KỆ KHO</span>
+            <span class="loc">VỊ TRÍ: ${material.location || 'Kho Tổng'}</span>
+          </div>
+          <div class="middle">
+            ${material.image ? `<img src="${material.image}" class="photo" alt="Photo" />` : ''}
+            <div class="info">
+              <div class="code">${material.code}</div>
+              <div class="name">${material.name}</div>
+              <div class="spec"><strong>Quy cách:</strong> ${specText}</div>
+            </div>
+          </div>
+          <div class="foot">
+            <div class="qr-part">
+              <img src="${qrImgSrc}" alt="QR" />
+              <div class="qr-txt">
+                <div>QUÉT CAMERA</div>
+                <div>XEM ẢNH THẬT</div>
+              </div>
+            </div>
+            <div class="meta">
+              <div>ĐVT: ${material.unit}</div>
+              <div>ĐỊNH MỨC: ${material.minStock} - ${material.maxStock}</div>
+            </div>
+          </div>
+        </div>
+        <script>
+          window.onload = function() { window.print(); };
+        </script>
+      </body>
+      </html>
+    `);
+    printWindow.document.close();
   };
 
   const toggleCheck = (key: string) => {
@@ -230,9 +351,23 @@ export const MaterialImageModal: React.FC<MaterialDetailModalProps> = ({
                       <div>
                         <p className="text-slate-300 font-semibold text-xs">Chưa có ảnh thật trong hồ sơ</p>
                         <p className="text-[11px] text-slate-500 mt-1 max-w-xs mx-auto">
-                          Bạn có thể dán link ảnh vào cột <strong>HÌNH ẢNH</strong> trên Google Sheet rồi bấm Đồng Bộ để hiển thị tức thì.
+                          Bạn có thể chụp ảnh trực tiếp tại kệ hoặc dán link ảnh trên Google Sheet.
                         </p>
                       </div>
+
+                      <label className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold transition shadow-md shadow-blue-600/30 cursor-pointer">
+                        <Camera className="w-3.5 h-3.5" />
+                        <span>{isUploadingPhoto ? 'Đang lưu ảnh...' : 'Chụp Ảnh Vật Tư Tại Kệ'}</span>
+                        <input
+                          ref={photoInputRef}
+                          type="file"
+                          accept="image/*"
+                          capture="environment"
+                          onChange={handleUploadPhoto}
+                          disabled={isUploadingPhoto}
+                          className="hidden"
+                        />
+                      </label>
                     </div>
                   )}
 
@@ -265,27 +400,47 @@ export const MaterialImageModal: React.FC<MaterialDetailModalProps> = ({
               </div>
 
               {/* Barcode & QR Code Reference Card */}
-              <div className="p-3.5 rounded-xl bg-slate-850 border border-slate-800 flex items-center justify-between gap-3">
-                <div className="space-y-1 min-w-0">
-                  <div className="text-[10px] uppercase font-bold text-slate-400 tracking-wider flex items-center gap-1">
-                    <QrCode className="w-3.5 h-3.5 text-blue-400" />
-                    Mã Vạch &amp; QR Định Danh
+              <div className="p-3.5 rounded-xl bg-slate-850 border border-slate-800 space-y-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="space-y-1 min-w-0 flex-1">
+                    <div className="text-[10px] uppercase font-bold text-slate-400 tracking-wider flex items-center gap-1">
+                      <QrCode className="w-3.5 h-3.5 text-purple-400" />
+                      Mã Vạch &amp; QR Định Danh Kệ (Google Sheet)
+                    </div>
+                    <div className="font-mono text-xs text-cyan-300 font-bold tracking-wider truncate">
+                      {material.qrCode || `${material.name} | ${material.code}`}
+                    </div>
+                    <div className="text-[10px] text-slate-400 font-mono">
+                      Barcode 1D: <strong className="text-slate-200">{material.barcode || rawBarcode}</strong>
+                    </div>
+                    <p className="text-[10px] text-slate-500">
+                      Quét trực tiếp bằng camera điện thoại hoặc súng bắn mã vạch trên kệ kho
+                    </p>
                   </div>
-                  <div className="font-mono text-xs text-cyan-300 font-bold tracking-wider truncate">
-                    {rawBarcode}
+
+                  <div className="shrink-0 bg-white p-1.5 rounded-lg shadow-md flex flex-col items-center">
+                    <img
+                      src={`https://api.qrserver.com/v1/create-qr-code/?size=90x90&data=${encodeURIComponent(
+                        typeof window !== 'undefined'
+                          ? `${window.location.origin}/?scan=${encodeURIComponent(material.code)}`
+                          : material.code
+                      )}`}
+                      alt="QR Code"
+                      className="w-16 h-16 object-contain"
+                    />
+                    <span className="text-[8px] font-mono text-slate-800 mt-0.5 font-bold">QR QUÉT KỆ</span>
                   </div>
-                  <p className="text-[10px] text-slate-500">
-                    Quét nhanh bằng camera điện thoại hoặc súng bắn mã vạch
-                  </p>
                 </div>
 
-                <div className="shrink-0 bg-white p-1.5 rounded-lg shadow-md">
-                  <img
-                    src={`https://api.qrserver.com/v1/create-qr-code/?size=72x72&data=${encodeURIComponent(material.code)}`}
-                    alt="QR Code"
-                    className="w-14 h-14 object-contain"
-                  />
-                </div>
+                {/* Print Shelf Label Action */}
+                <button
+                  type="button"
+                  onClick={handlePrintShelfLabel}
+                  className="w-full py-2 px-3 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold flex items-center justify-center gap-2 border border-slate-700 hover:border-blue-500/50 transition shadow-sm"
+                >
+                  <Printer className="w-3.5 h-3.5 text-blue-400" />
+                  <span>In Tem Nhãn Kệ Kho (Mã QR + Ảnh Thật + Quy Cách)</span>
+                </button>
               </div>
             </div>
 
@@ -326,13 +481,13 @@ export const MaterialImageModal: React.FC<MaterialDetailModalProps> = ({
                 <div className="flex items-center justify-between text-slate-300 font-semibold text-xs">
                   <div className="flex items-center gap-1.5">
                     <ShieldCheck className="w-4 h-4 text-cyan-400" />
-                    <span>Quy Cách Kỹ Thuật &amp; Tiêu Chuẩn:</span>
+                    <span>Quy Cách Kỹ Thuật &amp; Tiêu Chuẩn (Mô Tả Vật Tư):</span>
                   </div>
                   <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${brandInfo.color}`}>
                     {brandInfo.name}
                   </span>
                 </div>
-                <div className="text-slate-100 leading-relaxed text-xs sm:text-sm bg-slate-900 p-3 rounded-lg border border-slate-800 font-mono select-text">
+                <div className="text-slate-100 leading-relaxed text-xs sm:text-sm bg-slate-900 p-3 rounded-lg border border-slate-800 font-medium select-text">
                   {material.specification || material.name}
                 </div>
               </div>

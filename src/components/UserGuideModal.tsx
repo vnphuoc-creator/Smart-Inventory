@@ -19,6 +19,10 @@ import {
   Lock,
   Download,
   Lightbulb,
+  QrCode,
+  Camera,
+  Eye,
+  RefreshCw,
 } from 'lucide-react';
 import { User } from '../types';
 import { printCleanDocument } from '../utils/printHelper';
@@ -249,6 +253,30 @@ export const UserGuideModal: React.FC<UserGuideModalProps> = ({
                   </p>
                 </div>
               </div>
+
+              {/* 2.5 Quét QR & Barcode Đối Chiếu Ảnh Thật */}
+              <div className="bg-slate-850 p-5 rounded-2xl border border-purple-500/40 space-y-3">
+                <div className="flex items-center gap-2 text-white font-bold text-sm">
+                  <span className="w-6 h-6 rounded-lg bg-purple-600 text-white flex items-center justify-center text-xs font-mono">5</span>
+                  Quét Mã QR & Barcode - Đối Chiếu Ảnh Thật Chống Nhầm Lẫn
+                </div>
+                <div className="pl-8 space-y-2 text-xs text-slate-300">
+                  <div className="p-3 bg-purple-950/40 border border-purple-500/30 rounded-xl space-y-1.5">
+                    <div className="font-bold text-purple-300 flex items-center gap-1.5">
+                      <QrCode className="w-4 h-4 text-purple-400" /> Nhận diện linh kiện tương đồng ca đêm / nhân viên mới
+                    </div>
+                    <p className="text-[11px] text-slate-300">
+                      Bấm nút <strong>"Quét Mã QR & Barcode"</strong> trên thanh tìm kiếm hoặc menu bên trái. Hỗ trợ quét bằng Camera điện thoại, súng quét Barcode USB cầm tay, hoặc tải ảnh chụp nhãn mác linh kiện lên.
+                    </p>
+                  </div>
+                  <p>
+                    • <strong className="text-cyan-300">Thẻ Nhận Diện Trực Quan:</strong> Khi khớp mã, hệ thống hiển thị ảnh chụp thật độ nét cao 1000px, thông số kỹ thuật chuẩn và hộp cảnh báo màu vàng nổi bật các điểm phân biệt vật tư dễ nhầm (VD: ánh sáng vàng 3000K vs trắng 6500K; cùm Ø114 vs Ø90; nguồn Mean Well ngâm nước IP67 vs nguồn tổ ong thường).
+                  </p>
+                  <p>
+                    • Từ thẻ nhận diện, bạn có thể bấm trực tiếp để lập nhanh Phiếu Xuất Kho cho linh kiện đó.
+                  </p>
+                </div>
+              </div>
             </div>
           )}
 
@@ -330,6 +358,30 @@ export const UserGuideModal: React.FC<UserGuideModalProps> = ({
                   </p>
                 </div>
               </div>
+
+              {/* 3.5 Đồng bộ Google Sheet & Drive */}
+              <div className="bg-slate-850 p-5 rounded-2xl border border-emerald-500/40 space-y-3">
+                <div className="flex items-center gap-2 text-white font-bold text-sm">
+                  <span className="w-6 h-6 rounded-lg bg-emerald-600 text-white flex items-center justify-center text-xs font-mono">5</span>
+                  Đồng Bộ Tự Động Từ Google Sheet &amp; Ảnh Thật Google Drive
+                </div>
+                <div className="pl-8 space-y-2 text-xs text-slate-300">
+                  <div className="p-3 bg-emerald-950/40 border border-emerald-500/30 rounded-xl space-y-1">
+                    <div className="font-bold text-emerald-300 flex items-center gap-1.5">
+                      <RefreshCw className="w-4 h-4 text-emerald-400" /> Tự Động Nạp Cột &amp; Chuẩn Hóa Link Ảnh Drive
+                    </div>
+                    <p className="text-[11px] text-slate-300">
+                      Vào <strong>Cài Đặt Hệ Thống</strong> hoặc bấm nút <strong>"Đồng Bộ Google Sheet"</strong>. Dán đường link Google Sheet chứa danh mục vật tư, hệ thống sẽ tự động quét phát hiện cột Tiêu Đề (bỏ qua banner gộp ô) và hiển thị bảng so sánh khác biệt (Diff) trước khi áp dụng.
+                    </p>
+                  </div>
+                  <p>
+                    • <strong className="text-amber-300">Hỗ trợ Link Google Drive:</strong> Cột hình ảnh có thể điền link Drive công khai (<code className="text-xs font-mono text-cyan-300">drive.google.com/file/d/...</code>). Hệ thống sẽ tự động chuyển thành ảnh xem trước độ nét cao <code className="text-xs font-mono text-cyan-300">thumbnail?id=...&amp;sz=w1000</code>.
+                  </p>
+                  <p>
+                    • <strong className="text-emerald-400">Đồng bộ Cloud tức thì:</strong> Sau khi xác nhận nạp, toàn bộ dữ liệu vật tư, ảnh thật, barcode và vị trí kho được lưu đồng bộ lên Firebase Firestore cho mọi ca làm việc.
+                  </p>
+                </div>
+              </div>
             </div>
           )}
 
@@ -370,6 +422,24 @@ export const UserGuideModal: React.FC<UserGuideModalProps> = ({
                 </div>
                 <p className="text-xs text-slate-300 pl-6 leading-relaxed">
                   👉 <strong>Giải quyết:</strong> Quản lý vào tab <em>Đối Chiếu Tờ Trình</em> $\rightarrow$ Bấm <strong>"Chốt Đóng Tờ Trình"</strong> $\rightarrow$ Ghi lý do nghiệm thu theo thực nhận $\rightarrow$ Xác nhận.
+                </p>
+              </div>
+
+              <div className="bg-slate-850 p-4 rounded-2xl border border-slate-800 space-y-2">
+                <div className="font-bold text-white text-xs sm:text-sm flex items-center gap-2 text-purple-300">
+                  <span>❓</span> Làm thế nào để quét mã vạch Barcode / QR khi máy tính bàn không có Camera?
+                </div>
+                <p className="text-xs text-slate-300 pl-6 leading-relaxed">
+                  👉 <strong>Giải quyết:</strong> Bạn có thể dùng <strong>súng quét barcode USB cầm tay</strong> (chỉ cần bấm cò, mã sẽ tự động điền vào ô tra cứu) hoặc chụp ảnh nhãn mác bằng điện thoại rồi bấm nút <strong>"Tải Ảnh Lên"</strong> trong hộp thoại quét mã để nhận diện tức thì.
+                </p>
+              </div>
+
+              <div className="bg-slate-850 p-4 rounded-2xl border border-slate-800 space-y-2">
+                <div className="font-bold text-white text-xs sm:text-sm flex items-center gap-2 text-emerald-300">
+                  <span>❓</span> Link ảnh trên Google Drive làm sao để hiển thị ảnh thật trong ứng dụng?
+                </div>
+                <p className="text-xs text-slate-300 pl-6 leading-relaxed">
+                  👉 <strong>Giải quyết:</strong> Bạn chỉ cần đảm bảo file ảnh hoặc thư mục ảnh trên Google Drive được đặt quyền: <em>"Bất kỳ ai có đường liên kết đều có thể xem" (Anyone with the link can view)</em>. Hệ thống sẽ tự động chuyển link Drive thành ảnh thumbnail độ nét cao chuẩn để hiển thị trong kho.
                 </p>
               </div>
             </div>
