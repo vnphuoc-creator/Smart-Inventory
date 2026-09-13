@@ -59,6 +59,7 @@ import {
   ActivityActionType,
   UIThemeConfig,
   DEFAULT_THEME_CONFIG,
+  WarehouseShelfEntity,
 } from '../types';
 import { formatVND, formatNumber, formatDisplayDate, getOriginalDefaultPassword } from '../utils/inventoryEngine';
 import { AHTLogo } from './AHTLogo';
@@ -67,6 +68,9 @@ import { SearchableMaterialSelect } from './SearchableMaterialSelect';
 import { ThemeCustomizerView } from './ThemeCustomizerView';
 import { SmartMaterialImportSection } from './SmartMaterialImportSection';
 import { GoogleSheetSyncSection } from './GoogleSheetSyncSection';
+import { MasterShelfLayoutModal } from './MasterShelfLayoutModal';
+import { DEFAULT_WAREHOUSE_ENTITIES } from '../data/warehouseLayoutData';
+import { QrCode, Boxes, Package, MapPin, Tag, SlidersHorizontal, LayoutGrid } from 'lucide-react';
 
 interface SettingsViewProps {
   currentUser: User;
@@ -76,6 +80,7 @@ interface SettingsViewProps {
   proposals?: PurchaseProposal[];
   activityLogs?: ActivityLog[];
   themeConfig?: UIThemeConfig;
+  warehouseEntities?: WarehouseShelfEntity[];
   onApplyThemeConfig?: (config: UIThemeConfig) => void;
   onResetThemeConfig?: () => void;
   onShowToast?: (message: string, type?: 'success' | 'info' | 'error') => void;
@@ -90,6 +95,7 @@ interface SettingsViewProps {
   onDeleteTransaction?: (txId: string) => void;
   onResetDemoData?: () => void;
   onClearAllTransactionsAndProposals?: () => void;
+  onUpdateWarehouseEntities?: (entities: WarehouseShelfEntity[]) => Promise<boolean | void>;
 }
 
 export const SettingsView: React.FC<SettingsViewProps> = ({
@@ -100,6 +106,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   proposals = [],
   activityLogs = [],
   themeConfig,
+  warehouseEntities = DEFAULT_WAREHOUSE_ENTITIES,
   onApplyThemeConfig,
   onResetThemeConfig,
   onShowToast,
@@ -114,6 +121,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   onDeleteTransaction,
   onResetDemoData,
   onClearAllTransactionsAndProposals,
+  onUpdateWarehouseEntities,
 }) => {
   // Master Admin permission check
   const isMasterAdmin =
@@ -121,8 +129,13 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     currentUser.email.toLowerCase().trim() === 'vn.phuoc235';
 
   const [activeTab, setActiveTab] = useState<
-    'SHEET_SYNC' | 'ACTIVITY_LOGS' | 'CUSTOMIZE_UI' | 'IMPORT_SMART' | 'UNITS_PASSWORD' | 'LOGO_COMPANY' | 'IMPORT_STOCK' | 'BACKUP'
+    'SHEET_SYNC' | 'ACTIVITY_LOGS' | 'CUSTOMIZE_UI' | 'IMPORT_SMART' | 'UNITS_PASSWORD' | 'LOGO_COMPANY' | 'IMPORT_STOCK' | 'BACKUP' | 'WAREHOUSE_LAYOUT'
   >(isMasterAdmin ? 'SHEET_SYNC' : 'IMPORT_SMART');
+
+  const [isMasterLayoutModalOpen, setIsMasterLayoutModalOpen] = useState(false);
+  const [layoutSelectedEntityId, setLayoutSelectedEntityId] = useState<string>('KE-03');
+  const [layoutSelectedTierNum, setLayoutSelectedTierNum] = useState<number>(4);
+  const [layoutSearchQuery, setLayoutSearchQuery] = useState<string>('');
 
   // --- UNIT MANAGEMENT STATE ---
   const [units, setUnits] = useState<string[]>(() => {
@@ -684,6 +697,26 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             </button>
           )}
 
+          {/* Master Only: Chỉnh Sửa Layout Sơ Đồ Kho */}
+          {isMasterAdmin && (
+            <button
+              type="button"
+              id="tab-warehouse-layout"
+              onClick={() => setActiveTab('WAREHOUSE_LAYOUT')}
+              className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition-all whitespace-nowrap ${
+                activeTab === 'WAREHOUSE_LAYOUT'
+                  ? 'bg-purple-600 text-white shadow-md shadow-purple-950/50'
+                  : 'text-slate-300 hover:text-white hover:bg-slate-800/80'
+              }`}
+            >
+              <Layers className="w-4 h-4 text-purple-300" />
+              <span>Chỉnh Sửa Layout Sơ Đồ Kho</span>
+              <span className="px-1.5 py-0.2 rounded-md text-[9px] font-extrabold bg-amber-400/20 text-amber-300 border border-amber-400/40 uppercase">
+                Master
+              </span>
+            </button>
+          )}
+
           {/* Smart Importer */}
           <button
             type="button"
@@ -1124,6 +1157,312 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 </tbody>
               </table>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ===================== TAB: MASTER WAREHOUSE LAYOUT CUSTOMIZER ===================== */}
+      {activeTab === 'WAREHOUSE_LAYOUT' && isMasterAdmin && (
+        <div className="space-y-6 animate-in fade-in duration-200">
+          {/* Header Card with Master Permissions Badge */}
+          <div className="bg-gradient-to-r from-purple-950/50 via-slate-900 to-indigo-950/40 border border-purple-800/40 rounded-2xl p-6 shadow-xl relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-96 h-96 bg-purple-500/5 rounded-full blur-3xl pointer-events-none" />
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-5 relative z-10">
+              <div className="space-y-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="px-2.5 py-1 rounded-full text-xs font-black bg-amber-500/20 text-amber-300 border border-amber-500/40 uppercase tracking-wider flex items-center gap-1.5">
+                    <ShieldCheck className="w-3.5 h-3.5" />
+                    Đặc Quyền Master Admin
+                  </span>
+                  <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-purple-500/20 text-purple-300 border border-purple-500/30 flex items-center gap-1.5">
+                    <Boxes className="w-3.5 h-3.5" />
+                    Bản Vẽ Phòng Kỹ Thuật ĐNCT
+                  </span>
+                  <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 flex items-center gap-1.5">
+                    <RefreshCw className="w-3.5 h-3.5" />
+                    Đồng Bộ Cloud Firestore
+                  </span>
+                </div>
+                <h3 className="text-xl font-black text-white tracking-tight flex items-center gap-2">
+                  <Layers className="w-6 h-6 text-purple-400" />
+                  Chỉnh Sửa &amp; Thiết Lập Layout Sơ Đồ Kho
+                </h3>
+                <p className="text-sm text-slate-300 max-w-3xl leading-relaxed">
+                  Tài khoản Master có toàn quyền cấu hình lại mọi thành phần kho: Thay đổi vật tư được gán vào từng khay, cấu hình khay nhựa / hộp quai đỏ / cuộn CADIVI / hộp đồ nghề, chỉnh sửa mã QR từng vị trí để in tem dán, và đồng bộ tức thì cho toàn bộ nhân viên.
+                </p>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-3 shrink-0">
+                <button
+                  type="button"
+                  id="btn-open-master-shelf-modal"
+                  onClick={() => setIsMasterLayoutModalOpen(true)}
+                  className="px-5 py-3 rounded-xl font-black text-sm bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white shadow-lg shadow-purple-900/40 flex items-center gap-2.5 transition-all transform active:scale-95"
+                >
+                  <SlidersHorizontal className="w-4 h-4" />
+                  <span>Mở Trình Biên Tập Master Layout</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Quick Metrics Summary */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-6 pt-6 border-t border-slate-800/80">
+              <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-3.5">
+                <div className="text-xs text-slate-400 font-medium">Kệ Vật Tư 4 Tầng</div>
+                <div className="text-xl font-black text-emerald-400 mt-1">5 Kệ Sắt 5S</div>
+                <div className="text-[11px] text-slate-500 mt-0.5">KE-01 đến KE-05</div>
+              </div>
+              <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-3.5">
+                <div className="text-xs text-slate-400 font-medium">Tủ Đồ Nghề Kỹ Thuật</div>
+                <div className="text-xl font-black text-blue-400 mt-1">2 Tủ Bảo Hộ</div>
+                <div className="text-[11px] text-slate-500 mt-0.5">TDN-01 &amp; TDN-02</div>
+              </div>
+              <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-3.5">
+                <div className="text-xs text-slate-400 font-medium">Cụm Nguồn &amp; Tủ Điện</div>
+                <div className="text-xl font-black text-amber-400 mt-1">3 Cụm Thiết Bị</div>
+                <div className="text-[11px] text-slate-500 mt-0.5">UPS, Ắc Quy, Tủ Điện</div>
+              </div>
+              <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-3.5">
+                <div className="text-xs text-slate-400 font-medium">Tổng Số Khay / Hộp</div>
+                <div className="text-xl font-black text-purple-400 mt-1">
+                  {warehouseEntities.reduce((acc, ent) => {
+                    return acc + (ent.tiers || []).reduce((tAcc, t) => tAcc + (t.compartments?.length || 0), 0);
+                  }, 0)}+ Khay Ngăn
+                </div>
+                <div className="text-[11px] text-slate-500 mt-0.5">Đã gắn mã QR định danh</div>
+              </div>
+            </div>
+          </div>
+
+          {/* Interactive Layout Navigator & Quick Edit Preview */}
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800 pb-4">
+              <div>
+                <h4 className="text-base font-black text-white flex items-center gap-2">
+                  <LayoutGrid className="w-4 h-4 text-purple-400" />
+                  Danh Sách Kệ / Tủ Đang Áp Dụng Thực Tế
+                </h4>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  Bấm chọn từng Kệ / Tủ bên dưới để xem danh sách khay ngăn, vị trí vật tư và mã QR tương ứng
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsMasterLayoutModalOpen(true)}
+                className="px-3.5 py-1.5 rounded-lg text-xs font-bold bg-purple-600/20 text-purple-300 border border-purple-500/40 hover:bg-purple-600/30 flex items-center gap-1.5 w-fit"
+              >
+                <Edit3 className="w-3.5 h-3.5" />
+                <span>Chỉnh sửa cấu trúc &amp; vật tư</span>
+              </button>
+            </div>
+
+            {/* Entity Selector Tabs */}
+            <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
+              {warehouseEntities.map((ent) => {
+                const isSelected = (layoutSelectedEntityId || 'KE-03') === ent.id;
+                const isShelf = ent.type === 'SHELF_4_TIER';
+                const isTool = ent.type === 'TOOL_CABINET';
+                return (
+                  <button
+                    key={ent.id}
+                    type="button"
+                    onClick={() => {
+                      setLayoutSelectedEntityId(ent.id);
+                      setLayoutSelectedTierNum(4);
+                    }}
+                    className={`px-3.5 py-2 rounded-xl text-xs font-black flex items-center gap-2 shrink-0 transition-all border ${
+                      isSelected
+                        ? 'bg-purple-600 text-white border-purple-500 shadow-md shadow-purple-950/50'
+                        : 'bg-slate-800/80 text-slate-300 border-slate-700 hover:text-white hover:bg-slate-800'
+                    }`}
+                  >
+                    <span className={`w-2 h-2 rounded-full ${isShelf ? 'bg-emerald-400' : isTool ? 'bg-blue-400' : 'bg-amber-400'}`} />
+                    <span>{ent.code}</span>
+                    <span className="text-[10px] font-normal opacity-80 truncate max-w-[120px]">
+                      {ent.name.replace('Kệ Vật Tư 4 Tầng ', 'Kệ ').replace('Tủ Đồ Nghề Kỹ Thuật ', 'Tủ ')}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Selected Entity Detailed View */}
+            {(() => {
+              const currentEnt = warehouseEntities.find((e) => e.id === (layoutSelectedEntityId || 'KE-03')) || warehouseEntities[0];
+              if (!currentEnt) return null;
+
+              const tiers = currentEnt.tiers || [];
+              const activeTier = tiers.find((t) => t.tierNumber === layoutSelectedTierNum) || tiers[0];
+
+              return (
+                <div className="space-y-4 pt-2">
+                  {/* Entity Metadata Card */}
+                  <div className="bg-slate-950/70 border border-slate-800 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span className="px-2.5 py-0.5 rounded-md text-xs font-black font-mono bg-purple-500/20 text-purple-300 border border-purple-500/40">
+                          {currentEnt.code}
+                        </span>
+                        <span className="text-sm font-bold text-white">{currentEnt.name}</span>
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-slate-800 text-slate-300 border border-slate-700">
+                          {currentEnt.categoryLabel}
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-400 leading-relaxed max-w-2xl">
+                        {currentEnt.description}
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-2 shrink-0">
+                      <div className="px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-right">
+                        <div className="text-[10px] text-slate-500 font-mono">MÃ QR VỊ TRÍ</div>
+                        <div className="text-xs font-bold font-mono text-amber-300">{currentEnt.qrCodeValue}</div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setIsMasterLayoutModalOpen(true)}
+                        className="p-2 rounded-lg bg-purple-600/20 text-purple-300 hover:bg-purple-600/30 border border-purple-500/40"
+                        title="Chỉnh sửa Kệ này"
+                      >
+                        <Edit2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Tier Selector (Tầng 4 -> Tầng 1) */}
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-black text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+                        <Tag className="w-3.5 h-3.5 text-blue-400" />
+                        Chọn Tầng Xem Khay / Ngăn:
+                      </span>
+                      <span className="text-xs text-slate-400">
+                        Quy chuẩn 5S • Tầng 4 (trên cùng) đến Tầng 1 (dưới cùng)
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                      {tiers.slice().reverse().map((t) => {
+                        const isTierActive = activeTier?.tierNumber === t.tierNumber;
+                        return (
+                          <button
+                            key={t.tierNumber}
+                            type="button"
+                            onClick={() => setLayoutSelectedTierNum(t.tierNumber)}
+                            className={`p-2.5 rounded-xl text-left border transition-all ${
+                              isTierActive
+                                ? 'bg-indigo-600/30 border-indigo-500 text-white shadow-md'
+                                : 'bg-slate-950/50 border-slate-800 text-slate-400 hover:text-slate-200 hover:border-slate-700'
+                            }`}
+                          >
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs font-black text-indigo-300">{t.label}</span>
+                              <span className="text-[10px] px-1.5 py-0.2 rounded bg-slate-900 border border-slate-800 text-slate-400 font-mono">
+                                {t.compartments?.length || 0} Khay
+                              </span>
+                            </div>
+                            <div className="text-[11px] text-slate-300 truncate mt-1">
+                              {t.categoryDesc}
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Compartments / Boxes / Trays in active Tier */}
+                  {activeTier && (
+                    <div className="space-y-3 pt-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
+                          <Boxes className="w-3.5 h-3.5 text-emerald-400" />
+                          Chi Tiết Từng Khay / Hộp Tại {activeTier.label}:
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setIsMasterLayoutModalOpen(true)}
+                          className="text-xs font-bold text-purple-400 hover:text-purple-300 flex items-center gap-1"
+                        >
+                          <Plus className="w-3 h-3" />
+                          Thêm / Chỉnh Sửa Khay
+                        </button>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                        {(activeTier.compartments || []).map((comp) => {
+                          const visualBadge =
+                            comp.visualType === 'blue-bins'
+                              ? { label: '🟦 Khay nhựa xanh 5S', color: 'bg-blue-500/20 text-blue-300 border-blue-500/30' }
+                              : comp.visualType === 'clear-boxes'
+                              ? { label: '📦 Hộp quai đỏ công nghiệp', color: 'bg-rose-500/20 text-rose-300 border-rose-500/30' }
+                              : comp.visualType === 'cadivi-coils'
+                              ? { label: '🟡 Cuộn dây cáp CADIVI', color: 'bg-amber-500/20 text-amber-300 border-amber-500/30' }
+                              : comp.visualType === 'tool-case'
+                              ? { label: '🧰 Hộp đồ nghề kỹ thuật', color: 'bg-cyan-500/20 text-cyan-300 border-cyan-500/30' }
+                              : { label: '🟫 Thùng carton / Khay lẻ', color: 'bg-slate-700/40 text-slate-300 border-slate-600/40' };
+
+                          return (
+                            <div
+                              key={comp.id}
+                              className="bg-slate-950/80 border border-slate-800 rounded-xl p-3.5 space-y-2.5 hover:border-purple-600/40 transition-colors"
+                            >
+                              <div className="flex items-start justify-between gap-2">
+                                <div>
+                                  <div className="flex items-center gap-1.5">
+                                    <span className="px-1.5 py-0.5 rounded text-[10px] font-black font-mono bg-purple-500/20 text-purple-300 border border-purple-500/40">
+                                      {comp.code}
+                                    </span>
+                                    <span className={`px-2 py-0.5 rounded text-[10px] font-semibold border ${visualBadge.color}`}>
+                                      {visualBadge.label}
+                                    </span>
+                                  </div>
+                                  <h5 className="text-xs font-bold text-white mt-1.5 leading-snug">
+                                    {comp.name}
+                                  </h5>
+                                </div>
+                              </div>
+
+                              {/* Sample items & keywords */}
+                              <div className="space-y-1 text-[11px] bg-slate-900/80 rounded-lg p-2 border border-slate-800/80">
+                                <div className="text-slate-400 font-medium">Vật tư chứa trong khay:</div>
+                                <div className="space-y-0.5">
+                                  {(comp.sampleItems || []).slice(0, 3).map((item, idx) => (
+                                    <div key={idx} className="text-slate-200 flex items-center gap-1">
+                                      <span className="w-1 h-1 rounded-full bg-emerald-400" />
+                                      <span className="truncate">{item}</span>
+                                    </div>
+                                  ))}
+                                  {(comp.sampleItems?.length || 0) > 3 && (
+                                    <div className="text-[10px] text-slate-500 italic">
+                                      + {comp.sampleItems.length - 3} vật tư khác...
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+
+                              {/* QR Code Footer */}
+                              <div className="flex items-center justify-between pt-1 border-t border-slate-900 text-[10px]">
+                                <div className="flex items-center gap-1 font-mono text-slate-400">
+                                  <QrCode className="w-3 h-3 text-amber-400" />
+                                  <span className="truncate max-w-[140px]">{comp.qrCodeValue || 'Chưa gắn QR'}</span>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => setIsMasterLayoutModalOpen(true)}
+                                  className="text-purple-400 hover:text-purple-300 font-bold"
+                                >
+                                  Sửa
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
           </div>
         </div>
       )}
@@ -1862,6 +2201,29 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
           setTimeout(() => setUnitToast(null), 4000);
         }}
       />
+
+      {/* Master Shelf Layout Customizer Modal */}
+      {isMasterLayoutModalOpen && (
+        <MasterShelfLayoutModal
+          isOpen={isMasterLayoutModalOpen}
+          onClose={() => setIsMasterLayoutModalOpen(false)}
+          entities={warehouseEntities}
+          onSave={async (newEntities) => {
+            if (onUpdateWarehouseEntities) {
+              await onUpdateWarehouseEntities(newEntities);
+            }
+            if (onShowToast) {
+              onShowToast('Đã lưu và đồng bộ sơ đồ kho thực tế lên Cloud!', 'success');
+            } else {
+              setUnitToast('Đã lưu và đồng bộ sơ đồ kho thực tế lên Cloud!');
+              setTimeout(() => setUnitToast(null), 3500);
+            }
+            setIsMasterLayoutModalOpen(false);
+          }}
+          materials={materials}
+          currentUser={currentUser}
+        />
+      )}
     </div>
   );
 };

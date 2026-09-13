@@ -98,20 +98,61 @@ export const BarcodeQrScanModal: React.FC<BarcodeQrScanModalProps> = ({
     setHasTorch(false);
   }, []);
 
+  const getDriveId = (str: string): string | null => {
+    if (!str) return null;
+    const m1 = str.match(/\/d\/([a-zA-Z0-9_-]{15,})/);
+    if (m1 && m1[1]) return m1[1];
+    const m2 = str.match(/[?&]id=([a-zA-Z0-9_-]{15,})/);
+    if (m2 && m2[1]) return m2[1];
+    const m3 = str.match(/\/file\/d\/([a-zA-Z0-9_-]{15,})/);
+    if (m3 && m3[1]) return m3[1];
+    return null;
+  };
+
   const findMaterialByCode = useCallback(
     (rawCode: string): Material | null => {
       if (!rawCode) return null;
       let input = rawCode.trim();
       if (!input) return null;
 
-      // 1. Phân tích nếu mã quét là URL (quét bằng camera điện thoại ngoài hoặc link quét kệ)
+      // 1. Phân tích nếu mã quét là URL (chứa link Google Sheet, link ảnh Drive, hoặc link app)
       if (input.startsWith('http://') || input.startsWith('https://')) {
+        // Kiểm tra khớp Google Drive File ID với ảnh thực tế hoặc qrCode
+        const scannedDriveId = getDriveId(input);
+        if (scannedDriveId) {
+          const driveMatch = materials.find((m) => {
+            if (m.image && getDriveId(m.image) === scannedDriveId) return true;
+            if (m.qrCode && getDriveId(m.qrCode) === scannedDriveId) return true;
+            return false;
+          });
+          if (driveMatch) return driveMatch;
+        }
+
+        // Kiểm tra khớp trực tiếp link ảnh thực tế
+        const imageDirectMatch = materials.find(
+          (m) => (m.image && m.image.trim() === input) || (m.qrCode && m.qrCode.trim() === input)
+        );
+        if (imageDirectMatch) return imageDirectMatch;
+
+        // Trích xuất tên file ảnh từ URL (ví dụ: ACB_100A.jpg, van_buom.png)
+        const urlFileName = input.split('/').pop()?.split('?')[0]?.toLowerCase();
+        if (urlFileName && urlFileName.length > 5) {
+          const fileMatch = materials.find((m) => {
+            if (m.image && m.image.toLowerCase().includes(urlFileName)) return true;
+            return false;
+          });
+          if (fileMatch) return fileMatch;
+        }
+
         try {
           const url = new URL(input);
           const paramCode =
             url.searchParams.get('scan') ||
             url.searchParams.get('code') ||
             url.searchParams.get('mat') ||
+            url.searchParams.get('dn') ||
+            url.searchParams.get('material') ||
+            url.searchParams.get('item') ||
             url.searchParams.get('id') ||
             url.searchParams.get('data');
           if (paramCode) {
@@ -137,7 +178,7 @@ export const BarcodeQrScanModal: React.FC<BarcodeQrScanModalProps> = ({
       found = materials.find((m) => m.barcode && m.barcode.trim().toUpperCase() === cleanUpper);
       if (found) return found;
 
-      // 5. So khớp phân tách ký tự ngăn cách: "Tên Sản Phẩm | Mã Vật Tư" (Cột E Google Sheet)
+      // 5. So khớp phân tách ký tự: "Tên Sản Phẩm | Mã Vật Tư" (Cột E Google Sheet)
       if (input.includes('|') || input.includes(' - ') || input.includes(':')) {
         const parts = input.split(/[|\-:]/).map((p) => p.trim());
         for (const part of parts) {
@@ -245,7 +286,7 @@ export const BarcodeQrScanModal: React.FC<BarcodeQrScanModalProps> = ({
         } catch {}
       }
 
-      // 2. Canvas-based decoder with jsQR & Zoom Center Crop
+      // 2. Canvas-based decoder with jsQR (Preserving exact 1:1 aspect ratio)
       const canvas = canvasRef.current;
       if (canvas) {
         try {
@@ -253,25 +294,41 @@ export const BarcodeQrScanModal: React.FC<BarcodeQrScanModalProps> = ({
           if (ctx) {
             const vw = video.videoWidth;
             const vh = video.videoHeight;
-            // Target optimal decoding resolution (approx 640-800px)
-            const targetDim = Math.min(Math.max(vw, vh), 800);
-            canvas.width = targetDim;
-            canvas.height = targetDim;
+            const minDim = Math.min(vw, vh);
 
-            // When zoomed in, crop center portion so distant shelf QR fills frame
-            const currentZoom = zoomLevel;
-            if (currentZoom > 1) {
-              const cropW = vw / currentZoom;
-              const cropH = vh / currentZoom;
-              const cropX = (vw - cropW) / 2;
-              const cropY = (vh - cropH) / 2;
-              ctx.drawImage(video, cropX, cropY, cropW, cropH, 0, 0, canvas.width, canvas.height);
-            } else {
-              ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            // PASS 1: Center Square Crop (matches optical viewfinder target, zoomed into shelf QR)
+            // This ensures distant shelf QR fills frame with 100% distortion-free square geometry
+            const cropFraction = Math.max(0.4, 0.85 / Math.max(1, zoomLevel));
+            const cropSize = Math.round(minDim * cropFraction);
+            const cropX = Math.round((vw - cropSize) / 2);
+            const cropY = Math.round((vh - cropSize) / 2);
+            const squareDim = 640;
+
+            canvas.width = squareDim;
+            canvas.height = squareDim;
+            ctx.drawImage(video, cropX, cropY, cropSize, cropSize, 0, 0, squareDim, squareDim);
+
+            const squareData = ctx.getImageData(0, 0, squareDim, squareDim);
+            let qrResult = jsQR(squareData.data, squareDim, squareDim, {
+              inversionAttempts: 'attemptBoth',
+            });
+
+            if (qrResult && qrResult.data) {
+              handleDetectedCode(qrResult.data);
+              return;
             }
 
-            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-            const qrResult = jsQR(imageData.data, imageData.width, imageData.height, {
+            // PASS 2: Full video frame with uniform aspect ratio (for close-up or off-center QR codes)
+            const scale = Math.min(1, 800 / Math.max(vw, vh));
+            const fullW = Math.round(vw * scale);
+            const fullH = Math.round(vh * scale);
+
+            canvas.width = fullW;
+            canvas.height = fullH;
+            ctx.drawImage(video, 0, 0, fullW, fullH);
+
+            const fullData = ctx.getImageData(0, 0, fullW, fullH);
+            qrResult = jsQR(fullData.data, fullW, fullH, {
               inversionAttempts: 'attemptBoth',
             });
 

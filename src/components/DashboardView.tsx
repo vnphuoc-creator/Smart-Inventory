@@ -35,19 +35,28 @@ import {
   CalculatedMaterialStock,
   InventoryTransaction,
   User,
+  Material,
+  WarehouseShelfEntity,
 } from '../types';
 import { formatVND, formatNumber } from '../utils/inventoryEngine';
 import { SeagullMascotWelcome } from './SeagullMascotWelcome';
+import { WarehouseHomeWidget } from './WarehouseHomeWidget';
+import { DEFAULT_WAREHOUSE_ENTITIES } from '../data/warehouseLayoutData';
 
 interface DashboardViewProps {
   currentUser: User;
   calculatedStocks: CalculatedMaterialStock[];
   transactions: InventoryTransaction[];
+  materials?: Material[];
+  warehouseEntities?: WarehouseShelfEntity[];
   onNavigateTab: (tab: string, filter?: string) => void;
-  onOpenCreateTransaction: (type: 'IMPORT' | 'EXPORT') => void;
+  onOpenCreateTransaction: (type: 'IMPORT' | 'EXPORT', prefillCode?: string) => void;
   onApproveTransaction: (txId: string) => void;
   onRejectTransaction: (txId: string) => void;
   onOpenStockCard: (materialCode: string) => void;
+  onOpenMasterEditor?: () => void;
+  onOpenPrintModal?: (shelfId?: string, compId?: string) => void;
+  onOpenFullMap?: () => void;
 }
 
 const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#06b6d4', '#64748b'];
@@ -56,11 +65,16 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   currentUser,
   calculatedStocks,
   transactions,
+  materials = [],
+  warehouseEntities = [],
   onNavigateTab,
   onOpenCreateTransaction,
   onApproveTransaction,
   onRejectTransaction,
   onOpenStockCard,
+  onOpenMasterEditor,
+  onOpenPrintModal,
+  onOpenFullMap,
 }) => {
   // Aggregate Metrics
   const totalMaterialCount = calculatedStocks.length;
@@ -210,7 +224,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               Kiểm Tra Tồn Kho &amp; Vị Trí
             </h3>
             <p className="text-xs text-slate-400 mt-1 leading-relaxed">
-              Tra cứu &gt;600 mã chuẩn DN_*, số lượng khả dụng, định mức min và vị trí kệ tủ.
+              Tra cứu &gt;2.000 mã chuẩn DN_*, số lượng khả dụng, định mức min và vị trí kệ tủ.
             </p>
           </div>
           <div className="mt-3 pt-3 border-t border-slate-800 flex items-center justify-between text-xs text-indigo-400 font-medium">
@@ -358,6 +372,20 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </p>
         </div>
       </div>
+
+      {/* Sơ Đồ Kho & Hệ Thống Kệ 4 Tầng Thông Minh (Trực diện trang chủ) */}
+      <WarehouseHomeWidget
+        entities={warehouseEntities && warehouseEntities.length > 0 ? warehouseEntities : DEFAULT_WAREHOUSE_ENTITIES}
+        materials={materials}
+        calculatedStocks={calculatedStocks}
+        currentUser={currentUser}
+        onOpenMasterEditor={onOpenMasterEditor}
+        onOpenPrintModal={onOpenPrintModal}
+        onOpenFullMap={onOpenFullMap || (() => onNavigateTab('warehouse-map'))}
+        onQuickTransaction={(type, materialCode) => {
+          onOpenCreateTransaction(type === 'IN' ? 'IMPORT' : 'EXPORT', materialCode);
+        }}
+      />
 
       {/* Analytics Charts Row */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

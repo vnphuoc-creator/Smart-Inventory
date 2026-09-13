@@ -61,7 +61,7 @@ export const AiAssistantView: React.FC<AiAssistantViewProps> = ({
       sender: 'AI',
       text: `Xin chào **${currentUser.fullName}**! Tôi là Trợ Lý AI Quản Lý Vật Tư Kho (Đội Điện Nước AHT).
 Bạn có thể hỏi tôi bất kỳ thông tin nào về:
-- **Tồn kho tức thời** của hơn 600 mã vật tư chuẩn \`DN_*\` (ví dụ: \`DN_VT_DHDDN_02\`, \`DN_VT_MCBSC_01\`, \`DN_VT_D25MM_01\`,...)
+- **Tồn kho tức thời** của hơn 2.000 mã vật tư chuẩn \`DN_*\` (ví dụ: \`DN_VT_DHDDN_02\`, \`DN_VT_MCBSC_01\`, \`DN_VT_D25MM_01\`,...)
 - **Cảnh báo thiếu hụt**, vật tư sắp hết hoặc vượt định mức an toàn
 - **Đối chiếu tiến độ nhập hàng** theo các **Tờ trình mua sắm** (Tờ trình 17, 26, 31, 45,...)
 - **Gợi ý lập phiếu xuất/nhập kho** với thao tác 1 chạm trực tiếp.`,

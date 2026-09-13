@@ -12,8 +12,9 @@ import {
   limit,
 } from 'firebase/firestore';
 import { db } from '../firebase';
-import { User, Material, PurchaseProposal, InventoryTransaction, ActivityLog, ActivityActionType } from '../types';
+import { User, Material, PurchaseProposal, InventoryTransaction, ActivityLog, ActivityActionType, WarehouseShelfEntity } from '../types';
 import { normalizeProposalNumber, isProposalMatch } from '../utils/inventoryEngine';
+import { normalizeWarehouseEntities } from '../data/warehouseLayoutData';
 
 // Collection references
 const USERS_COL = 'users';
@@ -939,6 +940,7 @@ export interface SystemSettingsConfig {
   googleSheetAutoSync?: boolean;
   googleSheetLastSyncedAt?: string;
   googleSheetTotalItems?: number;
+  warehouseLayout?: WarehouseShelfEntity[];
 }
 
 const SETTINGS_DOC_ID = 'general_config';
@@ -1134,4 +1136,91 @@ export async function refreshAllFromCloud(): Promise<{
   }
 
   return { users, materials, proposals, transactions, settings };
+}
+
+/**
+ * 7. REAL-TIME WAREHOUSE LAYOUT SYNC (Shelves, Tiers & Compartments)
+ * Enables Master Admin to dynamically edit shelf layouts, tiers, and compartment assignments.
+ * Persists to Cloud Firestore and local storage with real-time broadcast across all devices.
+ */
+const WAREHOUSE_LAYOUT_COL = 'warehouse_layouts';
+const WAREHOUSE_LAYOUT_DOC_ID = 'master_layout';
+const LOCAL_WAREHOUSE_LAYOUT_KEY = 'smart_warehouse_master_layout_v3';
+
+export async function saveWarehouseLayoutToCloud(
+  entities: WarehouseShelfEntity[],
+  userEmail?: string
+): Promise<boolean> {
+  try {
+    const normalized = normalizeWarehouseEntities(entities);
+    // Save to local storage first for offline resilience
+    try {
+      localStorage.setItem(LOCAL_WAREHOUSE_LAYOUT_KEY, JSON.stringify(normalized));
+    } catch {}
+
+    const ref = doc(db, WAREHOUSE_LAYOUT_COL, WAREHOUSE_LAYOUT_DOC_ID);
+    await setDoc(
+      ref,
+      {
+        entities: cleanForFirestore(normalized),
+        updatedAt: new Date().toISOString(),
+        updatedBy: userEmail || 'Master Admin (vn.phuoc235@gmail.com)',
+      },
+      { merge: true }
+    );
+    broadcastLocalChange('SETTINGS');
+    return true;
+  } catch (e) {
+    console.error('Error saving warehouse layout to Firebase:', e);
+    return false;
+  }
+}
+
+export function subscribeToWarehouseLayout(
+  onUpdate: (entities: WarehouseShelfEntity[]) => void,
+  fallbackEntities: WarehouseShelfEntity[]
+): () => void {
+  const normalizedFallback = normalizeWarehouseEntities(fallbackEntities);
+
+  // Check local storage cached copy first
+  try {
+    const cached = localStorage.getItem(LOCAL_WAREHOUSE_LAYOUT_KEY);
+    if (cached) {
+      const parsed = JSON.parse(cached);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        onUpdate(normalizeWarehouseEntities(parsed));
+      }
+    }
+  } catch {}
+
+  const ref = doc(db, WAREHOUSE_LAYOUT_COL, WAREHOUSE_LAYOUT_DOC_ID);
+  return onSnapshot(
+    ref,
+    (snapshot) => {
+      if (snapshot.exists()) {
+        const data = snapshot.data();
+        if (data && Array.isArray(data.entities) && data.entities.length > 0) {
+          const normalized = normalizeWarehouseEntities(data.entities as WarehouseShelfEntity[]);
+          try {
+            localStorage.setItem(LOCAL_WAREHOUSE_LAYOUT_KEY, JSON.stringify(normalized));
+          } catch {}
+          onUpdate(normalized);
+          return;
+        }
+      }
+      // If no document exists yet, fallback to default and seed it
+      onUpdate(normalizedFallback);
+    },
+    (err) => {
+      console.warn('Firebase warehouse layout sync error, using fallback:', err);
+      onUpdate(normalizedFallback);
+    }
+  );
+}
+
+export async function resetWarehouseLayoutInCloud(
+  defaultEntities: WarehouseShelfEntity[],
+  userEmail?: string
+): Promise<boolean> {
+  return saveWarehouseLayoutToCloud(defaultEntities, userEmail);
 }

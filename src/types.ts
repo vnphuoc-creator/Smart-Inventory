@@ -288,3 +288,71 @@ export const DEFAULT_THEME_CONFIG: UIThemeConfig = {
   customAppTitle: 'Hệ Thống Quản Lý Kho Vật Tư AHT',
 };
 
+// ==========================================
+// WAREHOUSE LAYOUT & COMPARTMENT DEFINITIONS
+// ==========================================
+
+export type ShelfVisualContainerType =
+  | 'blue-bins'       // Khay nhựa xanh
+  | 'clear-boxes'     // Hộp nhựa trong quai đỏ
+  | 'cadivi-coils'    // Cuộn dây CADIVI tròn
+  | 'cardboard-boxes' // Thùng carton phụ kiện
+  | 'tool-case';      // Hộp đồ nghề kỹ thuật
+
+export interface WarehouseCompartment {
+  id: string; // e.g. "KE-03-T3-K01"
+  code: string; // e.g. "K01" or "KHAY-1"
+  name: string; // e.g. "Khay 1: Aptomat MCB 1P 10A-20A Schneider"
+  description?: string;
+  visualType: ShelfVisualContainerType;
+  sampleItems?: string[];
+  assignedMaterialCodes?: string[]; // Specific material codes assigned directly to this tray
+  itemKeywords?: string[]; // Keywords for fallback matching
+  qrCodeValue?: string; // Specific QR value (defaults to e.g. DNCT-WH-KE-03-T3-K01)
+  capacity?: number;
+  notes?: string;
+}
+
+export interface ShelfTierInfo {
+  tierNumber: number; // 1 (Đáy), 2, 3, 4 (Trên cùng)
+  label: string; // e.g. "Tầng 4 (Trên cùng)"
+  categoryDesc: string;
+  itemKeywords: string[];
+  visualType: ShelfVisualContainerType;
+  sampleItems: string[];
+  compartments?: WarehouseCompartment[]; // Multi-tray/compartment layout per tier!
+}
+
+export interface WarehouseShelfEntity {
+  id: string;
+  code: string;
+  name: string;
+  type: 'SHELF_4_TIER' | 'TOOL_CABINET' | 'UPS_CABINET' | 'BATTERY_RACK' | 'DISTRIBUTION_BOARD';
+  categoryLabel: string;
+  dimensions: {
+    lengthMm: number; // e.g. 1500mm
+    widthMm: number;  // e.g. 500mm
+    heightMm: number; // e.g. 1500mm
+    levels: number;   // 4 tiers
+  };
+  svgRect: {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  };
+  colorTheme: {
+    base: string;
+    border: string;
+    glow: string;
+    badgeBg: string;
+    badgeText: string;
+  };
+  tiers?: ShelfTierInfo[];
+  description: string;
+  qrCodeValue: string;
+  notes?: string;
+  updatedAt?: string;
+  updatedBy?: string;
+}
+

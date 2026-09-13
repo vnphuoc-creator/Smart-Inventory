@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import {
   Layers,
   Search,
@@ -28,7 +28,8 @@ import {
   X,
   ExternalLink,
 } from 'lucide-react';
-import { Material, CalculatedMaterialStock } from '../types';
+import { Material, CalculatedMaterialStock, WarehouseShelfEntity, User, ShelfTierInfo } from '../types';
+import { DEFAULT_WAREHOUSE_ENTITIES } from '../data/warehouseLayoutData';
 import { formatNumber } from '../utils/inventoryEngine';
 
 interface WarehouseMapViewProps {
@@ -36,527 +37,31 @@ interface WarehouseMapViewProps {
   calculatedStocks: { [materialCode: string]: CalculatedMaterialStock } | CalculatedMaterialStock[];
   onSelectMaterial: (material: Material) => void;
   onUpdateMaterialLocation?: (materialCode: string, newLocation: string) => Promise<void> | void;
+  entities?: WarehouseShelfEntity[];
+  currentUser?: User | null;
+  onOpenMasterEditor?: () => void;
+  onOpenPrintModal?: (shelfId?: string, compId?: string) => void;
 }
 
-// Visual definition of warehouse zones and shelves
-interface ShelfTierInfo {
-  tierNumber: number;
-  label: string;
-  categoryDesc: string;
-  itemKeywords: string[];
-  visualType: 'blue-bins' | 'clear-boxes' | 'cadivi-coils' | 'cardboard-boxes' | 'tool-case';
-  sampleItems: string[];
-}
-
-interface WarehouseShelfEntity {
-  id: string;
-  code: string;
-  name: string;
-  type: 'SHELF_4_TIER' | 'TOOL_CABINET' | 'UPS_CABINET' | 'BATTERY_RACK' | 'DISTRIBUTION_BOARD';
-  categoryLabel: string;
-  dimensions: {
-    lengthMm: number; // dài 1500mm
-    widthMm: number;  // rộng 500mm
-    heightMm: number; // cao 1500mm
-    levels: number;   // 4 tầng
-  };
-  svgRect: {
-    x: number;
-    y: number;
-    width: number;
-    height: number;
-  };
-  colorTheme: {
-    base: string;
-    border: string;
-    glow: string;
-    badgeBg: string;
-    badgeText: string;
-  };
-  tiers?: ShelfTierInfo[];
-  description: string;
-  qrCodeValue: string;
-  notes?: string;
-}
-
-// Master data of room equipment according to Image 1 and warehouse photos
-const WAREHOUSE_ENTITIES: WarehouseShelfEntity[] = [
-  // 1. TỦ ĐỒ NGHỀ 1 (Bắt đầu từ cửa vào, tủ kim loại xanh dương 2 cánh bảo hộ)
-  {
-    id: 'TDN-01',
-    code: 'TDN-01',
-    name: 'Tủ Đồ Nghề Kỹ Thuật 1',
-    type: 'TOOL_CABINET',
-    categoryLabel: 'Dụng Cụ An Toàn & Thi Công',
-    dimensions: { lengthMm: 900, widthMm: 500, heightMm: 1800, levels: 4 },
-    svgRect: { x: 740, y: 70, width: 65, height: 75 },
-    colorTheme: {
-      base: 'from-blue-600/30 to-blue-900/40',
-      border: 'border-blue-500',
-      glow: 'shadow-blue-500/30',
-      badgeBg: 'bg-blue-600/20 text-blue-300 border-blue-500/40',
-      badgeText: 'text-blue-300',
-    },
-    description: 'Tủ thép xanh 2 cánh bảo hộ chuyên biệt: Dụng cụ an toàn điện, kìm ép cosse thủy lực, đồng hồ vạn năng VOM, máy đo điện trở cách điện Megger, găng tay cách điện hạ thế.',
-    qrCodeValue: 'DNCT-WH-CABINET-TOOL-01',
-    notes: 'Có dán mã QR trên góc cánh tủ để quét nhanh bàn giao ca.',
-    tiers: [
-      { tierNumber: 4, label: 'Tầng 4', categoryDesc: 'Thiết bị đo kiểm Fluke/Kyoritsu & Đồng hồ đo điện áp', itemKeywords: ['fluke', 'đo', 'vom', 'ampe', 'megger'], visualType: 'tool-case', sampleItems: ['Đồng hồ VOM Fluke 179', 'Ampe kìm Kyoritsu 2002PA', 'Máy đo điện trở đất'] },
-      { tierNumber: 3, label: 'Tầng 3', categoryDesc: 'Kìm ép cosse cơ & thủy lực, kìm tuốt dây', itemKeywords: ['kìm', 'cosse', 'tuốt', 'bấm'], visualType: 'tool-case', sampleItems: ['Kìm ép cosse thủy lực YQK-300', 'Kìm tuốt dây tự động', 'Bộ tuốc nơ vít cách điện 1000V'] },
-      { tierNumber: 2, label: 'Tầng 2', categoryDesc: 'Đồ bảo hộ an toàn điện, mũ nón, găng tay cách điện', itemKeywords: ['găng', 'bảo hộ', 'cách điện', 'kính'], visualType: 'tool-case', sampleItems: ['Găng tay cách điện hạ thế 1000V', 'Kính bảo hộ chống hồ quang', 'Ủng cách điện'] },
-      { tierNumber: 1, label: 'Tầng 1', categoryDesc: 'Máy hàn thiếc, cuộn chì, đồng hồ kiểm tra pha', itemKeywords: ['hàn', 'chì', 'pha', 'thử điện'], visualType: 'tool-case', sampleItems: ['Máy hàn thiếc Weller 80W', 'Bút thử điện cảm ứng', 'Đồng hồ chỉ thị thứ tự pha'] },
-    ],
-  },
-
-  // 2. TỦ ĐỒ NGHỀ 2 (Tủ dụng cụ cơ khí kỹ thuật xám/kính)
-  {
-    id: 'TDN-02',
-    code: 'TDN-02',
-    name: 'Tủ Đồ Nghề Kỹ Thuật 2',
-    type: 'TOOL_CABINET',
-    categoryLabel: 'Dụng Cụ Cơ Khí & Máy Pin',
-    dimensions: { lengthMm: 900, widthMm: 500, heightMm: 1800, levels: 4 },
-    svgRect: { x: 665, y: 70, width: 65, height: 75 },
-    colorTheme: {
-      base: 'from-cyan-600/30 to-slate-850',
-      border: 'border-cyan-500',
-      glow: 'shadow-cyan-500/30',
-      badgeBg: 'bg-cyan-600/20 text-cyan-300 border-cyan-500/40',
-      badgeText: 'text-cyan-300',
-    },
-    description: 'Tủ kim loại xám/kính kỹ thuật: Máy khoan pin Makita/Bosch, bộ mũi khoan đa năng, máy cắt sắt, cưa cầm tay, bộ cờ lê mỏ lết, búa cao su, súng bắn keo nến.',
-    qrCodeValue: 'DNCT-WH-CABINET-TOOL-02',
-    tiers: [
-      { tierNumber: 4, label: 'Tầng 4', categoryDesc: 'Máy khoan pin, sạc dự phòng & pin 18V', itemKeywords: ['khoan', 'pin', 'makita', 'bosch', 'sạc'], visualType: 'tool-case', sampleItems: ['Máy khoan búa pin Makita 18V', 'Máy vặn vít pin Bosch', 'Đốc sạc nhanh 18V kép'] },
-      { tierNumber: 3, label: 'Tầng 3', categoryDesc: 'Bộ mũi khoan bê tông, sắt, mũi khoét lỗ tủ điện', itemKeywords: ['mũi', 'khoan', 'khoét', 'taro'], visualType: 'clear-boxes', sampleItems: ['Bộ mũi khoét lỗ tủ điện Unika 16-35mm', 'Bộ mũi khoan bê tông rút lõi', 'Bộ taro ren M3-M12'] },
-      { tierNumber: 2, label: 'Tầng 2', categoryDesc: 'Bộ cờ lê tự động, cần xiết lực, mỏ lết răng', itemKeywords: ['cờ lê', 'mỏ lết', 'lục giác', 'khẩu'], visualType: 'tool-case', sampleItems: ['Bộ cờ lê vòng miệng Kingtony 8-32mm', 'Cần xiết lực 20-100Nm', 'Bộ lục giác bông hoa thị'] },
-      { tierNumber: 1, label: 'Tầng 1', categoryDesc: 'Máy cắt cầm tay, cưa tay, búa sắt, búa cao su', itemKeywords: ['cắt', 'cưa', 'búa', 'đục'], visualType: 'tool-case', sampleItems: ['Máy mài góc cầm tay 100mm', 'Cưa sắt cầm tay Eclipse', 'Búa cao su chống xước mặt tủ'] },
-    ],
-  },
-
-  // 3. KỆ 1 (1.5m x 0.5m x 1.5m, 4 Tầng)
-  {
-    id: 'KE-01',
-    code: 'KE-01',
-    name: 'KỆ VẬT TƯ SỐ 1',
-    type: 'SHELF_4_TIER',
-    categoryLabel: 'Vật Tư Nước & Thiết Bị Vệ Sinh',
-    dimensions: { lengthMm: 1500, widthMm: 500, heightMm: 1500, levels: 4 },
-    svgRect: { x: 550, y: 70, width: 105, height: 75 },
-    colorTheme: {
-      base: 'from-emerald-600/30 to-slate-900',
-      border: 'border-emerald-500',
-      glow: 'shadow-emerald-500/30',
-      badgeBg: 'bg-emerald-600/20 text-emerald-300 border-emerald-500/40',
-      badgeText: 'text-emerald-300',
-    },
-    description: 'Kệ sắt v lỗ 4 tầng kích thước 1,5m x 1,5m x 0,5m chuyên chứa vật tư cơ điện nhẹ và thiết bị vệ sinh cao cấp khu vực nhà ga T2.',
-    qrCodeValue: 'DNCT-WH-SHELF-KE-01',
-    notes: 'Kích thước chuẩn: Dài 1.5m x Ngang 1.5m x Rộng 50cm (4 tầng)',
-    tiers: [
-      { tierNumber: 4, label: 'Tầng 4 (Trên cùng)', categoryDesc: 'Xi phông lavabo, đèn quang hợp, LED đường chiếu sáng', itemKeywords: ['xi phông', 'xiphong', 'lavabo', 'đèn', 'quang hợp', 'led'], visualType: 'clear-boxes', sampleItems: ['Xi phông lavabo ruột gà Inox', 'Đèn LED chiếu sáng công nghiệp', 'Đèn quang hợp cây cảnh T2'] },
-      { tierNumber: 3, label: 'Tầng 3', categoryDesc: 'Linh kiện thiết bị vệ sinh TOTO, chốt nắp bồn cầu, đầu vòi', itemKeywords: ['toto', 'bồn cầu', 'chốt', 'vòi', 'lavabo'], visualType: 'cardboard-boxes', sampleItems: ['Chốt cố định nắp bồn cầu TOTO', 'Đầu vòi nối dài bồn rửa', 'Van cấp nước bồn cầu Inax/Toto'] },
-      { tierNumber: 2, label: 'Tầng 2', categoryDesc: 'Keo Silicon, Titebond, phao bồn tiểu, dây cấp nước, thoát sàn', itemKeywords: ['silicon', 'titebond', 'phao', 'bồn tiểu', 'dây cấp', 'thoát sàn'], visualType: 'clear-boxes', sampleItems: ['Chai keo Silicon Apollo A500', 'Keo đa năng Titebond Heavy Duty', 'Dây cấp nước Inox 304 mềm 40cm', 'Phễu thoát sàn khử mùi 10x10'] },
-      { tierNumber: 1, label: 'Tầng 1 (Dưới cùng)', categoryDesc: 'Nắp bồn tiểu, đầu vòi dài, bình xà phòng, vật tư nặng', itemKeywords: ['nắp', 'tiểu', 'vòi', 'xà phòng', 'thùng'], visualType: 'cardboard-boxes', sampleItems: ['Thùng nắp bồn tiểu cảm ứng', 'Bộ xả bồn tiểu nam Viglacera', 'Hộp đựng xà phòng treo tường cảm ứng'] },
-    ],
-  },
-
-  // 4. KỆ 2 (1.5m x 0.5m x 1.5m, 4 Tầng) - HÌNH ẢNH THỰC TẾ PHOTO 3
-  {
-    id: 'KE-02',
-    code: 'KE-02',
-    name: 'KỆ VẬT TƯ SỐ 2',
-    type: 'SHELF_4_TIER',
-    categoryLabel: 'Linh Kiện TOTO & Phụ Kiện Cơ Điện',
-    dimensions: { lengthMm: 1500, widthMm: 500, heightMm: 1500, levels: 4 },
-    svgRect: { x: 435, y: 70, width: 105, height: 75 },
-    colorTheme: {
-      base: 'from-teal-600/30 to-slate-900',
-      border: 'border-teal-500',
-      glow: 'shadow-teal-500/30',
-      badgeBg: 'bg-teal-600/20 text-teal-300 border-teal-500/40',
-      badgeText: 'text-teal-300',
-    },
-    description: 'Kệ sắt v lỗ 4 tầng kích thước 1,5m x 1,5m x 0,5m khớp hình ảnh thực tế: Chứa phụ kiện TOTO bồn cầu, phao cấp nước, keo silicon và hộp linh kiện có quai xách.',
-    qrCodeValue: 'DNCT-WH-SHELF-KE-02',
-    notes: 'Kích thước chuẩn: Dài 1.5m x Ngang 1.5m x Rộng 50cm (4 tầng)',
-    tiers: [
-      { tierNumber: 4, label: 'Tầng 4 (Trên cùng)', categoryDesc: 'Đèn quang hợp, đèn đường LED, xiphong chậu rửa', itemKeywords: ['đèn quang hợp', 'led đường', 'xiphong lavobo', 'xiphong'], visualType: 'clear-boxes', sampleItems: ['Đèn quang hợp trồng cây sảnh T2', 'Đèn LED đường 50W IP66', 'Xiphong Lavabo Inox'] },
-      { tierNumber: 3, label: 'Tầng 3', categoryDesc: 'Nhãn in Brother TZe, hộp phụ kiện TOTO, chốt bồn cầu', itemKeywords: ['nhãn in', 'toto', 'chốt bồn cầu', 'vòi dài'], visualType: 'clear-boxes', sampleItems: ['Cuộn nhãn in TZe-251 24mm', 'Chốt cố định bồn cầu cao su nở', 'Đầu vòi dài Lavabo Inox 304', 'Bộ ron sứ chống rò rỉ bồn cầu'] },
-      { tierNumber: 2, label: 'Tầng 2', categoryDesc: 'Silicon A500, Titebond, phao cấp bồn tiểu, bộ xả nước bồn cầu, thoát sàn', itemKeywords: ['silicon', 'titebon', 'phao bồn tiểu', 'bộ xả bồn cầu', 'dây cấp nước', 'thoát sàn', 'hộp giấy'], visualType: 'clear-boxes', sampleItems: ['Hộp tuýp Silicon Apollo A500 / A300', 'Keo dán gỗ sắt Titebond', 'Phao cấp bồn tiểu cảm ứng', 'Bộ xả nước bồn cầu 2 nút nhấn', 'Dây cấp nước lưới Inox'] },
-      { tierNumber: 1, label: 'Tầng 1 (Dưới cùng)', categoryDesc: 'Thùng đồ nghề tận dụng, nắp bồn tiểu sứ, vòi xả phòng', itemKeywords: ['thùng đồ nghề', 'nắp bồn tiểu', 'vòi xả phòng', 'chân tiểu'], visualType: 'cardboard-boxes', sampleItems: ['Thùng đồ nghề tận dụng đa năng', 'Nắp bồn tiểu Model 5A1 Wonderful', 'Chân đỡ tiểu nam treo tường', 'Bình và vòi xả xà phòng âm bàn'] },
-    ],
-  },
-
-  // 5. KỆ 3 (1.5m x 0.5m x 1.5m, 4 Tầng) - HÌNH ẢNH THỰC TẾ PHOTO 2 (ĐIỆN & CADIVI)
-  {
-    id: 'KE-03',
-    code: 'KE-03',
-    name: 'KỆ VẬT TƯ SỐ 3',
-    type: 'SHELF_4_TIER',
-    categoryLabel: 'Khí Cụ Đóng Cắt CB/MCB & Dây Cáp CADIVI',
-    dimensions: { lengthMm: 1500, widthMm: 500, heightMm: 1500, levels: 4 },
-    svgRect: { x: 320, y: 70, width: 105, height: 75 },
-    colorTheme: {
-      base: 'from-amber-600/30 to-slate-900',
-      border: 'border-amber-500',
-      glow: 'shadow-amber-500/30',
-      badgeBg: 'bg-amber-600/20 text-amber-300 border-amber-500/40',
-      badgeText: 'text-amber-300',
-    },
-    description: 'Kệ trọng điểm về khí cụ điện: Khay nhựa xanh chia ngăn MCB/CB, hộp rơ le đế rơ le, contactor khởi động từ và các cuộn dây điện CADIVI tròn tầng đáy.',
-    qrCodeValue: 'DNCT-WH-SHELF-KE-03',
-    notes: 'Kích thước chuẩn: Dài 1.5m x Ngang 1.5m x Rộng 50cm (4 tầng)',
-    tiers: [
-      { tierNumber: 4, label: 'Tầng 4 (Trên cùng)', categoryDesc: 'Vật tư chờ phân loại, Rơ-le các loại, Đế rơ-le, Timer, Chống sét van, Khởi động từ', itemKeywords: ['chờ phân loại', 'role', 'đế role', 'timer', 'chống sét', 'khởi động từ'], visualType: 'clear-boxes', sampleItems: ['Hộp nhựa quai đỏ: Rơ le Omron 24VDC/220VAC', 'Đế rơ le 8 chân & 14 chân tròn/dẹp', 'Timer thời gian hẹn giờ Autonics', 'Chống sét lan truyền Schneider iPRD', 'Khởi động từ Contactor LS / Fuji'] },
-      { tierNumber: 3, label: 'Tầng 3', categoryDesc: 'Ổ sạc USB đôi 2.1A, Đèn báo pha, Công tắc xoay 2-3 vị trí, Khay xanh MCB 1P (10A, 20A, 32A, 50A, 63A)', itemKeywords: ['sạc usb', 'đèn báo pha', 'công tắc', 'mcb 10a', 'mcb 20a', 'mcb 32a', 'mcb 50a', 'mcb 63a', 'cb 10a', 'cb 20a', 'cb 32a'], visualType: 'blue-bins', sampleItems: ['Mặt ổ sạc USB đôi âm tường 2.1A', 'Đèn báo pha LED 220V Xanh/Đỏ/Vàng phi 22', 'Công tắc xoay 3 vị trí I-O-II Schneider', 'Khay nhựa xanh đựng MCB 1P 10A, 20A, 32A, 50A, 63A'] },
-      { tierNumber: 2, label: 'Tầng 2', categoryDesc: 'Contactor 1P-25A, Contactor 3P-32A, Khay xanh MCB 3P, RCCB 4P (30mA-300mA), RCBO chống rò', itemKeywords: ['contactor 1p-25a', 'contactor 3p-32a', 'mcb 3p', 'rccb 4p', 'rcbo'], visualType: 'blue-bins', sampleItems: ['Contactor Schneider 1P 25A coil 220V', 'Contactor 3P 32A khởi động động cơ', 'MCB 3P 10A, 50A, 63A Schneider Acti9', 'RCCB 4P 63A-300mA, 40A-30mA chống dòng rò', 'RCBO 1P+N 20A-30mA'] },
-      { tierNumber: 1, label: 'Tầng 1 (Dưới cùng)', categoryDesc: 'Các cuộn dây điện đơn & cáp CADIVI, dây TE tiếp địa, dây chống cháy 4mm, nắp sứ bồn tiểu', itemKeywords: ['cadivi', 'dây điện', 'dây te', 'dây l', 'dây n', 'dây chống cháy', '4mm', '2.5mm'], visualType: 'cadivi-coils', sampleItems: ['Cuộn CADIVI 2.5mm² Vàng-Xanh (Dây TE tiếp địa)', 'Cuộn CADIVI 2.5mm² Đỏ (Dây Pha L)', 'Cuộn CADIVI 2.5mm² Đen/Xanh Dương (Dây Trung Tính N)', 'Cuộn CADIVI Chống Cháy 4.0mm² Vỏ Cam Cam', 'Cuộn dây đôi mềm Oval dẹp VCmd 2x1.5'] },
-    ],
-  },
-
-  // 6. KỆ 4 (1.5m x 0.5m x 1.5m, 4 Tầng)
-  {
-    id: 'KE-04',
-    code: 'KE-04',
-    name: 'KỆ VẬT TƯ SỐ 4',
-    type: 'SHELF_4_TIER',
-    categoryLabel: 'Nguồn Meanwell, Biến Áp & Phụ Kiện Điện Nhẹ',
-    dimensions: { lengthMm: 1500, widthMm: 500, heightMm: 1500, levels: 4 },
-    svgRect: { x: 205, y: 70, width: 105, height: 75 },
-    colorTheme: {
-      base: 'from-indigo-600/30 to-slate-900',
-      border: 'border-indigo-500',
-      glow: 'shadow-indigo-500/30',
-      badgeBg: 'bg-indigo-600/20 text-indigo-300 border-indigo-500/40',
-      badgeText: 'text-indigo-300',
-    },
-    description: 'Kệ sắt v lỗ 4 tầng kích thước 1,5m x 1,5m x 0,5m chuyên chứa bộ nguồn tổ ong Meanwell, biến dòng đo lường CT, quạt tản nhiệt UPS và đầu cosse.',
-    qrCodeValue: 'DNCT-WH-SHELF-KE-04',
-    notes: 'Kích thước chuẩn: Dài 1.5m x Ngang 1.5m x Rộng 50cm (4 tầng)',
-    tiers: [
-      { tierNumber: 4, label: 'Tầng 4 (Trên cùng)', categoryDesc: 'Bộ nguồn tổ ong Meanwell 12V-350W, 24V-150W, Adapter Camera', itemKeywords: ['meanwell', 'nguồn', '12v', '24v', 'adapter'], visualType: 'cardboard-boxes', sampleItems: ['Nguồn Meanwell LRS-350-12 (12V 29A)', 'Nguồn Meanwell NDR-120-24 gắn thanh ray', 'Bộ nguồn dự phòng 24VDC 5A Schneider'] },
-      { tierNumber: 3, label: 'Tầng 3', categoryDesc: 'Biến áp đo lường CT 50/5A - 400/5A, đồng hồ đo đa năng Selec', itemKeywords: ['ct', 'biến dòng', 'selec', 'đồng hồ tủ'], visualType: 'clear-boxes', sampleItems: ['Biến dòng hở CT 100/5A Omega', 'Đồng hồ đa năng kỹ thuật số Selec MFM384', 'Bộ chuyển đổi tín hiệu 4-20mA'] },
-      { tierNumber: 2, label: 'Tầng 2', categoryDesc: 'Đầu cosse đồng SC, cosse tròn, cosse pin kim, ống co nhiệt, dây rút', itemKeywords: ['cosse', 'cos', 'sc', 'co nhiệt', 'dây rút'], visualType: 'blue-bins', sampleItems: ['Hộp cosse đồng đúc mạ thiếc SC 16-6, SC 25-8, SC 50-10', 'Đầu cosse pin kim bấm dây điều khiển', 'Cuộn ống co nhiệt phi 4, 6, 8, 12 chống cháy'] },
-      { tierNumber: 1, label: 'Tầng 1 (Dưới cùng)', categoryDesc: 'Quạt tản nhiệt tủ UPS 220VAC, lưới lọc bụi công nghiệp, biến áp cách ly', itemKeywords: ['quạt', 'tản nhiệt', 'ups', 'lọc bụi', 'biến áp'], visualType: 'cardboard-boxes', sampleItems: ['Quạt hút tản nhiệt Sunon 120x120 220VAC', 'Tấm lọc bụi than hoạt tính cho tủ điện', 'Biến áp cách ly 1 pha 220V/110V 500VA'] },
-    ],
-  },
-
-  // 7. KỆ 5 (1.5m x 0.5m x 1.5m, 4 Tầng - Góc trong cùng gần cụm ắc quy)
-  {
-    id: 'KE-05',
-    code: 'KE-05',
-    name: 'KỆ VẬT TƯ SỐ 5',
-    type: 'SHELF_4_TIER',
-    categoryLabel: 'Vật Tư Dự Phòng Sự Cố & Đóng Cắt Lớn',
-    dimensions: { lengthMm: 1500, widthMm: 500, heightMm: 1500, levels: 4 },
-    svgRect: { x: 90, y: 70, width: 105, height: 75 },
-    colorTheme: {
-      base: 'from-purple-600/30 to-slate-900',
-      border: 'border-purple-500',
-      glow: 'shadow-purple-500/30',
-      badgeBg: 'bg-purple-600/20 text-purple-300 border-purple-500/40',
-      badgeText: 'text-purple-300',
-    },
-    description: 'Kệ sắt v lỗ 4 tầng kích thước 1,5m x 1,5m x 0,5m nằm trong cùng giáp cụm ắc quy tường trái: Chứa khí cụ đóng cắt công suất lớn, cầu dao ACB/MCCB dự phòng và thanh đồng tiếp địa.',
-    qrCodeValue: 'DNCT-WH-SHELF-KE-05',
-    notes: 'Kích thước chuẩn: Dài 1.5m x Ngang 1.5m x Rộng 50cm (4 tầng)',
-    tiers: [
-      { tierNumber: 4, label: 'Tầng 4 (Trên cùng)', categoryDesc: 'Cầu chì bán dẫn công suất cao, phụ kiện đóng cắt UPS Socomec', itemKeywords: ['cầu chì', 'bán dẫn', 'socomec', 'ups'], visualType: 'clear-boxes', sampleItems: ['Cầu chì bán dẫn Bussmann 160A 690V cho UPS', 'Bo mạch điều khiển bypass Socomec', 'Màn hình LCD thay thế UPS Delphys'] },
-      { tierNumber: 3, label: 'Tầng 3', categoryDesc: 'MCCB 3P khối đúc từ 100A đến 250A Schneider Compact NSX', itemKeywords: ['mccb', 'nsx', '100a', '160a', '250a'], visualType: 'cardboard-boxes', sampleItems: ['Aptomat khối MCCB 3P 100A 36kA Schneider', 'MCCB 3P 160A chỉnh định nhiệt từ', 'Cuộn cắt Shunt Trip 220VAC cho MCCB'] },
-      { tierNumber: 2, label: 'Tầng 2', categoryDesc: 'Khối Contactor 3P 65A - 150A, Rơ le nhiệt bảo vệ quá tải', itemKeywords: ['contactor 65a', 'contactor 150a', 'rơ le nhiệt', 'overload'], visualType: 'blue-bins', sampleItems: ['Contactor 3P 65A Schneider LC1D65', 'Rơ le nhiệt bảo vệ động cơ LRD3353', 'Khối tiếp điểm phụ NO+NC gá mặt trước'] },
-      { tierNumber: 1, label: 'Tầng 1 (Dưới cùng)', categoryDesc: 'Thanh đồng thanh cái Busbar, cọc tiếp địa đồng D16, cáp bện đồng trần', itemKeywords: ['đồng', 'thanh cái', 'tiếp địa', 'cọc đồng', 'busbar'], visualType: 'cadivi-coils', sampleItems: ['Cọc tiếp địa đồng nguyên chất phi 16 dài 2.4m', 'Thanh đồng cái Busbar 30x5mm mạ thiếc', 'Cuộn cáp đồng trần M50 thoát sét tiếp đất'] },
-    ],
-  },
-
-  // 8. CỤM TỦ UPS & ẮC QUY HÀNG 1 (Ở GIỮA PHÒNG - UPPER ROW)
-  {
-    id: 'UPS-1-EQPT',
-    code: 'UPS-1 EQPT',
-    name: 'Tủ Nguồn Lưu Điện UPS-1',
-    type: 'UPS_CABINET',
-    categoryLabel: 'Hệ Thống Nguồn UPS Công Nghiệp',
-    dimensions: { lengthMm: 800, widthMm: 850, heightMm: 1900, levels: 1 },
-    svgRect: { x: 535, y: 190, width: 75, height: 85 },
-    colorTheme: {
-      base: 'from-slate-800 to-slate-950',
-      border: 'border-yellow-500',
-      glow: 'shadow-yellow-500/20',
-      badgeBg: 'bg-yellow-500/20 text-yellow-300 border-yellow-500/40',
-      badgeText: 'text-yellow-300',
-    },
-    description: 'Tủ UPS công nghiệp Socomec Delphys BC (160kVA - 200kVA) cấp nguồn liên tục cho thiết bị điều hành nhà ga sân bay T2. Đặt trong vùng cảnh báo an toàn sọc vàng đen.',
-    qrCodeValue: 'DNCT-SYS-UPS-01-EQPT',
-    notes: 'Khu vực điện cao thế - Bắt buộc mang đồ bảo hộ khi kiểm tra.',
-  },
-  {
-    id: 'BATT-2-UPS-1',
-    code: 'BATT.2 UPS-1',
-    name: 'Tủ Ắc Quy Dự Phòng 2 (UPS 1)',
-    type: 'BATTERY_RACK',
-    categoryLabel: 'Dàn Ắc Quy Chì-Axit Kín Khí',
-    dimensions: { lengthMm: 1000, widthMm: 800, heightMm: 1900, levels: 4 },
-    svgRect: { x: 615, y: 190, width: 95, height: 85 },
-    colorTheme: {
-      base: 'from-slate-800 to-slate-950',
-      border: 'border-amber-500',
-      glow: 'shadow-amber-500/20',
-      badgeBg: 'bg-amber-500/20 text-amber-300 border-amber-500/40',
-      badgeText: 'text-amber-300',
-    },
-    description: 'Dàn ắc quy khô viễn thông chuyên dụng 12V-150Ah/200Ah kết nối chuỗi DC dự phòng thời lượng 30-60 phút cho UPS-1.',
-    qrCodeValue: 'DNCT-SYS-BATT-02-UPS-01',
-  },
-  {
-    id: 'BATT-1-UPS-1',
-    code: 'BATT.1 UPS-1',
-    name: 'Tủ Ắc Quy Dự Phòng 1 (UPS 1)',
-    type: 'BATTERY_RACK',
-    categoryLabel: 'Dàn Ắc Quy Chì-Axit Kín Khí',
-    dimensions: { lengthMm: 1000, widthMm: 800, heightMm: 1900, levels: 4 },
-    svgRect: { x: 715, y: 190, width: 95, height: 85 },
-    colorTheme: {
-      base: 'from-slate-800 to-slate-950',
-      border: 'border-amber-500',
-      glow: 'shadow-amber-500/20',
-      badgeBg: 'bg-amber-500/20 text-amber-300 border-amber-500/40',
-      badgeText: 'text-amber-300',
-    },
-    description: 'Dàn ắc quy khô chuyên dụng UPS-1 chuỗi 1 cấp nguồn cho tải thiết bị trọng yếu sân bay.',
-    qrCodeValue: 'DNCT-SYS-BATT-01-UPS-01',
-  },
-
-  // 9. CỤM TỦ UPS & ẮC QUY HÀNG 2 (LOWER ROW)
-  {
-    id: 'UPS-2-EQPT',
-    code: 'UPS-2 EQPT',
-    name: 'Tủ Nguồn Lưu Điện UPS-2',
-    type: 'UPS_CABINET',
-    categoryLabel: 'Hệ Thống Nguồn UPS Công Nghiệp',
-    dimensions: { lengthMm: 800, widthMm: 850, heightMm: 1900, levels: 1 },
-    svgRect: { x: 435, y: 340, width: 75, height: 85 },
-    colorTheme: {
-      base: 'from-slate-800 to-slate-950',
-      border: 'border-yellow-500',
-      glow: 'shadow-yellow-500/20',
-      badgeBg: 'bg-yellow-500/20 text-yellow-300 border-yellow-500/40',
-      badgeText: 'text-yellow-300',
-    },
-    description: 'Tủ nguồn UPS Socomec Hệ thống 2 chạy song song dự phòng N+1 bảo đảm tính sẵn sàng 99.999% cho Cảng HKQT Đà Nẵng.',
-    qrCodeValue: 'DNCT-SYS-UPS-02-EQPT',
-  },
-  {
-    id: 'BATT-3-UPS-2',
-    code: 'BATT.3 UPS-2',
-    name: 'Tủ Ắc Quy 3 (UPS 2)',
-    type: 'BATTERY_RACK',
-    categoryLabel: 'Dàn Ắc Quy Chì-Axit Kín Khí',
-    dimensions: { lengthMm: 1000, widthMm: 800, heightMm: 1900, levels: 4 },
-    svgRect: { x: 515, y: 340, width: 95, height: 85 },
-    colorTheme: {
-      base: 'from-slate-800 to-slate-950',
-      border: 'border-amber-500',
-      glow: 'shadow-amber-500/20',
-      badgeBg: 'bg-amber-500/20 text-amber-300 border-amber-500/40',
-      badgeText: 'text-amber-300',
-    },
-    description: 'Dàn ắc quy lưu điện dự phòng chuỗi 3 cho hệ thống UPS-2.',
-    qrCodeValue: 'DNCT-SYS-BATT-03-UPS-02',
-  },
-  {
-    id: 'BATT-2-UPS-2',
-    code: 'BATT.2 UPS-2',
-    name: 'Tủ Ắc Quy 2 (UPS 2)',
-    type: 'BATTERY_RACK',
-    categoryLabel: 'Dàn Ắc Quy Chì-Axit Kín Khí',
-    dimensions: { lengthMm: 1000, widthMm: 800, heightMm: 1900, levels: 4 },
-    svgRect: { x: 615, y: 340, width: 95, height: 85 },
-    colorTheme: {
-      base: 'from-slate-800 to-slate-950',
-      border: 'border-amber-500',
-      glow: 'shadow-amber-500/20',
-      badgeBg: 'bg-amber-500/20 text-amber-300 border-amber-500/40',
-      badgeText: 'text-amber-300',
-    },
-    description: 'Dàn ắc quy lưu điện dự phòng chuỗi 2 cho hệ thống UPS-2.',
-    qrCodeValue: 'DNCT-SYS-BATT-02-UPS-02',
-  },
-  {
-    id: 'BATT-1-UPS-2',
-    code: 'BATT.1 UPS-2',
-    name: 'Tủ Ắc Quy 1 (UPS 2)',
-    type: 'BATTERY_RACK',
-    categoryLabel: 'Dàn Ắc Quy Chì-Axit Kín Khí',
-    dimensions: { lengthMm: 1000, widthMm: 800, heightMm: 1900, levels: 4 },
-    svgRect: { x: 715, y: 340, width: 95, height: 85 },
-    colorTheme: {
-      base: 'from-slate-800 to-slate-950',
-      border: 'border-amber-500',
-      glow: 'shadow-amber-500/20',
-      badgeBg: 'bg-amber-500/20 text-amber-300 border-amber-500/40',
-      badgeText: 'text-amber-300',
-    },
-    description: 'Dàn ắc quy lưu điện dự phòng chuỗi 1 cho hệ thống UPS-2.',
-    qrCodeValue: 'DNCT-SYS-BATT-01-UPS-02',
-  },
-
-  // 10. DÃY TỦ PHÂN PHỐI ĐIỆN (DISTRIBUTION PANELS - DỌC TƯỜNG DƯỚI)
-  {
-    id: 'ESB-UPS-LTG',
-    code: 'ESB-UPS LTG',
-    name: 'Tủ ESB-UPS LTG (Chiếu Sáng Khẩn Cấp)',
-    type: 'DISTRIBUTION_BOARD',
-    categoryLabel: 'Tủ Phân Phối Schneider Prisma',
-    dimensions: { lengthMm: 1400, widthMm: 600, heightMm: 2200, levels: 1 },
-    svgRect: { x: 35, y: 520, width: 140, height: 70 },
-    colorTheme: {
-      base: 'from-slate-100 to-slate-300 text-slate-900',
-      border: 'border-emerald-500',
-      glow: 'shadow-emerald-500/20',
-      badgeBg: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40',
-      badgeText: 'text-emerald-300',
-    },
-    description: 'Tủ phân phối điện chiếu sáng khẩn cấp Emergency Switchboard (ESB) màu trắng kem Schneider có cánh kính bảo vệ. Cung cấp điện cho đèn sự cố, đèn thoát hiểm Exit.',
-    qrCodeValue: 'DNCT-SYS-ESB-UPS-LTG',
-  },
-  {
-    id: 'ESB-UPS-EQPT',
-    code: 'ESB-UPS EQPT',
-    name: 'Tủ ESB-UPS EQPT (Thiết Bị Khẩn Cấp)',
-    type: 'DISTRIBUTION_BOARD',
-    categoryLabel: 'Tủ Phân Phối Schneider Prisma',
-    dimensions: { lengthMm: 1400, widthMm: 600, heightMm: 2200, levels: 1 },
-    svgRect: { x: 210, y: 520, width: 140, height: 70 },
-    colorTheme: {
-      base: 'from-slate-100 to-slate-300 text-slate-900',
-      border: 'border-blue-500',
-      glow: 'shadow-blue-500/20',
-      badgeBg: 'bg-blue-500/20 text-blue-300 border-blue-500/40',
-      badgeText: 'text-blue-300',
-    },
-    description: 'Tủ phân phối điện cho thiết bị phụ trợ khẩn cấp phục vụ an ninh và thông tin liên lạc sân bay.',
-    qrCodeValue: 'DNCT-SYS-ESB-UPS-EQPT',
-  },
-  {
-    id: 'DP-UPS-LTG',
-    code: 'DP-UPS LTG',
-    name: 'Tủ DP-UPS LTG (Phân Phối Chiếu Sáng)',
-    type: 'DISTRIBUTION_BOARD',
-    categoryLabel: 'Tủ Phân Phối Schneider Prisma',
-    dimensions: { lengthMm: 1500, widthMm: 600, heightMm: 2200, levels: 1 },
-    svgRect: { x: 355, y: 520, width: 150, height: 70 },
-    colorTheme: {
-      base: 'from-slate-100 to-slate-300 text-slate-900',
-      border: 'border-cyan-500',
-      glow: 'shadow-cyan-500/20',
-      badgeBg: 'bg-cyan-500/20 text-cyan-300 border-cyan-500/40',
-      badgeText: 'text-cyan-300',
-    },
-    description: 'Tủ điện phân phối chính cho mạng lưới đèn chiếu sáng thường trực qua bộ lưu điện UPS.',
-    qrCodeValue: 'DNCT-SYS-DP-UPS-LTG',
-  },
-  {
-    id: 'DP-UPS-EQPT',
-    code: 'DP-UPS EQPT',
-    name: 'Tủ DP-UPS EQPT (Phân Phối Thiết Bị Chính)',
-    type: 'DISTRIBUTION_BOARD',
-    categoryLabel: 'Tủ Phân Phối Schneider Prisma',
-    dimensions: { lengthMm: 1700, widthMm: 600, heightMm: 2200, levels: 1 },
-    svgRect: { x: 510, y: 520, width: 170, height: 70 },
-    colorTheme: {
-      base: 'from-slate-100 to-slate-300 text-slate-900',
-      border: 'border-purple-500',
-      glow: 'shadow-purple-500/20',
-      badgeBg: 'bg-purple-500/20 text-purple-300 border-purple-500/40',
-      badgeText: 'text-purple-300',
-    },
-    description: 'Tủ phân phối điện chính cho toàn bộ hệ thống máy chủ, băng chuyền hành lý BHS, radar và hạ tầng kỹ thuật T2.',
-    qrCodeValue: 'DNCT-SYS-DP-UPS-EQPT',
-  },
-
-  // 11. CỤM ẮC QUY TƯỜNG TRÁI (LEFT WALL)
-  {
-    id: 'BATT-3',
-    code: 'BATT.3',
-    name: 'Dàn Ắc Quy Dự Phòng 3 (Tường Trái)',
-    type: 'BATTERY_RACK',
-    categoryLabel: 'Dàn Ắc Quy Mở',
-    dimensions: { lengthMm: 650, widthMm: 600, heightMm: 1800, levels: 3 },
-    svgRect: { x: 135, y: 145, width: 70, height: 65 },
-    colorTheme: {
-      base: 'from-slate-800 to-slate-950',
-      border: 'border-slate-500',
-      glow: 'shadow-slate-500/20',
-      badgeBg: 'bg-slate-700 text-slate-300',
-      badgeText: 'text-slate-300',
-    },
-    description: 'Khung giá đỡ ắc quy mở tầng dọc tường trái.',
-    qrCodeValue: 'DNCT-SYS-BATT-03-WALL',
-  },
-  {
-    id: 'BATT-2',
-    code: 'BATT.2',
-    name: 'Dàn Ắc Quy Dự Phòng 2 (Tường Trái)',
-    type: 'BATTERY_RACK',
-    categoryLabel: 'Dàn Ắc Quy Mở',
-    dimensions: { lengthMm: 650, widthMm: 600, heightMm: 1800, levels: 3 },
-    svgRect: { x: 135, y: 215, width: 70, height: 65 },
-    colorTheme: {
-      base: 'from-slate-800 to-slate-950',
-      border: 'border-slate-500',
-      glow: 'shadow-slate-500/20',
-      badgeBg: 'bg-slate-700 text-slate-300',
-      badgeText: 'text-slate-300',
-    },
-    description: 'Khung giá đỡ ắc quy mở tầng 2 dọc tường trái.',
-    qrCodeValue: 'DNCT-SYS-BATT-02-WALL',
-  },
-  {
-    id: 'BATT-1',
-    code: 'BATT.1',
-    name: 'Dàn Ắc Quy Dự Phòng 1 (Tường Trái)',
-    type: 'BATTERY_RACK',
-    categoryLabel: 'Dàn Ắc Quy Mở',
-    dimensions: { lengthMm: 650, widthMm: 600, heightMm: 1800, levels: 3 },
-    svgRect: { x: 135, y: 285, width: 70, height: 65 },
-    colorTheme: {
-      base: 'from-slate-800 to-slate-950',
-      border: 'border-slate-500',
-      glow: 'shadow-slate-500/20',
-      badgeBg: 'bg-slate-700 text-slate-300',
-      badgeText: 'text-slate-300',
-    },
-    description: 'Khung giá đỡ ắc quy mở tầng 1 dọc tường trái.',
-    qrCodeValue: 'DNCT-SYS-BATT-01-WALL',
-  },
-  {
-    id: 'NEW-UPS-LTG',
-    code: 'NEW UPS-LTG',
-    name: 'Tủ NEW UPS-LTG (Chiếu Sáng Thế Hệ Mới)',
-    type: 'UPS_CABINET',
-    categoryLabel: 'Tủ Nguồn UPS Module Mới',
-    dimensions: { lengthMm: 1150, widthMm: 500, heightMm: 1900, levels: 1 },
-    svgRect: { x: 115, y: 355, width: 90, height: 65 },
-    colorTheme: {
-      base: 'from-slate-800 to-slate-950',
-      border: 'border-emerald-500',
-      glow: 'shadow-emerald-500/20',
-      badgeBg: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40',
-      badgeText: 'text-emerald-300',
-    },
-    description: 'Tủ nguồn UPS chiếu sáng mới kích thước 1150mm x 500mm theo đúng bản vẽ thiết kế.',
-    qrCodeValue: 'DNCT-SYS-NEW-UPS-LTG',
-  },
-];
+// Note: Shelf entities and layout are centrally defined in warehouseLayoutData.ts and synchronized via Firestore
 
 export const WarehouseMapView: React.FC<WarehouseMapViewProps> = ({
   materials,
   calculatedStocks,
   onSelectMaterial,
   onUpdateMaterialLocation,
+  entities: propEntities,
+  currentUser,
+  onOpenMasterEditor,
+  onOpenPrintModal,
 }) => {
+  const WAREHOUSE_ENTITIES = propEntities && propEntities.length > 0 ? propEntities : DEFAULT_WAREHOUSE_ENTITIES;
+  const isMasterAdmin =
+    currentUser?.email === 'vn.phuoc235@gmail.com' ||
+    currentUser?.role === 'ADMIN' ||
+    (currentUser?.email || '').toLowerCase().includes('phuoc');
   // State management
-  const [selectedEntityId, setSelectedEntityId] = useState<string>('KE-03'); // Default to Shelf 3 (from user photos)
+  const [selectedEntityId, setSelectedEntityId] = useState<string>('KE-01'); // Default to Shelf 1
   const [selectedTier, setSelectedTier] = useState<number | null>(null);
   const [viewMode, setViewMode] = useState<'2D_MAP' | 'FRONT_ELEVATION' | 'ISOMETRIC_3D'>('2D_MAP');
   const [searchQuery, setSearchQuery] = useState('');
@@ -567,6 +72,65 @@ export const WarehouseMapView: React.FC<WarehouseMapViewProps> = ({
   const [materialToAssign, setMaterialToAssign] = useState<Material | null>(null);
   const [targetLocationString, setTargetLocationString] = useState('');
   const [isAssigning, setIsAssigning] = useState(false);
+
+  // 3D Camera Controls State
+  const [pitch3D, setPitch3D] = useState<number>(55);
+  const [yaw3D, setYaw3D] = useState<number>(45);
+  const [zoom3D, setZoom3D] = useState<number>(0.85);
+  const [isAutoRotating3D, setIsAutoRotating3D] = useState<boolean>(false);
+  const [hoveredEntity3D, setHoveredEntity3D] = useState<string | null>(null);
+  const isDragging3DRef = useRef(false);
+  const dragStart3DRef = useRef<{ x: number; y: number; yaw: number; pitch: number }>({ x: 0, y: 0, yaw: 45, pitch: 55 });
+
+  useEffect(() => {
+    if (!isAutoRotating3D || viewMode !== 'ISOMETRIC_3D') return;
+    const interval = setInterval(() => {
+      setYaw3D((prev) => (prev + 0.4) % 360);
+    }, 30);
+    return () => clearInterval(interval);
+  }, [isAutoRotating3D, viewMode]);
+
+  const handle3DMouseDown = (e: React.MouseEvent) => {
+    isDragging3DRef.current = true;
+    dragStart3DRef.current = {
+      x: e.clientX,
+      y: e.clientY,
+      yaw: yaw3D,
+      pitch: pitch3D,
+    };
+  };
+
+  const handle3DMouseMove = (e: React.MouseEvent) => {
+    if (!isDragging3DRef.current) return;
+    const deltaX = e.clientX - dragStart3DRef.current.x;
+    const deltaY = e.clientY - dragStart3DRef.current.y;
+    setYaw3D((dragStart3DRef.current.yaw + deltaX * 0.4) % 360);
+    setPitch3D(Math.max(15, Math.min(85, dragStart3DRef.current.pitch + deltaY * 0.35)));
+  };
+
+  const handle3DMouseUp = () => {
+    isDragging3DRef.current = false;
+  };
+
+  const handle3DTouchStart = (e: React.TouchEvent) => {
+    if (e.touches.length === 1) {
+      isDragging3DRef.current = true;
+      dragStart3DRef.current = {
+        x: e.touches[0].clientX,
+        y: e.touches[0].clientY,
+        yaw: yaw3D,
+        pitch: pitch3D,
+      };
+    }
+  };
+
+  const handle3DTouchMove = (e: React.TouchEvent) => {
+    if (!isDragging3DRef.current || e.touches.length !== 1) return;
+    const deltaX = e.touches[0].clientX - dragStart3DRef.current.x;
+    const deltaY = e.touches[0].clientY - dragStart3DRef.current.y;
+    setYaw3D((dragStart3DRef.current.yaw + deltaX * 0.4) % 360);
+    setPitch3D(Math.max(15, Math.min(85, dragStart3DRef.current.pitch + deltaY * 0.35)));
+  };
 
   // Normalized stock map (handling array or record)
   const stockMap = useMemo(() => {
@@ -584,77 +148,32 @@ export const WarehouseMapView: React.FC<WarehouseMapViewProps> = ({
 
   // Active selected entity
   const activeEntity = useMemo(() => {
-    return WAREHOUSE_ENTITIES.find((e) => e.id === selectedEntityId) || WAREHOUSE_ENTITIES[4]; // Default to KE-03
-  }, [selectedEntityId]);
+    return WAREHOUSE_ENTITIES.find((e) => e.id === selectedEntityId) || WAREHOUSE_ENTITIES[0];
+  }, [selectedEntityId, WAREHOUSE_ENTITIES]);
 
-  // Intelligent Material Mapping Algorithm
-  // Maps materials from database to specific shelves based on `material.location`, name, and specs
+  // Strict Material Mapping Algorithm: Only display materials explicitly assigned to shelf/tray
   const entityMaterialsMap = useMemo(() => {
     const map: { [entityId: string]: Material[] } = {};
     WAREHOUSE_ENTITIES.forEach((e) => {
       map[e.id] = [];
     });
 
-    materials.forEach((mat) => {
-      const loc = (mat.location || '').toLowerCase().trim();
-      const name = (mat.name || '').toLowerCase();
-      const spec = (mat.specification || '').toLowerCase();
-      const text = `${loc} ${name} ${spec}`;
-
-      // Direct shelf code matches in `location`
-      if (loc.includes('kệ 1') || loc.includes('ke 1') || loc.includes('ke-01') || loc.includes('k1')) {
-        map['KE-01'].push(mat);
-      } else if (loc.includes('kệ 2') || loc.includes('ke 2') || loc.includes('ke-02') || loc.includes('k2')) {
-        map['KE-02'].push(mat);
-      } else if (loc.includes('kệ 3') || loc.includes('ke 3') || loc.includes('ke-03') || loc.includes('k3')) {
-        map['KE-03'].push(mat);
-      } else if (loc.includes('kệ 4') || loc.includes('ke 4') || loc.includes('ke-04') || loc.includes('k4')) {
-        map['KE-04'].push(mat);
-      } else if (loc.includes('kệ 5') || loc.includes('ke 5') || loc.includes('ke-05') || loc.includes('k5')) {
-        map['KE-05'].push(mat);
-      } else if (loc.includes('tủ đồ nghề 1') || loc.includes('tdn-01') || loc.includes('tủ 1')) {
-        map['TDN-01'].push(mat);
-      } else if (loc.includes('tủ đồ nghề 2') || loc.includes('tdn-02') || loc.includes('tủ 2')) {
-        map['TDN-02'].push(mat);
-      }
-      // Smart content-based classification for materials currently marked with generic "Kho Tổng"
-      else if (
-        text.includes('cadivi') ||
-        text.includes('dây điện') ||
-        text.includes('mcb') ||
-        text.includes('rccb') ||
-        text.includes('rcbo') ||
-        text.includes('contactor') ||
-        text.includes('rơ le') ||
-        text.includes('role') ||
-        text.includes('khởi động từ')
-      ) {
-        map['KE-03'].push(mat);
-      } else if (
-        text.includes('toto') ||
-        text.includes('bồn cầu') ||
-        text.includes('bồn tiểu') ||
-        text.includes('silicon') ||
-        text.includes('titebond') ||
-        text.includes('lavabo') ||
-        text.includes('xiphong') ||
-        text.includes('vòi')
-      ) {
-        map['KE-02'].push(mat);
-      } else if (text.includes('meanwell') || text.includes('nguồn') || text.includes('cosse') || text.includes('co nhiệt') || text.includes('biến áp')) {
-        map['KE-04'].push(mat);
-      } else if (text.includes('kìm') || text.includes('búa') || text.includes('mỏ lết') || text.includes('fluke') || text.includes('khoan')) {
-        map['TDN-01'].push(mat);
-      } else if (text.includes('mccb') || text.includes('acb') || text.includes('busbar') || text.includes('đồng trần') || text.includes('tiếp địa')) {
-        map['KE-05'].push(mat);
-      } else {
-        // Distribute evenly among material shelves as general spare
-        map['KE-01'].push(mat);
-      }
+    // Direct assignments from entity compartments (Master Layout & Shelf Data)
+    WAREHOUSE_ENTITIES.forEach((ent) => {
+      (ent.tiers || []).forEach((tier) => {
+        (tier.compartments || []).forEach((comp) => {
+          (comp.assignedMaterialCodes || []).forEach((code) => {
+            const foundMat = materials.find((m) => m.code === code);
+            if (foundMat && map[ent.id] && !map[ent.id].some((m) => m.id === foundMat.id)) {
+              map[ent.id].push(foundMat);
+            }
+          });
+        });
+      });
     });
 
     return map;
-  }, [materials]);
+  }, [materials, WAREHOUSE_ENTITIES]);
 
   // Filter materials for active entity
   const activeMaterials = useMemo(() => {
@@ -662,10 +181,12 @@ export const WarehouseMapView: React.FC<WarehouseMapViewProps> = ({
     if (selectedTier !== null && activeEntity.tiers) {
       const tierInfo = activeEntity.tiers.find((t) => t.tierNumber === selectedTier);
       if (tierInfo) {
-        list = list.filter((m) => {
-          const mText = `${m.name} ${m.specification} ${m.location || ''}`.toLowerCase();
-          return tierInfo.itemKeywords.some((kw) => mText.includes(kw));
+        const compMaterialCodes = new Set<string>();
+        (tierInfo.compartments || []).forEach((c) => {
+          (c.assignedMaterialCodes || []).forEach((code) => compMaterialCodes.add(code));
         });
+
+        list = list.filter((m) => compMaterialCodes.has(m.code));
       }
     }
     if (searchQuery.trim()) {
@@ -782,7 +303,7 @@ export const WarehouseMapView: React.FC<WarehouseMapViewProps> = ({
               <div class="info">
                 <div class="entity-code">${entity.code}</div>
                 <div style="font-size: 13px; font-weight: 700; color: #0f172a; margin-top: 2px;">${entity.name}</div>
-                <div class="dim">Kích thước: 1,5m (Dài) x 1,5m (Cao) x 0,5m (Rộng) - 4 Tầng</div>
+                <div class="dim">Kệ 4 Tầng Tiêu Chuẩn 5S</div>
                 <div style="font-size: 10px; color: #475569; margin-top: 4px;">Phân loại: <strong>${entity.categoryLabel}</strong></div>
               </div>
             </div>
@@ -818,7 +339,7 @@ export const WarehouseMapView: React.FC<WarehouseMapViewProps> = ({
                   </span>
                 </h2>
                 <p className="text-xs text-slate-400 mt-0.5">
-                  Nhà Ga Quốc Tế T2 • 2 Tủ Đồ Nghề + 5 Kệ Vật Tư 4 Tầng (1.5m x 1.5m x 0.5m) • Cụm Nguồn UPS Socomec &amp; Tủ Điện Schneider
+                  Nhà Ga Quốc Tế T2 • 2 Tủ Đồ Nghề • 5 Kệ Vật Tư 4 Tầng • Cụm Nguồn UPS Socomec &amp; Tủ Điện Schneider
                 </p>
               </div>
             </div>
@@ -867,16 +388,41 @@ export const WarehouseMapView: React.FC<WarehouseMapViewProps> = ({
               </button>
             </div>
 
+            {/* Master Layout Edit Action */}
+            {isMasterAdmin && onOpenMasterEditor && (
+              <button
+                type="button"
+                onClick={onOpenMasterEditor}
+                className="px-3 py-1.5 rounded-xl bg-amber-950/50 hover:bg-amber-900/60 text-amber-300 border border-amber-500/40 transition text-xs font-bold flex items-center gap-1.5 shadow-sm"
+                title="Chỉnh sửa chi tiết khay, ngăn và gán vật tư (Master Admin)"
+              >
+                <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                <span>Chỉnh Sửa Layout (Master)</span>
+              </button>
+            )}
+
             {/* Print Shelf Label Action */}
-            <button
-              type="button"
-              onClick={() => handlePrintShelfLabel(activeEntity)}
-              className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 hover:border-blue-500/40 transition text-xs font-bold flex items-center gap-1.5 shadow-sm"
-              title="In tem nhãn dán khay kệ theo tiêu chuẩn 5S"
-            >
-              <Printer className="w-3.5 h-3.5 text-blue-400" />
-              <span>In Tem Kệ {activeEntity.code}</span>
-            </button>
+            {onOpenPrintModal ? (
+              <button
+                type="button"
+                onClick={() => onOpenPrintModal(activeEntity.id)}
+                className="px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white transition text-xs font-bold flex items-center gap-1.5 shadow-sm"
+                title="In tem nhãn dán khay kệ theo tiêu chuẩn 5S"
+              >
+                <Printer className="w-3.5 h-3.5" />
+                <span>In Tem Mã QR (Chuẩn 5S)</span>
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => handlePrintShelfLabel(activeEntity)}
+                className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 hover:border-blue-500/40 transition text-xs font-bold flex items-center gap-1.5 shadow-sm"
+                title="In tem nhãn dán khay kệ theo tiêu chuẩn 5S"
+              >
+                <Printer className="w-3.5 h-3.5 text-blue-400" />
+                <span>In Tem Kệ {activeEntity.code}</span>
+              </button>
+            )}
           </div>
         </div>
 
@@ -926,18 +472,7 @@ export const WarehouseMapView: React.FC<WarehouseMapViewProps> = ({
                   : 'bg-slate-950 text-slate-400 hover:text-white border border-slate-800'
               }`}
             >
-              5 Kệ Vật Tư (4 Tầng)
-            </button>
-            <button
-              type="button"
-              onClick={() => setFilterType('TOOL_CABINETS')}
-              className={`px-2.5 py-1 rounded-lg font-medium transition shrink-0 ${
-                filterType === 'TOOL_CABINETS'
-                  ? 'bg-cyan-600/30 text-cyan-300 border border-cyan-500/50'
-                  : 'bg-slate-950 text-slate-400 hover:text-white border border-slate-800'
-              }`}
-            >
-              2 Tủ Đồ Nghề
+              5 Kệ Vật Tư (5 Tầng Chuẩn 5S)
             </button>
             <button
               type="button"
@@ -969,7 +504,7 @@ export const WarehouseMapView: React.FC<WarehouseMapViewProps> = ({
                 {activeEntity.name} ({activeEntity.code})
               </span>
               <span className="text-[11px] text-slate-400 hidden sm:inline">
-                {activeEntity.type === 'SHELF_4_TIER' ? '• Kích thước: 1,5m x 1,5m x 0,5m (4 Tầng)' : ''}
+                {activeEntity.type === 'SHELF_4_TIER' ? `• ${activeEntity.tiers?.length || 5} Tầng Tiêu Chuẩn` : ''}
               </span>
             </div>
 
@@ -1018,10 +553,10 @@ export const WarehouseMapView: React.FC<WarehouseMapViewProps> = ({
                   transformOrigin: 'center center',
                   transition: 'transform 0.2s ease-out',
                 }}
-                className="w-full max-w-[950px] aspect-[950/620]"
+                className="w-full max-w-[960px] aspect-[960/540]"
               >
                 <svg
-                  viewBox="0 0 950 620"
+                  viewBox="0 0 960 540"
                   className="w-full h-full drop-shadow-2xl"
                   xmlns="http://www.w3.org/2000/svg"
                 >
@@ -1044,100 +579,47 @@ export const WarehouseMapView: React.FC<WarehouseMapViewProps> = ({
                   </defs>
 
                   {/* ROOM BACKGROUND (Sàn bê tông công nghiệp phủ Epoxy chống tĩnh điện) */}
-                  <rect x="20" y="20" width="910" height="580" fill="#0b1120" stroke="#334155" strokeWidth="3" rx="4" />
-                  <rect x="20" y="20" width="910" height="580" fill="url(#floorGrid)" />
+                  <rect x="15" y="15" width="930" height="510" fill="#0b1120" stroke="#334155" strokeWidth="3" rx="6" />
+                  <rect x="15" y="15" width="930" height="510" fill="url(#floorGrid)" />
 
                   {/* 5S WALKWAY LINE (Vạch sơn trắng phân định lối đi bộ an toàn từ cửa vào) */}
                   <path
-                    d="M 830 50 L 830 160 L 70 160 L 70 490 L 830 490"
+                    d="M 885 55 L 885 110 L 175 110 L 175 440 L 885 440"
                     fill="none"
                     stroke="#e2e8f0"
-                    strokeWidth="2.5"
-                    strokeDasharray="8 6"
-                    opacity="0.4"
+                    strokeWidth="2"
+                    strokeDasharray="6 6"
+                    opacity="0.45"
                   />
-                  <text x="740" y="152" fill="#94a3b8" fontSize="10" fontFamily="sans-serif" fontWeight="bold">
+                  <text x="210" y="103" fill="#94a3b8" fontSize="10" fontFamily="sans-serif" fontWeight="bold">
                     🚶 LỐI ĐI BỘ AN TOÀN 5S
                   </text>
 
                   {/* SAFETY HAZARD STRIPES (Vạch sơn cảnh báo cách ly vàng - đen quanh cụm UPS và tủ điện) */}
+                  {/* Quanh Dãy Pin & Tủ New UPS Phía Tây */}
+                  <rect x="18" y="120" width="142" height="315" fill="none" stroke="url(#hazardStripe)" strokeWidth="4" rx="4" opacity="0.75" />
                   {/* Quanh Cụm UPS 1 */}
-                  <rect x="525" y="180" width="295" height="105" fill="none" stroke="url(#hazardStripe)" strokeWidth="6" rx="6" opacity="0.75" />
+                  <rect x="455" y="135" width="465" height="130" fill="none" stroke="url(#hazardStripe)" strokeWidth="4" rx="4" opacity="0.75" />
                   {/* Quanh Cụm UPS 2 */}
-                  <rect x="425" y="330" width="395" height="105" fill="none" stroke="url(#hazardStripe)" strokeWidth="6" rx="6" opacity="0.75" />
+                  <rect x="375" y="290" width="545" height="130" fill="none" stroke="url(#hazardStripe)" strokeWidth="4" rx="4" opacity="0.75" />
                   {/* Quanh Dãy Tủ Phân Phối Tường Dưới */}
-                  <rect x="25" y="510" width="665" height="88" fill="none" stroke="url(#hazardStripe)" strokeWidth="6" rx="6" opacity="0.75" />
+                  <rect x="18" y="450" width="880" height="75" fill="none" stroke="url(#hazardStripe)" strokeWidth="4" rx="4" opacity="0.75" />
 
-                  {/* CỬA RA VÀO (Top-Right Door - Rộng 1350mm) */}
+                  {/* CỬA RA VÀO (Top-Right Door - Chuẩn bản vẽ phòng nguồn) */}
                   <g id="entrance-door">
-                    <rect x="800" y="14" width="100" height="12" fill="#ef4444" rx="2" />
-                    {/* Door swing arc */}
-                    <path d="M 800 24 A 85 85 0 0 0 885 105" fill="none" stroke="#ef4444" strokeWidth="2" strokeDasharray="4 3" />
-                    <line x1="800" y1="24" x2="800" y2="105" stroke="#ef4444" strokeWidth="3" />
-                    <rect x="805" y="35" width="105" height="26" fill="#ef4444" rx="6" className="drop-shadow-lg" />
-                    <text x="857" y="52" fill="#ffffff" fontSize="11" fontWeight="900" textAnchor="middle">
-                      CỬA RA VÀO
-                    </text>
-                    <text x="857" y="125" fill="#f87171" fontSize="9" fontWeight="bold" textAnchor="middle">
-                      Kích thước: 1350mm
+                    <rect x="885" y="16" width="55" height="14" fill="#ef4444" rx="2" />
+                    <text x="912" y="27" fill="#ffffff" fontSize="8.5" fontWeight="900" textAnchor="middle">
+                      CỬA VÀO
                     </text>
                   </g>
 
-                  {/* KHU VỰC TỦ VẬT TƯ (Top Wall Label as in Image 1) */}
-                  <g id="material-area-badge">
-                    <rect x="280" y="24" width="360" height="34" fill="#dc2626" rx="8" className="drop-shadow-md" />
-                    <text x="460" y="47" fill="#ffffff" fontSize="16" fontWeight="900" textAnchor="middle" letterSpacing="1">
-                      Khu vực tủ &amp; kệ vật tư (ĐNCT)
+                  {/* BÌNH CHỮA CHÁY PCCC */}
+                  <g id="fire-extinguisher">
+                    <circle cx="868" cy="46" r="9" fill="#dc2626" />
+                    <text x="868" y="49" fill="#ffffff" fontSize="7" fontWeight="bold" textAnchor="middle">
+                      PCCC
                     </text>
                   </g>
-
-                  {/* CỘT KỸ THUẬT & HỘP THÔNG GIÓ (Hatched Shafts from Image 1) */}
-                  {/* Left Column 500x600 */}
-                  <rect x="20" y="380" width="65" height="85" fill="url(#pillarHatch)" stroke="#475569" strokeWidth="2" />
-                  <text x="52" y="425" fill="#94a3b8" fontSize="9" fontWeight="bold" textAnchor="middle">
-                    500x600
-                  </text>
-                  {/* Right Wall Shaft */}
-                  <rect x="865" y="380" width="65" height="85" fill="url(#pillarHatch)" stroke="#475569" strokeWidth="2" />
-                  <text x="897" y="425" fill="#94a3b8" fontSize="9" fontWeight="bold" textAnchor="middle">
-                    HỘP GIÓ
-                  </text>
-
-                  {/* MÁNG CÁP THẲNG ĐỨNG (Galvanized Vertical Trunking/Riser Column) - Seen in all photos */}
-                  <g id="cable-riser">
-                    <rect x="420" y="235" width="30" height="60" fill="#64748b" stroke="#cbd5e1" strokeWidth="2" rx="2" />
-                    <line x1="420" y1="250" x2="450" y2="250" stroke="#94a3b8" strokeWidth="1.5" />
-                    <line x1="420" y1="265" x2="450" y2="265" stroke="#94a3b8" strokeWidth="1.5" />
-                    <line x1="420" y1="280" x2="450" y2="280" stroke="#94a3b8" strokeWidth="1.5" />
-                    <text x="435" y="310" fill="#94a3b8" fontSize="8" fontWeight="bold" textAnchor="middle">
-                      Máng Cáp
-                    </text>
-                  </g>
-
-                  {/* DIMENSION LINES & LABELS FROM IMAGE 1 */}
-                  {/* Distance from top door wall: 1670mm */}
-                  <line x1="785" y1="20" x2="785" y2="185" stroke="#0ea5e9" strokeWidth="1" strokeDasharray="3 3" opacity="0.6" />
-                  <text x="775" y="110" fill="#38bdf8" fontSize="10" fontWeight="bold" transform="rotate(-90 775 110)">
-                    1670 mm
-                  </text>
-
-                  {/* Distance between row 1 & row 2: 1000mm */}
-                  <line x1="820" y1="275" x2="820" y2="335" stroke="#0ea5e9" strokeWidth="1" strokeDasharray="3 3" opacity="0.6" />
-                  <text x="832" y="310" fill="#38bdf8" fontSize="9" fontWeight="bold">
-                    1000 mm
-                  </text>
-
-                  {/* Distance from row 2 to bottom: 1950mm */}
-                  <line x1="820" y1="430" x2="820" y2="515" stroke="#0ea5e9" strokeWidth="1" strokeDasharray="3 3" opacity="0.6" />
-                  <text x="825" y="475" fill="#38bdf8" fontSize="10" fontWeight="bold" transform="rotate(-90 825 475)">
-                    1950 mm
-                  </text>
-
-                  {/* Distance from bottom panels to right wall: 2750mm */}
-                  <line x1="685" y1="560" x2="930" y2="560" stroke="#0ea5e9" strokeWidth="1" strokeDasharray="3 3" opacity="0.6" />
-                  <text x="790" y="552" fill="#38bdf8" fontSize="10" fontWeight="bold" textAnchor="middle">
-                    2750 mm
-                  </text>
 
                   {/* RENDER ALL INTERACTIVE WAREHOUSE ENTITIES */}
                   {WAREHOUSE_ENTITIES.map((entity) => {
@@ -1146,6 +628,7 @@ export const WarehouseMapView: React.FC<WarehouseMapViewProps> = ({
                     const matCount = (entityMaterialsMap[entity.id] || []).length;
                     const isShelf = entity.type === 'SHELF_4_TIER';
                     const isTool = entity.type === 'TOOL_CABINET';
+                    const tierCount = entity.tiers?.length || 5;
 
                     // Determine stroke color and glow
                     let strokeColor = isSelected ? '#38bdf8' : isMatched ? '#f59e0b' : '#475569';
@@ -1164,16 +647,16 @@ export const WarehouseMapView: React.FC<WarehouseMapViewProps> = ({
                         {/* Radar Pulse Effect for Searched / Selected Shelf */}
                         {(isSelected || isMatched) && (
                           <rect
-                            x={entity.svgRect.x - 4}
-                            y={entity.svgRect.y - 4}
-                            width={entity.svgRect.width + 8}
-                            height={entity.svgRect.height + 8}
+                            x={entity.svgRect.x - 3}
+                            y={entity.svgRect.y - 3}
+                            width={entity.svgRect.width + 6}
+                            height={entity.svgRect.height + 6}
                             fill="none"
                             stroke={isSelected ? '#38bdf8' : '#f59e0b'}
                             strokeWidth="2"
-                            rx="6"
+                            rx="5"
                             className="animate-pulse"
-                            opacity="0.8"
+                            opacity="0.85"
                           />
                         )}
 
@@ -1202,46 +685,30 @@ export const WarehouseMapView: React.FC<WarehouseMapViewProps> = ({
                           className="drop-shadow-lg transition-colors group-hover:fill-slate-800"
                         />
 
-                        {/* Visual Shelf Tier Dividers for 4-Tier Shelves */}
-                        {isShelf && (
-                          <>
-                            {/* Inner rack lines representing 4 levels */}
+                        {/* Visual Shelf Tier Dividers dynamically rendered for all tiers */}
+                        {isShelf && (entity.tiers || []).map((_, idx, arr) => {
+                          if (idx === 0) return null;
+                          const yOffset = entity.svgRect.y + (entity.svgRect.height / arr.length) * idx;
+                          return (
                             <line
+                              key={idx}
                               x1={entity.svgRect.x}
-                              y1={entity.svgRect.y + entity.svgRect.height * 0.25}
+                              y1={yOffset}
                               x2={entity.svgRect.x + entity.svgRect.width}
-                              y2={entity.svgRect.y + entity.svgRect.height * 0.25}
+                              y2={yOffset}
                               stroke="#334155"
                               strokeWidth="1"
                               strokeDasharray="2 2"
                             />
-                            <line
-                              x1={entity.svgRect.x}
-                              y1={entity.svgRect.y + entity.svgRect.height * 0.5}
-                              x2={entity.svgRect.x + entity.svgRect.width}
-                              y2={entity.svgRect.y + entity.svgRect.height * 0.5}
-                              stroke="#334155"
-                              strokeWidth="1"
-                              strokeDasharray="2 2"
-                            />
-                            <line
-                              x1={entity.svgRect.x}
-                              y1={entity.svgRect.y + entity.svgRect.height * 0.75}
-                              x2={entity.svgRect.x + entity.svgRect.width}
-                              y2={entity.svgRect.y + entity.svgRect.height * 0.75}
-                              stroke="#334155"
-                              strokeWidth="1"
-                              strokeDasharray="2 2"
-                            />
-                          </>
-                        )}
+                          );
+                        })}
 
                         {/* Label Badge on Shelf */}
                         <text
                           x={entity.svgRect.x + entity.svgRect.width / 2}
                           y={entity.svgRect.y + entity.svgRect.height / 2 - (isShelf ? 6 : 2)}
                           fill={entity.type === 'DISTRIBUTION_BOARD' ? '#0f172a' : '#ffffff'}
-                          fontSize={isShelf || isTool ? 11 : 9.5}
+                          fontSize={isShelf || isTool ? 10.5 : 9}
                           fontWeight="900"
                           fontFamily="monospace"
                           textAnchor="middle"
@@ -1252,18 +719,24 @@ export const WarehouseMapView: React.FC<WarehouseMapViewProps> = ({
                         {/* Shelf specs or subtitle */}
                         <text
                           x={entity.svgRect.x + entity.svgRect.width / 2}
-                          y={entity.svgRect.y + entity.svgRect.height / 2 + 10}
+                          y={entity.svgRect.y + entity.svgRect.height / 2 + 9}
                           fill={entity.type === 'DISTRIBUTION_BOARD' ? '#334155' : '#94a3b8'}
-                          fontSize={isShelf ? 8 : 7.5}
+                          fontSize={isShelf ? 7.5 : 7}
                           fontWeight="bold"
                           textAnchor="middle"
                         >
-                          {isShelf ? '4 TẦNG • 1.5M' : isTool ? 'TỦ ĐỒ NGHỀ' : entity.type === 'UPS_CABINET' ? 'SOCOMEC' : 'PRISMA'}
+                          {isShelf
+                            ? `${tierCount} TẦNG`
+                            : isTool
+                            ? 'TỦ ĐỒ NGHỀ'
+                            : entity.type === 'UPS_CABINET'
+                            ? (entity.code.includes('NEW UPS') ? 'Schneider' : 'SOCOMEC')
+                            : 'PRISMA'}
                         </text>
 
                         {/* Material Count Pill on Shelves */}
                         {(isShelf || isTool) && matCount > 0 && (
-                          <g transform={`translate(${entity.svgRect.x + entity.svgRect.width - 24}, ${entity.svgRect.y + 4})`}>
+                          <g transform={`translate(${entity.svgRect.x + entity.svgRect.width - 24}, ${entity.svgRect.y + 3})`}>
                             <rect width="20" height="13" rx="4" fill="#3b82f6" />
                             <text x="10" y="9.5" fill="#ffffff" fontSize="8" fontWeight="bold" textAnchor="middle">
                               {matCount}
@@ -1296,7 +769,7 @@ export const WarehouseMapView: React.FC<WarehouseMapViewProps> = ({
                       </span>
                       <h3 className="text-base font-black text-white">{activeEntity.name}</h3>
                       <span className="text-xs text-amber-400 font-semibold">
-                        (Dài 1.5m x Cao 1.5m x Rộng 0.5m • 4 Tầng Sắt V Lỗ)
+                        ({activeEntity.tiers?.length || 5} Tầng Tiêu Chuẩn 5S - Nóc Trên Tận Dụng)
                       </span>
                     </div>
                     <p className="text-xs text-slate-400 mt-1">{activeEntity.description}</p>
@@ -1304,7 +777,7 @@ export const WarehouseMapView: React.FC<WarehouseMapViewProps> = ({
 
                   {/* Direct Shelf Switcher Tabs */}
                   <div className="flex items-center gap-1.5 overflow-x-auto w-full md:w-auto">
-                    {WAREHOUSE_ENTITIES.filter((e) => e.type === 'SHELF_4_TIER' || e.type === 'TOOL_CABINET').map((e) => (
+                    {WAREHOUSE_ENTITIES.filter((e) => e.type === 'SHELF_4_TIER').map((e) => (
                       <button
                         key={e.id}
                         type="button"
@@ -1324,24 +797,28 @@ export const WarehouseMapView: React.FC<WarehouseMapViewProps> = ({
                   </div>
                 </div>
 
-                {/* THE 4-TIER METALLIC INDUSTRIAL SHELF RACK (Sắt V lỗ xám công nghiệp) */}
+                {/* THE 5-TIER METALLIC INDUSTRIAL SHELF RACK (Sắt V lỗ xám công nghiệp) */}
                 <div className="border-4 border-slate-700 bg-gradient-to-b from-slate-900 via-slate-950 to-slate-900 rounded-xl p-4 shadow-2xl relative space-y-3">
                   {/* Top Rack Header Beam */}
                   <div className="h-6 bg-slate-800 border-b-2 border-slate-700 rounded-t flex items-center justify-between px-3 text-[10px] font-mono text-slate-400">
                     <span className="font-bold flex items-center gap-1 text-slate-300">
                       <Tag className="w-3 h-3 text-blue-400" />
-                      KỆ KHO ĐNCT • TIÊU CHUẨN 5S • DÀI 1500MM x NGANG 1500MM x SÂU 500MM
+                      KỆ KHO ĐNCT • TIÊU CHUẨN 5S • PHÂN KHAY NGĂN CHI TIẾT
                     </span>
-                    <span>KHAY KỆ 4 TẦNG CHỊU TẢI 250KG/TẦNG</span>
+                    <span>KHAY KỆ {activeEntity.tiers?.length || 5} TẦNG TIÊU CHUẨN (TẦNG 1 Ở TRÊN CÙNG)</span>
                   </div>
 
-                  {/* Render 4 Tiers from Top (Tầng 4) to Bottom (Tầng 1) */}
-                  {(activeEntity.tiers || []).slice().reverse().map((tier) => {
+                  {/* Render Tiers from Top (Tầng 1 - Nóc trên) to Bottom (Tầng 5 - Mâm đáy) */}
+                  {(activeEntity.tiers || []).slice().sort((a, b) => a.tierNumber - b.tierNumber).map((tier) => {
                     const isTierSelected = selectedTier === tier.tierNumber;
-                    const tierMats = (entityMaterialsMap[activeEntity.id] || []).filter((m) => {
-                      const mText = `${m.name} ${m.specification} ${m.location || ''}`.toLowerCase();
-                      return tier.itemKeywords.some((kw) => mText.includes(kw));
+                    const compMaterialCodes = new Set<string>();
+                    (tier.compartments || []).forEach((c) => {
+                      (c.assignedMaterialCodes || []).forEach((code) => compMaterialCodes.add(code));
                     });
+
+                    const tierMats = (entityMaterialsMap[activeEntity.id] || []).filter((m) =>
+                      compMaterialCodes.has(m.code)
+                    );
 
                     return (
                       <div
@@ -1359,6 +836,11 @@ export const WarehouseMapView: React.FC<WarehouseMapViewProps> = ({
                             <span className="px-2 py-0.5 rounded bg-slate-800 text-amber-300 font-mono font-black text-xs border border-slate-700">
                               {tier.label}
                             </span>
+                            {tier.tierNumber === 1 && (
+                              <span className="px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 font-bold text-[10px] border border-amber-500/40">
+                                🌟 Nóc Trên Cùng - Tận Dụng Lưu Trữ
+                              </span>
+                            )}
                             <span className="text-xs font-bold text-slate-200">
                               {tier.categoryDesc}
                             </span>
@@ -1368,8 +850,50 @@ export const WarehouseMapView: React.FC<WarehouseMapViewProps> = ({
                           </span>
                         </div>
 
-                        {/* Physical Item Visualizer on Shelf (Bins, Boxes, CADIVI Coils as in photos) */}
-                        <div className="pt-3 grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                        {/* Physical Item Visualizer on Shelf: Use customized Compartments if available */}
+                        {tier.compartments && tier.compartments.length > 0 ? (
+                          <div className="pt-3 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2.5">
+                            {tier.compartments.map((comp) => {
+                              const compMats = (entityMaterialsMap[activeEntity.id] || []).filter((m) =>
+                                (comp.assignedMaterialCodes || []).includes(m.code)
+                              );
+                              return (
+                                <div
+                                  key={comp.id}
+                                  className="bg-slate-800/80 border-2 border-blue-500/50 hover:border-blue-400 rounded-lg p-2.5 flex flex-col justify-between min-h-[85px] shadow-md transition group/comp relative"
+                                >
+                                  <div className="flex items-center justify-between text-[10px] text-blue-300 font-bold">
+                                    <span className="bg-blue-900/60 px-1.5 py-0.5 rounded text-white font-mono">
+                                      {comp.code}
+                                    </span>
+                                    <span className="text-[9px] font-mono text-slate-400">
+                                      {compMats.length || comp.assignedMaterialCodes?.length || 0} VT
+                                    </span>
+                                  </div>
+                                  <div className="text-xs font-bold text-white mt-1 line-clamp-2">
+                                    {comp.name}
+                                  </div>
+                                  <div className="text-[9px] text-slate-400 font-mono mt-1 truncate">
+                                    QR: {comp.qrCodeValue || `DNCT-WH-${activeEntity.code}-T${tier.tierNumber}-${comp.code}`}
+                                  </div>
+                                  {onOpenPrintModal && (
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        onOpenPrintModal(activeEntity.id, comp.id);
+                                      }}
+                                      className="mt-1.5 py-0.5 px-1.5 rounded bg-blue-600/30 hover:bg-blue-600 text-blue-200 hover:text-white text-[9px] font-semibold flex items-center justify-center gap-1 transition"
+                                    >
+                                      <Printer className="w-2.5 h-2.5" /> In Tem Khay
+                                    </button>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        ) : (
+                          <div className="pt-3 grid grid-cols-2 sm:grid-cols-4 gap-2.5">
                           {/* Visual representation based on photo archetype */}
                           {tier.visualType === 'blue-bins' && (
                             <>
@@ -1482,6 +1006,7 @@ export const WarehouseMapView: React.FC<WarehouseMapViewProps> = ({
                             </>
                           )}
                         </div>
+                        )}
                       </div>
                     );
                   })}
@@ -1491,51 +1016,494 @@ export const WarehouseMapView: React.FC<WarehouseMapViewProps> = ({
 
             {/* VIEW MODE 3: 3D ISOMETRIC INDUSTRIAL WAREHOUSE PROJECTION */}
             {viewMode === 'ISOMETRIC_3D' && (
-              <div className="w-full max-w-3xl py-4 flex flex-col items-center justify-center text-center space-y-4">
-                <div className="p-6 bg-slate-900/90 border border-slate-800 rounded-2xl shadow-2xl max-w-xl">
-                  <div className="w-16 h-16 rounded-2xl bg-blue-600/20 text-blue-400 flex items-center justify-center mx-auto mb-3 border border-blue-500/30">
-                    <Sparkles className="w-8 h-8 animate-pulse" />
-                  </div>
-                  <h3 className="text-base font-black text-white">
-                    Phối Cảnh 3D Phòng Kỹ Thuật ĐNCT &amp; Kệ Kho T2
-                  </h3>
-                  <p className="text-xs text-slate-300 mt-2 leading-relaxed">
-                    Mô hình không gian 3D thể hiện toàn bộ layout: 2 Tủ đồ nghề + 5 Kệ vật tư 4 tầng (1.5m x 1.5m x 0.5m) xếp dọc tường, đối diện là 2 dãy tủ UPS Socomec công nghiệp và dãy tủ phân phối Schneider Prisma.
-                  </p>
-
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 mt-5 text-left text-xs">
-                    <div className="p-2.5 rounded-xl bg-slate-950 border border-slate-800">
-                      <div className="text-slate-400 text-[10px]">Tường trên:</div>
-                      <div className="font-bold text-white mt-0.5">2 Tủ + 5 Kệ Vật Tư</div>
-                      <div className="text-[10px] text-emerald-400 mt-0.5">Kệ sắt 4 tầng 1.5m</div>
-                    </div>
-                    <div className="p-2.5 rounded-xl bg-slate-950 border border-slate-800">
-                      <div className="text-slate-400 text-[10px]">Trung tâm phòng:</div>
-                      <div className="font-bold text-white mt-0.5">2 Cụm UPS Socomec</div>
-                      <div className="text-[10px] text-yellow-400 mt-0.5">Dàn ắc quy DC dự phòng</div>
-                    </div>
-                    <div className="p-2.5 rounded-xl bg-slate-950 border border-slate-800">
-                      <div className="text-slate-400 text-[10px]">Tường dưới:</div>
-                      <div className="font-bold text-white mt-0.5">4 Tủ Schneider</div>
-                      <div className="text-[10px] text-blue-400 mt-0.5">ESB &amp; DP Switchboards</div>
-                    </div>
-                  </div>
-
-                  <div className="mt-5 pt-4 border-t border-slate-800 flex items-center justify-center gap-2">
+              <div className="w-full flex flex-col items-center select-none">
+                {/* 3D Camera Controls HUD */}
+                <div className="w-full mb-3 flex flex-wrap items-center justify-between gap-2 p-2.5 bg-slate-900/90 border border-slate-800 rounded-xl backdrop-blur-sm z-20">
+                  <div className="flex flex-wrap items-center gap-1.5 text-xs">
+                    <span className="text-[11px] font-bold text-slate-400 mr-1 flex items-center gap-1">
+                      <Compass className="w-3.5 h-3.5 text-blue-400" />
+                      Góc nhìn:
+                    </span>
                     <button
                       type="button"
-                      onClick={() => setViewMode('2D_MAP')}
-                      className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-xl transition shadow-lg shadow-blue-600/30"
+                      onClick={() => { setYaw3D(45); setPitch3D(55); }}
+                      className={`px-2.5 py-1 rounded-lg font-bold text-[11px] transition ${
+                        yaw3D === 45 && pitch3D === 55
+                          ? 'bg-blue-600 text-white shadow-md'
+                          : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                      }`}
                     >
-                      Xem Bản Vẽ 2D CAD Chi Tiết
+                      📐 Isometric 3D
                     </button>
                     <button
                       type="button"
-                      onClick={() => setViewMode('FRONT_ELEVATION')}
-                      className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold rounded-xl transition border border-slate-700"
+                      onClick={() => { setYaw3D(-30); setPitch3D(50); }}
+                      className={`px-2.5 py-1 rounded-lg font-bold text-[11px] transition ${
+                        yaw3D === -30 && pitch3D === 50
+                          ? 'bg-blue-600 text-white shadow-md'
+                          : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                      }`}
                     >
-                      Soi Từng Tầng Kệ Thực Tế
+                      🚪 Hướng Cửa Vào
                     </button>
+                    <button
+                      type="button"
+                      onClick={() => { setYaw3D(0); setPitch3D(35); }}
+                      className={`px-2.5 py-1 rounded-lg font-bold text-[11px] transition ${
+                        yaw3D === 0 && pitch3D === 35
+                          ? 'bg-blue-600 text-white shadow-md'
+                          : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                      }`}
+                    >
+                      📦 Trực Diện Kệ
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { setYaw3D(0); setPitch3D(82); }}
+                      className={`px-2.5 py-1 rounded-lg font-bold text-[11px] transition ${
+                        yaw3D === 0 && pitch3D === 82
+                          ? 'bg-blue-600 text-white shadow-md'
+                          : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                      }`}
+                    >
+                      🗺️ Mặt Bằng Trên
+                    </button>
+                  </div>
+
+                  <div className="flex items-center gap-1.5 text-xs">
+                    <button
+                      type="button"
+                      onClick={() => setIsAutoRotating3D((prev) => !prev)}
+                      className={`px-2.5 py-1 rounded-lg font-bold text-[11px] flex items-center gap-1.5 transition ${
+                        isAutoRotating3D
+                          ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/30 ring-1 ring-emerald-400'
+                          : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                      }`}
+                      title="Bật/Tắt tự động xoay 360 độ"
+                    >
+                      <RotateCcw className={`w-3 h-3 ${isAutoRotating3D ? 'animate-spin' : ''}`} />
+                      <span>{isAutoRotating3D ? 'Đang Xoay 360°' : 'Tự Xoay'}</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setZoom3D((z) => Math.max(0.5, z - 0.1))}
+                      className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300"
+                      title="Thu nhỏ 3D"
+                    >
+                      <ZoomOut className="w-3.5 h-3.5" />
+                    </button>
+                    <span className="text-[10px] font-mono text-slate-400 w-8 text-center">
+                      {Math.round(zoom3D * 100)}%
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setZoom3D((z) => Math.min(1.4, z + 0.1))}
+                      className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300"
+                      title="Phóng to 3D"
+                    >
+                      <ZoomIn className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { setYaw3D(45); setPitch3D(55); setZoom3D(0.85); }}
+                      className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300"
+                      title="Reset góc 3D chuẩn"
+                    >
+                      <RotateCcw className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Mouse Drag Instruction Pill */}
+                <div className="text-[11px] text-slate-400 mb-2 flex items-center gap-1.5">
+                  <span className="inline-block w-2 h-2 rounded-full bg-blue-400 animate-pulse" />
+                  <span>💡 Giữ chuột hoặc vuốt ngón tay kéo để xoay 360° • Click vào kệ/tủ để soi chi tiết vật tư</span>
+                </div>
+
+                {/* 3D Perspective Stage Container */}
+                <div
+                  onMouseDown={handle3DMouseDown}
+                  onMouseMove={handle3DMouseMove}
+                  onMouseUp={handle3DMouseUp}
+                  onMouseLeave={handle3DMouseUp}
+                  onTouchStart={handle3DTouchStart}
+                  onTouchMove={handle3DTouchMove}
+                  onTouchEnd={handle3DMouseUp}
+                  className="w-full h-[580px] bg-slate-950/90 border border-slate-850 rounded-2xl relative overflow-hidden flex items-center justify-center cursor-grab active:cursor-grabbing"
+                  style={{
+                    perspective: '1200px',
+                  }}
+                >
+                  {/* Subtle Grid Ambient Glow */}
+                  <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-blue-900/15 via-slate-950/60 to-slate-950 pointer-events-none" />
+
+                  {/* 3D Root World Object */}
+                  <div
+                    style={{
+                      transform: `scale(${zoom3D}) rotateX(${pitch3D}deg) rotateZ(${-yaw3D}deg)`,
+                      transformStyle: 'preserve-3d',
+                      transition: isDragging3DRef.current ? 'none' : 'transform 0.15s ease-out',
+                      width: '960px',
+                      height: '540px',
+                      position: 'relative',
+                    }}
+                  >
+                    {/* 3D Concrete Industrial Floor Plate */}
+                    <div
+                      style={{
+                        position: 'absolute',
+                        inset: 0,
+                        backgroundColor: '#0c1322',
+                        backgroundImage: `
+                          linear-gradient(to right, rgba(51, 65, 85, 0.25) 1px, transparent 1px),
+                          linear-gradient(to bottom, rgba(51, 65, 85, 0.25) 1px, transparent 1px)
+                        `,
+                        backgroundSize: '40px 40px',
+                        border: '3px solid #3b82f6',
+                        borderRadius: '8px',
+                        boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.8), inset 0 0 40px rgba(15, 23, 42, 0.8)',
+                        transform: 'translateZ(0px)',
+                      }}
+                    >
+                      {/* Safety Hazard Stripes around UPS-1 and UPS-2 Areas */}
+                      {/* West Battery & New UPS Area */}
+                      <div
+                        style={{
+                          position: 'absolute',
+                          left: '18px',
+                          top: '120px',
+                          width: '142px',
+                          height: '315px',
+                          border: '3px dashed #eab308',
+                          borderRadius: '6px',
+                          backgroundColor: 'rgba(234, 179, 8, 0.05)',
+                        }}
+                      >
+                        <span className="text-[8px] font-black text-amber-400 font-mono tracking-wider absolute top-1 left-1.5 opacity-80">
+                          ⚡ DÃY PIN &amp; TỦ NEW UPS
+                        </span>
+                      </div>
+
+                      {/* UPS-1 Warning Area */}
+                      <div
+                        style={{
+                          position: 'absolute',
+                          left: '455px',
+                          top: '135px',
+                          width: '465px',
+                          height: '130px',
+                          border: '4px dashed #eab308',
+                          borderRadius: '8px',
+                          backgroundColor: 'rgba(234, 179, 8, 0.05)',
+                        }}
+                      >
+                        <span className="text-[10px] font-black text-amber-400 font-mono tracking-wider absolute bottom-1 right-2 opacity-70">
+                          ⚡ VÙNG CẢNH BÁO ĐIỆN CAO THẾ UPS-1
+                        </span>
+                      </div>
+
+                      {/* UPS-2 Warning Area */}
+                      <div
+                        style={{
+                          position: 'absolute',
+                          left: '375px',
+                          top: '290px',
+                          width: '545px',
+                          height: '130px',
+                          border: '4px dashed #eab308',
+                          borderRadius: '8px',
+                          backgroundColor: 'rgba(234, 179, 8, 0.05)',
+                        }}
+                      >
+                        <span className="text-[10px] font-black text-amber-400 font-mono tracking-wider absolute bottom-1 right-2 opacity-70">
+                          ⚡ VÙNG CẢNH BÁO ĐIỆN CAO THẾ UPS-2
+                        </span>
+                      </div>
+
+                      {/* Distribution Board Safety Area along Bottom Wall */}
+                      <div
+                        style={{
+                          position: 'absolute',
+                          left: '18px',
+                          top: '450px',
+                          width: '880px',
+                          height: '75px',
+                          border: '3px solid rgba(59, 130, 246, 0.4)',
+                          borderRadius: '6px',
+                          backgroundColor: 'rgba(30, 58, 138, 0.1)',
+                        }}
+                      >
+                        <span className="text-[9px] font-bold text-blue-300 font-mono absolute top-1 left-2 opacity-70">
+                          DÃY TỦ ĐIỆN PHÂN PHỐI HẠ THẾ (ESB / DP / DB)
+                        </span>
+                      </div>
+
+                      {/* Entrance Threshold (Top Right) */}
+                      <div
+                        style={{
+                          position: 'absolute',
+                          left: '885px',
+                          top: '16px',
+                          width: '55px',
+                          height: '14px',
+                          backgroundColor: '#ef4444',
+                          borderRadius: '3px',
+                          boxShadow: '0 0 15px rgba(239, 68, 68, 0.5)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                        }}
+                      >
+                        <span className="text-[7.5px] font-black text-white">CỬA VÀO</span>
+                      </div>
+
+                      {/* 5S Walkway Guideline */}
+                      <div
+                        style={{
+                          position: 'absolute',
+                          left: '175px',
+                          top: '110px',
+                          width: '710px',
+                          height: '330px',
+                          border: '2px dashed rgba(255, 255, 255, 0.15)',
+                          borderRadius: '8px',
+                          pointerEvents: 'none',
+                        }}
+                      />
+                    </div>
+
+                    {/* RENDER ALL 3D ENTITIES ON THE ROOM FLOOR */}
+                    {WAREHOUSE_ENTITIES.map((entity) => {
+                      const isSelected = selectedEntityId === entity.id;
+                      const isHovered = hoveredEntity3D === entity.id;
+                      const isShelf = entity.type === 'SHELF_4_TIER';
+                      const isTool = entity.type === 'TOOL_CABINET';
+                      const isUps = entity.type === 'UPS_CABINET';
+                      const isBatt = entity.type === 'BATTERY_RACK';
+
+                      // Determine 3D height in Z dimension (pixels)
+                      const zHeight = isShelf
+                        ? 90
+                        : isTool
+                        ? 110
+                        : isUps
+                        ? 115
+                        : isBatt
+                        ? 85
+                        : 120;
+
+                      // Colors for 3D faces
+                      const primaryColor = isShelf
+                        ? '#059669' // Emerald for Shelves
+                        : isTool
+                        ? '#2563eb' // Blue for Tool Cabinets
+                        : isUps
+                        ? '#eab308' // Amber for UPS
+                        : isBatt
+                        ? '#64748b' // Slate for Batteries
+                        : '#0284c7'; // Sky Blue for DB
+
+                      return (
+                        <div
+                          key={entity.id}
+                          onMouseEnter={() => setHoveredEntity3D(entity.id)}
+                          onMouseLeave={() => setHoveredEntity3D(null)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedEntityId(entity.id);
+                            setSelectedTier(null);
+                          }}
+                          style={{
+                            position: 'absolute',
+                            left: `${entity.svgRect.x}px`,
+                            top: `${entity.svgRect.y}px`,
+                            width: `${entity.svgRect.width}px`,
+                            height: `${entity.svgRect.height}px`,
+                            transformStyle: 'preserve-3d',
+                            transform: `translateZ(${isSelected ? '8px' : '0px'})`,
+                            transition: 'transform 0.2s ease, filter 0.2s ease',
+                            cursor: 'pointer',
+                          }}
+                          className="group"
+                        >
+                          {/* 3D Box Geometry Construction */}
+                          {/* 1. TOP FACE (Z = zHeight) */}
+                          <div
+                            style={{
+                              position: 'absolute',
+                              inset: 0,
+                              height: `${entity.svgRect.height}px`,
+                              transform: `translateZ(${zHeight}px)`,
+                              backgroundColor: isSelected
+                                ? '#38bdf8'
+                                : isHovered
+                                ? '#60a5fa'
+                                : primaryColor,
+                              border: isSelected ? '2px solid #ffffff' : '1px solid rgba(255,255,255,0.4)',
+                              borderRadius: '3px',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              padding: '2px',
+                              boxShadow: isSelected
+                                ? '0 0 20px rgba(56, 189, 248, 0.8)'
+                                : 'none',
+                            }}
+                          >
+                            <span className="text-[10px] font-black text-white truncate max-w-full drop-shadow">
+                              {entity.code}
+                            </span>
+                            {isShelf && (
+                              <span className="text-[8px] font-bold text-white/90">
+                                {entity.tiers?.length || 5} TẦNG
+                              </span>
+                            )}
+                          </div>
+
+                          {/* 2. FRONT FACE (Facing viewer along Y) */}
+                          <div
+                            style={{
+                              position: 'absolute',
+                              left: 0,
+                              bottom: 0,
+                              width: `${entity.svgRect.width}px`,
+                              height: `${zHeight}px`,
+                              transformOrigin: 'bottom center',
+                              transform: 'rotateX(-90deg)',
+                              backgroundColor: isSelected ? '#0284c7' : '#0f172a',
+                              border: '1px solid rgba(255,255,255,0.2)',
+                              backgroundImage: isShelf
+                                ? `linear-gradient(to bottom, 
+                                    rgba(16, 185, 129, 0.3) 0%, 
+                                    rgba(15, 23, 42, 0.9) 20%, 
+                                    rgba(16, 185, 129, 0.3) 21%, 
+                                    rgba(15, 23, 42, 0.9) 40%,
+                                    rgba(16, 185, 129, 0.3) 41%, 
+                                    rgba(15, 23, 42, 0.9) 60%,
+                                    rgba(16, 185, 129, 0.3) 61%, 
+                                    rgba(15, 23, 42, 0.9) 80%,
+                                    rgba(16, 185, 129, 0.3) 81%,
+                                    rgba(15, 23, 42, 0.9) 100%)`
+                                : isTool
+                                ? `linear-gradient(to right, #1e3a8a 49%, #3b82f6 50%, #1e3a8a 51%)`
+                                : isUps
+                                ? `linear-gradient(to bottom, #ca8a04 0%, #1e293b 30%, #0f172a 100%)`
+                                : '#1e293b',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-around',
+                              padding: '2px',
+                            }}
+                          >
+                            {/* Realistic Details on Front Face */}
+                            {isShelf && (
+                              <div className="w-full h-full flex flex-col justify-between py-1 px-1 pointer-events-none">
+                                {(entity.tiers || []).slice().sort((a, b) => a.tierNumber - b.tierNumber).map((t) => (
+                                  <div key={t.tierNumber} className="h-1.5 w-full bg-emerald-500/40 rounded-xs flex items-center justify-between px-0.5">
+                                    <span className="text-[6px] font-mono font-bold text-white leading-none">T{t.tierNumber}</span>
+                                    <span className="w-2 h-0.5 bg-amber-400 rounded-xs" />
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+
+                            {isTool && (
+                              <div className="flex flex-col items-center justify-center space-y-1 w-full text-center">
+                                <div className="flex items-center space-x-1">
+                                  <div className="w-0.5 h-3 bg-slate-300 rounded" />
+                                  <div className="w-0.5 h-3 bg-slate-300 rounded" />
+                                </div>
+                                <span className="text-[7px] font-mono text-cyan-300">2 CÁNH</span>
+                              </div>
+                            )}
+
+                            {isUps && (
+                              <div className="flex flex-col items-center justify-center space-y-1 w-full text-center">
+                                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+                                <span className="text-[7px] font-mono font-bold text-amber-300">
+                                  {entity.code.includes('NEW UPS') ? 'Schneider' : 'SOCOMEC'}
+                                </span>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* 3. RIGHT SIDE FACE */}
+                          <div
+                            style={{
+                              position: 'absolute',
+                              right: 0,
+                              top: 0,
+                              width: `${entity.svgRect.height}px`,
+                              height: `${zHeight}px`,
+                              transformOrigin: 'top right',
+                              transform: 'rotateY(90deg) rotateX(-90deg)',
+                              backgroundColor: '#090d16',
+                              border: '1px solid rgba(255,255,255,0.15)',
+                            }}
+                          />
+
+                          {/* 4. LEFT SIDE FACE */}
+                          <div
+                            style={{
+                              position: 'absolute',
+                              left: 0,
+                              top: 0,
+                              width: `${entity.svgRect.height}px`,
+                              height: `${zHeight}px`,
+                              transformOrigin: 'top left',
+                              transform: 'rotateY(-90deg) rotateX(-90deg)',
+                              backgroundColor: '#090d16',
+                              border: '1px solid rgba(255,255,255,0.15)',
+                            }}
+                          />
+
+                          {/* 5. BACK FACE */}
+                          <div
+                            style={{
+                              position: 'absolute',
+                              left: 0,
+                              top: 0,
+                              width: `${entity.svgRect.width}px`,
+                              height: `${zHeight}px`,
+                              transformOrigin: 'top center',
+                              transform: 'rotateX(90deg)',
+                              backgroundColor: '#030712',
+                              border: '1px solid rgba(255,255,255,0.15)',
+                            }}
+                          />
+
+                          {/* 3D FLOATING BILLBOARD CALLOUT (When Selected or Hovered) */}
+                          {(isSelected || isHovered) && (
+                            <div
+                              style={{
+                                position: 'absolute',
+                                left: '50%',
+                                top: '50%',
+                                transform: `translate3d(-50%, -50%, ${zHeight + 35}px) rotateZ(${yaw3D}deg) rotateX(${-pitch3D}deg)`,
+                                transformStyle: 'preserve-3d',
+                                pointerEvents: 'none',
+                                whiteSpace: 'nowrap',
+                              }}
+                              className="z-50"
+                            >
+                              <div className="bg-slate-900/95 text-white px-2.5 py-1.5 rounded-xl border border-blue-400/80 shadow-2xl backdrop-blur-md flex items-center space-x-2 animate-bounce">
+                                <span className="w-2 h-2 rounded-full bg-emerald-400" />
+                                <div className="text-left">
+                                  <div className="text-[11px] font-black text-amber-300">
+                                    {entity.name}
+                                  </div>
+                                  <div className="text-[9px] text-slate-300">
+                                    {isShelf ? '4 Tầng • 16 Khay vật tư' : entity.categoryLabel}
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               </div>
@@ -1578,28 +1546,6 @@ export const WarehouseMapView: React.FC<WarehouseMapViewProps> = ({
                   className="w-14 h-14 object-contain"
                 />
                 <span className="text-[8px] font-mono text-slate-800 mt-0.5 font-black">QR KỆ</span>
-              </div>
-            </div>
-
-            {/* Technical Dimensions Box */}
-            <div className="p-3 bg-slate-950 rounded-xl border border-slate-800 grid grid-cols-3 gap-2 text-center text-xs">
-              <div>
-                <div className="text-[10px] text-slate-500 font-semibold">CHIỀU DÀI</div>
-                <div className="font-mono font-bold text-white mt-0.5">
-                  {(activeEntity.dimensions.lengthMm / 1000).toFixed(1)} m
-                </div>
-              </div>
-              <div>
-                <div className="text-[10px] text-slate-500 font-semibold">CHIỀU NGANG/CAO</div>
-                <div className="font-mono font-bold text-white mt-0.5">
-                  {(activeEntity.dimensions.heightMm / 1000).toFixed(1)} m
-                </div>
-              </div>
-              <div>
-                <div className="text-[10px] text-slate-500 font-semibold">ĐỘ RỘNG/SÂU</div>
-                <div className="font-mono font-bold text-white mt-0.5">
-                  {(activeEntity.dimensions.widthMm / 10).toFixed(0)} cm
-                </div>
               </div>
             </div>
 

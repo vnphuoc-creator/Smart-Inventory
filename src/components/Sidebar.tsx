@@ -89,7 +89,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     {
       id: 'materials',
       label: 'Tra Cứu Vật Tư',
-      sublabel: 'Định mức & quy cách (>600 mã DN)',
+      sublabel: 'Định mức & quy cách (>2.000 mã DN)',
       icon: Package,
     },
     {

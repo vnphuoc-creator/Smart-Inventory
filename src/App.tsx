@@ -34,7 +34,9 @@ import {
   UIThemeConfig,
   CanvasMode,
   DEFAULT_THEME_CONFIG,
+  WarehouseShelfEntity,
 } from './types';
+import { DEFAULT_WAREHOUSE_ENTITIES, normalizeWarehouseEntities } from './data/warehouseLayoutData';
 import { calculateAllMaterialStocks, formatVND, isProposalMatch } from './utils/inventoryEngine';
 import { safeStorage, safeSessionStorage } from './utils/safeStorage';
 import {
@@ -66,6 +68,8 @@ import {
   seedTransactions,
   seedUsers,
   clearLocalDeletedProposals,
+  saveWarehouseLayoutToCloud,
+  subscribeToWarehouseLayout,
 } from './services/firebaseSync';
 import {
   CheckCircle,
@@ -253,6 +257,40 @@ export function App() {
     }, INITIAL_ACTIVITY_LOGS);
     return () => unsubscribe();
   }, []);
+
+  // Warehouse Master Layout (Customizable by Master Admin & synced to Cloud Firestore)
+  const [warehouseEntities, setWarehouseEntities] = useState<WarehouseShelfEntity[]>(() => {
+    const saved = safeStorage.getItem('smart_warehouse_master_layout_v3');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return normalizeWarehouseEntities(parsed);
+      } catch (e) {
+        console.warn('Failed to parse saved warehouse layout:', e);
+      }
+    }
+    return normalizeWarehouseEntities(DEFAULT_WAREHOUSE_ENTITIES);
+  });
+
+  // Subscribe to real-time warehouse layout changes from Firestore
+  useEffect(() => {
+    const unsubscribe = subscribeToWarehouseLayout((cloudEntities) => {
+      if (cloudEntities && cloudEntities.length > 0) {
+        const normalized = normalizeWarehouseEntities(cloudEntities);
+        setWarehouseEntities(normalized);
+        safeStorage.setItem('smart_warehouse_master_layout_v3', JSON.stringify(normalized));
+      }
+    }, DEFAULT_WAREHOUSE_ENTITIES);
+    return () => unsubscribe();
+  }, []);
+
+  const handleUpdateWarehouseEntities = async (newEntities: WarehouseShelfEntity[]) => {
+    const normalized = normalizeWarehouseEntities(newEntities);
+    setWarehouseEntities(normalized);
+    safeStorage.setItem('smart_warehouse_master_layout_v3', JSON.stringify(normalized));
+    await saveWarehouseLayoutToCloud(normalized, currentUser?.email);
+    showToast('Đã lưu & đồng bộ sơ đồ kho thực tế lên Cloud Firestore thành công!', 'success');
+  };
 
   // Navigation & Modal State
   const [activeTab, setActiveTab] = useState<string>('dashboard');
@@ -1133,6 +1171,11 @@ export function App() {
               currentUser={currentUser}
               calculatedStocks={calculatedStocks}
               transactions={transactions}
+              materials={materials}
+              warehouseEntities={warehouseEntities}
+              onOpenMasterEditor={() => setActiveTab('settings')}
+              onOpenPrintModal={() => setIsBarcodeQrModalOpen(true)}
+              onOpenFullMap={() => setActiveTab('warehouse_map')}
               onNavigateTab={(tab, filter) => {
                 if (tab === 'transactions' || tab === 'transfers' || tab === 'requests') {
                   if (filter === 'IMPORT' || filter === 'EXPORT') {
@@ -1173,6 +1216,10 @@ export function App() {
             <WarehouseMapView
               materials={materials}
               calculatedStocks={calculatedStocks}
+              entities={warehouseEntities}
+              currentUser={currentUser}
+              onOpenMasterEditor={() => setActiveTab('settings')}
+              onOpenPrintModal={() => setIsBarcodeQrModalOpen(true)}
               onSelectMaterial={(mat) => {
                 setSelectedVisualCardMaterial(mat);
               }}
@@ -1195,6 +1242,7 @@ export function App() {
               calculatedStocks={calculatedStocks}
               transactions={transactions}
               proposals={proposals}
+              warehouseEntities={warehouseEntities}
               onUpdateProposal={handleUpdateProposal}
               onCreateProposal={handleCreateProposal}
               onDeleteProposal={handleDeleteProposal}
@@ -1317,6 +1365,8 @@ export function App() {
                   seedUsers(newUsers);
                   showToast(`Đã cập nhật danh sách người dùng và đồng bộ lên Cloud.`);
                 }}
+                warehouseEntities={warehouseEntities}
+                onUpdateWarehouseEntities={handleUpdateWarehouseEntities}
               />
             ) : (
               <div className="bg-slate-900 border border-red-500/30 rounded-2xl p-8 text-center max-w-lg mx-auto my-12">

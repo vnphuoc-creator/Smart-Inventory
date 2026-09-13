@@ -12,7 +12,7 @@ export const ALL_MATERIAL_CATEGORIES: string[] = [
 ];
 
 /**
- * Danh mục vật tư chính thức đầy đủ hơn 600 vật tư của Đội Điện Nước (ĐN) - AHT
+ * Danh mục vật tư chính thức đầy đủ hơn 2.000 vật tư của Đội Điện Nước (ĐN) - AHT
  * Toàn bộ các mã vật tư đều có tiền tố chuẩn DN_
  */
 const mergedMap = new Map<string, Material>();

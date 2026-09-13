@@ -175,7 +175,7 @@ export const UserGuideModal: React.FC<UserGuideModalProps> = ({
               <div className="bg-slate-850 p-5 rounded-2xl border border-slate-800 space-y-3">
                 <div className="flex items-center gap-2 text-white font-bold text-sm">
                   <span className="w-6 h-6 rounded-lg bg-blue-600 text-white flex items-center justify-center text-xs font-mono">1</span>
-                  Tra Cứu Danh Mục Vật Tư (&gt;600 Mã Chuẩn DN)
+                  Tra Cứu Danh Mục Vật Tư (&gt;2.000 Mã Chuẩn DN)
                 </div>
                 <div className="pl-8 space-y-2 text-xs text-slate-300">
                   <p>

@@ -32,6 +32,12 @@ import {
   ChevronsLeft,
   ChevronsRight,
   MoveHorizontal,
+  MapPin,
+  QrCode,
+  Boxes,
+  Layers,
+  SlidersHorizontal,
+  Info,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import {
@@ -43,6 +49,7 @@ import {
   CalculatedMaterialStock,
   User,
   PurchaseProposal,
+  WarehouseShelfEntity,
 } from '../types';
 import { formatVND, formatNumber, formatDisplayDate, isProposalMatch, normalizeProposalNumber } from '../utils/inventoryEngine';
 import { parseDocxHtml } from '../utils/docxProposalParser';
@@ -52,6 +59,8 @@ import { ProposalReconciliationView } from './ProposalReconciliationView';
 import { SearchableMaterialSelect } from './SearchableMaterialSelect';
 import { ProposalItem } from '../types';
 import { printCleanDocument } from '../utils/printHelper';
+import { resolveMaterialWarehouseLocation, MaterialLocationResult } from '../utils/warehouseLocationHelper';
+import { DEFAULT_WAREHOUSE_ENTITIES } from '../data/warehouseLayoutData';
 
 interface TransactionManagementViewProps {
   currentUser: User;
@@ -60,6 +69,7 @@ interface TransactionManagementViewProps {
   calculatedStocks: CalculatedMaterialStock[];
   transactions: InventoryTransaction[];
   proposals?: PurchaseProposal[];
+  warehouseEntities?: WarehouseShelfEntity[];
   onCreateTransaction: (transaction: InventoryTransaction) => void;
   onApproveTransaction: (txId: string, note?: string) => void;
   onRejectTransaction: (txId: string, note?: string) => void;
@@ -79,6 +89,7 @@ export const TransactionManagementView: React.FC<TransactionManagementViewProps>
   calculatedStocks,
   transactions,
   proposals = [],
+  warehouseEntities = DEFAULT_WAREHOUSE_ENTITIES,
   onCreateTransaction,
   onApproveTransaction,
   onRejectTransaction,
@@ -98,6 +109,7 @@ export const TransactionManagementView: React.FC<TransactionManagementViewProps>
   const [viewingDoc, setViewingDoc] = useState<{ url: string; html?: string; name?: string } | null>(null);
   const [docZoom, setDocZoom] = useState<number>(100);
   const [txToDelete, setTxToDelete] = useState<InventoryTransaction | null>(null);
+  const [showSlottingPlanModal, setShowSlottingPlanModal] = useState(false);
 
   // Top & Bottom Horizontal Scroll Synchronization
   const topScrollRef = useRef<HTMLDivElement>(null);
@@ -2232,8 +2244,22 @@ export const TransactionManagementView: React.FC<TransactionManagementViewProps>
                     </span>
                   </div>
 
-                  <div className="text-[11px] text-slate-300 font-mono bg-slate-900 px-2.5 py-1 rounded-lg border border-slate-700/60">
-                    Tổng: <strong className="text-white">{formItems.length}</strong> dòng vật tư
+                  <div className="flex items-center gap-2">
+                    <div className="text-[11px] text-slate-300 font-mono bg-slate-900 px-2.5 py-1 rounded-lg border border-slate-700/60">
+                      Tổng: <strong className="text-white">{formItems.length}</strong> dòng vật tư
+                    </div>
+
+                    {formItems.some((fi) => fi.materialCode) && (
+                      <button
+                        type="button"
+                        onClick={() => setShowSlottingPlanModal(true)}
+                        className="px-2.5 py-1 rounded-lg text-xs font-bold bg-cyan-600/20 text-cyan-300 border border-cyan-500/40 hover:bg-cyan-600/30 flex items-center gap-1.5 transition"
+                        title="Xem hướng dẫn chi tiết vị trí xếp kệ/khay cho các vật tư trên phiếu"
+                      >
+                        <MapPin className="w-3.5 h-3.5 text-cyan-400" />
+                        <span>Vị Trí Xếp Kho ({formItems.filter((fi) => fi.materialCode).length})</span>
+                      </button>
+                    )}
                   </div>
                 </div>
 
@@ -2318,6 +2344,57 @@ export const TransactionManagementView: React.FC<TransactionManagementViewProps>
                                 }}
                                 placeholder="Gõ tên hoặc mã vật tư..."
                               />
+
+                              {/* Warehouse Slotting Location Guidance Badge */}
+                              {(() => {
+                                if (!item.materialCode) return null;
+                                const targetMat = materials.find((m) => m.code === item.materialCode);
+                                const loc = resolveMaterialWarehouseLocation(
+                                  {
+                                    code: item.materialCode,
+                                    name: targetMat?.name || '',
+                                    specification: targetMat?.specification,
+                                    location: targetMat?.location,
+                                  },
+                                  warehouseEntities
+                                );
+                                return (
+                                  <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[11px] leading-tight">
+                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md font-semibold bg-blue-950/80 text-blue-300 border border-blue-600/40 shadow-sm">
+                                      <MapPin className="w-3 h-3 text-cyan-400 shrink-0" />
+                                      <span>
+                                        {formType === 'IMPORT' ? 'Xếp vào:' : 'Lấy tại:'}{' '}
+                                        <strong className="text-white">{loc.shelfName}</strong> • {loc.tierLabel} •{' '}
+                                        <strong className="text-cyan-300">{loc.compartmentName || loc.compartmentCode || 'Khay tiêu chuẩn'}</strong>
+                                      </span>
+                                    </span>
+                                    {loc.visualType && (
+                                      <span className="px-1.5 py-0.5 rounded text-[10px] bg-slate-900 text-slate-300 border border-slate-800">
+                                        {loc.visualType === 'blue-bins'
+                                          ? '🟦 Khay xanh'
+                                          : loc.visualType === 'clear-boxes'
+                                          ? '📦 Hộp quai đỏ'
+                                          : loc.visualType === 'cadivi-coils'
+                                          ? '🟡 Cuộn CADIVI'
+                                          : loc.visualType === 'tool-case'
+                                          ? '🧰 Hộp đồ nghề'
+                                          : '🟫 Thùng carton'}
+                                      </span>
+                                    )}
+                                    {loc.qrCodeValue && (
+                                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono bg-slate-950 text-amber-300 border border-slate-800">
+                                        <QrCode className="w-2.5 h-2.5 text-amber-400" />
+                                        {loc.qrCodeValue}
+                                      </span>
+                                    )}
+                                    {loc.isSuggested && (
+                                      <span className="px-1.5 py-0.2 rounded text-[9px] font-medium bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                                        Gợi ý 5S
+                                      </span>
+                                    )}
+                                  </div>
+                                );
+                              })()}
                             </td>
 
                             {/* Current Stock info */}
@@ -2911,6 +2988,236 @@ export const TransactionManagementView: React.FC<TransactionManagementViewProps>
                 className="px-4 py-2 rounded-xl text-xs font-bold bg-rose-600 hover:bg-rose-500 text-white shadow-md shadow-rose-600/30 transition"
               >
                 Xác Nhận Xóa
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Warehouse Slotting Guidance Plan (Hướng dẫn vị trí xếp kệ/khay chi tiết) */}
+      {showSlottingPlanModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-slate-950/80 backdrop-blur-sm animate-in fade-in">
+          <div className="w-full max-w-4xl max-h-[90vh] bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl flex flex-col overflow-hidden">
+            {/* Header */}
+            <div className="p-4 sm:p-5 bg-gradient-to-r from-slate-900 via-blue-950/50 to-slate-900 border-b border-slate-800 flex items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-400">
+                  <MapPin className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-white flex items-center gap-2">
+                    Hướng Dẫn Vị Trí Xếp Kệ Kho 5S
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">
+                      Chuẩn Thực Tế ĐNCT
+                    </span>
+                  </h3>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    Số tờ trình / Đơn: <strong className="text-amber-300 font-mono">{formProposalNumber || 'N/A'}</strong> • Tự động chỉ định Kệ, Tầng và Khay/Hộp chứa
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const printItems = formItems
+                      .filter((fi) => fi.materialCode)
+                      .map((fi, idx) => {
+                        const mat = materials.find((m) => m.code === fi.materialCode);
+                        const loc = resolveMaterialWarehouseLocation(
+                          {
+                            code: fi.materialCode,
+                            name: mat?.name || '',
+                            specification: mat?.specification,
+                            location: mat?.location,
+                          },
+                          warehouseEntities
+                        );
+                        return `
+                          <tr>
+                            <td style="border: 1px solid #cbd5e1; padding: 6px; text-align: center;">${idx + 1}</td>
+                            <td style="border: 1px solid #cbd5e1; padding: 6px; font-family: monospace; font-weight: bold;">${fi.materialCode}</td>
+                            <td style="border: 1px solid #cbd5e1; padding: 6px;"><strong>${mat?.name || ''}</strong><br/><small style="color: #64748b;">${mat?.specification || ''}</small></td>
+                            <td style="border: 1px solid #cbd5e1; padding: 6px; text-align: right; font-weight: bold;">${fi.quantity} ${mat?.unit || ''}</td>
+                            <td style="border: 1px solid #cbd5e1; padding: 6px; background-color: #f8fafc;">
+                              <strong style="color: #1e3a8a;">${loc.shelfName}</strong><br/>
+                              <span>${loc.tierLabel}</span> • <strong style="color: #0284c7;">${loc.compartmentName || loc.compartmentCode || 'Khay tiêu chuẩn'}</strong>
+                            </td>
+                            <td style="border: 1px solid #cbd5e1; padding: 6px; font-family: monospace; font-size: 11px; text-align: center;">${loc.qrCodeValue || '-'}</td>
+                          </tr>
+                        `;
+                      })
+                      .join('');
+
+                    printCleanDocument({
+                      title: `Phiếu Hướng Dẫn Vị Trí Xếp Kho - ${formProposalNumber || 'Đơn Nhập'}`,
+                      content: `
+                        <div style="font-family: Arial, sans-serif; color: #0f172a; padding: 10px;">
+                          <div style="text-align: center; margin-bottom: 15px; border-bottom: 2px solid #0f172a; padding-bottom: 10px;">
+                            <h2 style="margin: 0; text-transform: uppercase; font-size: 18px;">CẢNG HÀNG KHÔNG QUỐC TẾ ĐÀ NẴNG - NHÀ GA T2</h2>
+                            <h3 style="margin: 4px 0 0 0; color: #1e3a8a; font-size: 16px;">PHIẾU HƯỚNG DẪN VỊ TRÍ XẾP KỆ VẬT TƯ (SLOTTING SLIP)</h3>
+                            <p style="margin: 4px 0 0 0; font-size: 12px; color: #475569;">Áp dụng cho Tờ trình: <strong>${formProposalNumber || 'Tự do'}</strong> | Ngày in: ${new Date().toLocaleDateString('vi-VN')}</p>
+                          </div>
+                          <table style="width: 100%; border-collapse: collapse; font-size: 12px;">
+                            <thead>
+                              <tr style="background-color: #e2e8f0;">
+                                <th style="border: 1px solid #94a3b8; padding: 8px;">STT</th>
+                                <th style="border: 1px solid #94a3b8; padding: 8px;">Mã VT</th>
+                                <th style="border: 1px solid #94a3b8; padding: 8px;">Tên Vật Tư & Quy Cách</th>
+                                <th style="border: 1px solid #94a3b8; padding: 8px;">Số Lượng</th>
+                                <th style="border: 1px solid #94a3b8; padding: 8px;">Vị Trí Xếp (Kệ • Tầng • Khay)</th>
+                                <th style="border: 1px solid #94a3b8; padding: 8px;">Mã QR Vị Trí</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              ${printItems}
+                            </tbody>
+                          </table>
+                          <div style="margin-top: 20px; font-size: 11px; color: #475569; border-top: 1px dashed #cbd5e1; padding-top: 8px;">
+                            * Lưu ý nhân viên kho: Sau khi xếp vật tư vào đúng khay/hộp chỉ định, hãy quét mã QR dán trên kệ/khay để kiểm tra chéo và cập nhật trạng thái.
+                          </div>
+                        </div>
+                      `,
+                    });
+                  }}
+                  className="px-3 py-1.5 rounded-lg text-xs font-bold bg-cyan-600 hover:bg-cyan-500 text-white flex items-center gap-1.5 transition shadow-sm"
+                >
+                  <Printer className="w-3.5 h-3.5" />
+                  <span>In Phiếu Hướng Dẫn</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowSlottingPlanModal(false)}
+                  className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+
+            {/* Table Content */}
+            <div className="p-4 sm:p-6 overflow-y-auto flex-1 space-y-4">
+              <div className="bg-slate-950/70 border border-slate-800 rounded-xl overflow-hidden shadow-inner">
+                <table className="w-full text-left text-xs text-slate-300">
+                  <thead className="bg-slate-900/90 text-slate-400 uppercase text-[11px] font-semibold border-b border-slate-800">
+                    <tr>
+                      <th className="py-2.5 px-3 text-center w-12">STT</th>
+                      <th className="py-2.5 px-3 w-28 font-mono">Mã VT</th>
+                      <th className="py-2.5 px-3 min-w-[220px]">Tên Vật Tư &amp; Quy Cách</th>
+                      <th className="py-2.5 px-3 text-right w-24">Số Lượng</th>
+                      <th className="py-2.5 px-3 min-w-[240px]">Vị Trí Xếp (Kệ • Tầng • Khay)</th>
+                      <th className="py-2.5 px-3 text-center w-36 font-mono">Mã QR Định Danh</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-800/80">
+                    {formItems
+                      .filter((fi) => fi.materialCode)
+                      .map((fi, idx) => {
+                        const mat = materials.find((m) => m.code === fi.materialCode);
+                        const loc = resolveMaterialWarehouseLocation(
+                          {
+                            code: fi.materialCode,
+                            name: mat?.name || '',
+                            specification: mat?.specification,
+                            location: mat?.location,
+                          },
+                          warehouseEntities
+                        );
+
+                        return (
+                          <tr key={idx} className="hover:bg-slate-800/40 transition-colors">
+                            <td className="py-3 px-3 text-center font-mono font-bold text-slate-500">
+                              {idx + 1}
+                            </td>
+                            <td className="py-3 px-3 font-mono font-bold text-cyan-400">
+                              {fi.materialCode}
+                            </td>
+                            <td className="py-3 px-3">
+                              <div className="font-bold text-white leading-snug">{mat?.name || fi.materialCode}</div>
+                              {mat?.specification && (
+                                <div className="text-[11px] text-slate-400 mt-0.5">{mat.specification}</div>
+                              )}
+                            </td>
+                            <td className="py-3 px-3 text-right font-mono font-bold text-emerald-400">
+                              {fi.quantity} <span className="text-[11px] font-normal text-slate-400">{mat?.unit || ''}</span>
+                            </td>
+                            <td className="py-3 px-3">
+                              <div className="space-y-1">
+                                <div className="flex items-center gap-1.5">
+                                  <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-blue-950 text-blue-300 border border-blue-700/50">
+                                    {loc.shelfName}
+                                  </span>
+                                  <span className="text-slate-400 text-xs">•</span>
+                                  <span className="text-xs font-semibold text-slate-200">{loc.tierLabel}</span>
+                                </div>
+                                <div className="flex items-center gap-1.5 text-[11px]">
+                                  <span className="font-bold text-cyan-300">
+                                    {loc.compartmentName || loc.compartmentCode || 'Khay tiêu chuẩn'}
+                                  </span>
+                                  {loc.visualType && (
+                                    <span className="px-1.5 py-0.2 rounded text-[10px] bg-slate-800 text-slate-300 border border-slate-700">
+                                      {loc.visualType === 'blue-bins'
+                                        ? '🟦 Khay xanh'
+                                        : loc.visualType === 'clear-boxes'
+                                        ? '📦 Hộp quai đỏ'
+                                        : loc.visualType === 'cadivi-coils'
+                                        ? '🟡 Cuộn CADIVI'
+                                        : loc.visualType === 'tool-case'
+                                        ? '🧰 Hộp đồ nghề'
+                                        : '🟫 Thùng carton'}
+                                    </span>
+                                  )}
+                                  {loc.isSuggested && (
+                                    <span className="px-1.5 py-0.2 rounded text-[9px] bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                                      Gợi ý 5S
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            </td>
+                            <td className="py-3 px-3 text-center">
+                              {loc.qrCodeValue ? (
+                                <span className="inline-flex items-center gap-1 px-2 py-1 rounded bg-slate-900 border border-slate-800 font-mono text-[10px] text-amber-300">
+                                  <QrCode className="w-3 h-3 text-amber-400 shrink-0" />
+                                  <span className="truncate max-w-[120px]">{loc.qrCodeValue}</span>
+                                </span>
+                              ) : (
+                                <span className="text-slate-600 text-[11px]">-</span>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Guidance Tips */}
+              <div className="p-3.5 bg-blue-950/30 border border-blue-800/40 rounded-xl flex items-start gap-2.5 text-xs text-blue-200">
+                <Info className="w-4 h-4 text-cyan-400 shrink-0 mt-0.5" />
+                <div className="space-y-1">
+                  <span className="font-bold text-white">Quy trình xếp hàng không lo sót / nhầm lẫn:</span>
+                  <p className="text-slate-300 leading-relaxed">
+                    1. Cầm phiếu hướng dẫn ra đúng vị trí kệ (KE-01 đến KE-05 hoặc Tủ đồ nghề).<br/>
+                    2. Đặt vật tư vào đúng tầng và khay tương ứng theo quy chuẩn 5S.<br/>
+                    3. Quét mã QR trên tem giá kệ để kiểm tra chéo và đối chiếu mã vật tư.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="p-3.5 bg-slate-950 border-t border-slate-800 flex items-center justify-between">
+              <span className="text-xs text-slate-400">
+                Hiển thị vị trí cho <strong className="text-white">{formItems.filter((fi) => fi.materialCode).length}</strong> vật tư trên phiếu
+              </span>
+              <button
+                type="button"
+                onClick={() => setShowSlottingPlanModal(false)}
+                className="px-4 py-2 rounded-xl text-xs font-bold bg-slate-800 hover:bg-slate-700 text-slate-200"
+              >
+                Đóng
               </button>
             </div>
           </div>
