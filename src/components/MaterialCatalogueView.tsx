@@ -42,6 +42,7 @@ import {
   CalculatedMaterialStock,
   User,
   NaturalSearchFilters,
+  WarehouseShelfEntity,
 } from '../types';
 import { formatVND, formatNumber, validateMaterialCode } from '../utils/inventoryEngine';
 import { MATERIAL_CATEGORIES, STANDARD_UNITS } from '../data/seedData';
@@ -50,12 +51,14 @@ import { extractBrand, extractDifferentiators } from '../utils/materialDifferent
 import { BarcodeQrScanModal } from './BarcodeQrScanModal';
 import { resolveMaterialImageUrl, getMaterialVisualDossier } from '../utils/materialImageResolver';
 import { MaterialImageModal } from './MaterialImageModal';
+import { resolveMaterialWarehouseLocation } from '../utils/warehouseLocationHelper';
 
 interface MaterialCatalogueViewProps {
   currentUser: User;
   allUsers: User[];
   materials: Material[];
   calculatedStocks: CalculatedMaterialStock[];
+  warehouseEntities?: WarehouseShelfEntity[];
   onSaveMaterial: (material: Material) => void;
   onDeleteMaterial: (materialId: string) => void;
   onOpenStockCard: (materialCode: string) => void;
@@ -70,6 +73,7 @@ export const MaterialCatalogueView: React.FC<MaterialCatalogueViewProps> = ({
   allUsers,
   materials,
   calculatedStocks,
+  warehouseEntities,
   onSaveMaterial,
   onDeleteMaterial,
   onOpenStockCard,
@@ -195,7 +199,16 @@ export const MaterialCatalogueView: React.FC<MaterialCatalogueViewProps> = ({
           const matchCode = mat.code.toLowerCase().includes(term);
           const matchName = mat.name.toLowerCase().includes(term);
           const matchSpec = mat.specification.toLowerCase().includes(term);
-          const matchLocation = mat.location.toLowerCase().includes(term);
+          const loc = resolveMaterialWarehouseLocation(mat, warehouseEntities);
+          const matchLocation =
+            mat.location.toLowerCase().includes(term) ||
+            (loc.isAssigned && (
+              loc.shelfCode.toLowerCase().includes(term) ||
+              loc.shelfName.toLowerCase().includes(term) ||
+              loc.tierLabel.toLowerCase().includes(term) ||
+              (loc.compartmentCode && loc.compartmentCode.toLowerCase().includes(term)) ||
+              (loc.compartmentName && loc.compartmentName.toLowerCase().includes(term))
+            ));
           if (!matchCode && !matchName && !matchSpec && !matchLocation) return false;
         }
 
@@ -650,10 +663,26 @@ export const MaterialCatalogueView: React.FC<MaterialCatalogueViewProps> = ({
                       </div>
 
                       <div className="flex items-center justify-between text-[11px] text-slate-400 pt-2 border-t border-slate-800/80">
-                        <span className="truncate max-w-[130px] font-medium text-slate-300">{mat.category}</span>
-                        <span className="truncate max-w-[100px] text-slate-400 font-mono text-[10px]">
-                          {mat.location}
-                        </span>
+                        <span className="truncate max-w-[120px] font-medium text-slate-300">{mat.category}</span>
+                        {(() => {
+                          const loc = resolveMaterialWarehouseLocation(mat, warehouseEntities);
+                          if (loc.isAssigned) {
+                            return (
+                              <span
+                                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-blue-950/80 text-cyan-300 border border-blue-700/50 text-[10px] font-mono font-semibold truncate max-w-[135px]"
+                                title={`Vị trí sơ đồ: ${loc.shelfName} • ${loc.tierLabel} • ${loc.compartmentCode || loc.compartmentName}`}
+                              >
+                                <MapPin className="w-2.5 h-2.5 text-cyan-400 shrink-0" />
+                                <span>{loc.shelfCode}-T{loc.tierNumber}-{loc.compartmentCode}</span>
+                              </span>
+                            );
+                          }
+                          return (
+                            <span className="truncate max-w-[100px] text-slate-400 font-mono text-[10px]">
+                              {mat.location || 'Chưa gán'}
+                            </span>
+                          );
+                        })()}
                       </div>
 
                       {/* Stock Metric Gauge */}
@@ -952,10 +981,25 @@ export const MaterialCatalogueView: React.FC<MaterialCatalogueViewProps> = ({
                         {/* Category & Location */}
                         <td className="py-3 px-3">
                           <div className="material-table-category text-slate-300 text-[11px] font-medium">{mat.category}</div>
-                          <div className="text-[10px] text-slate-400 flex items-center gap-1 mt-0.5">
-                            <span className="w-1.5 h-1.5 rounded-full bg-slate-500"></span>
-                            {mat.location}
-                          </div>
+                          {(() => {
+                            const loc = resolveMaterialWarehouseLocation(mat, warehouseEntities);
+                            if (loc.isAssigned) {
+                              return (
+                                <div className="mt-1 flex items-center gap-1" title={`Vị trí: ${loc.shelfName} • ${loc.tierLabel} • ${loc.compartmentCode || loc.compartmentName}`}>
+                                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-blue-950/90 text-cyan-300 border border-blue-600/50 text-[10px] font-mono font-bold shadow-sm">
+                                    <MapPin className="w-2.5 h-2.5 text-cyan-400 shrink-0" />
+                                    <span>{loc.shelfCode} • T{loc.tierNumber} • {loc.compartmentCode}</span>
+                                  </span>
+                                </div>
+                              );
+                            }
+                            return (
+                              <div className="text-[10px] text-slate-500 flex items-center gap-1 mt-0.5">
+                                <span className="w-1.5 h-1.5 rounded-full bg-slate-600"></span>
+                                <span>{mat.location || 'Chưa gán kệ'}</span>
+                              </div>
+                            );
+                          })()}
                         </td>
 
                         {/* Unit */}
@@ -1263,7 +1307,7 @@ export const MaterialCatalogueView: React.FC<MaterialCatalogueViewProps> = ({
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 {/* Location */}
                 <div>
-                  <label className="block text-slate-300 font-medium mb-1">Vị Trí Lưu Kho</label>
+                  <label className="block text-slate-300 font-medium mb-1">Vị Trí Lưu Kho (Mô Tả)</label>
                   <input
                     type="text"
                     value={formData.location}
@@ -1271,6 +1315,18 @@ export const MaterialCatalogueView: React.FC<MaterialCatalogueViewProps> = ({
                     placeholder="Kệ A1-01, Kho Tổng..."
                     className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-blue-500"
                   />
+                  {formData.code && (() => {
+                    const loc = resolveMaterialWarehouseLocation({ code: formData.code }, warehouseEntities);
+                    if (loc.isAssigned) {
+                      return (
+                        <p className="text-[10px] text-cyan-400 mt-1 flex items-center gap-1 font-mono">
+                          <MapPin className="w-3 h-3 text-cyan-400 shrink-0" />
+                          <span>Sơ đồ: {loc.shelfCode} • T{loc.tierNumber} • {loc.compartmentCode}</span>
+                        </p>
+                      );
+                    }
+                    return null;
+                  })()}
                 </div>
 
                 {/* Initial Stock */}

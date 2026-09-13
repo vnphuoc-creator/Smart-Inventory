@@ -30,6 +30,7 @@ interface BarcodeQrScanModalProps {
   materials: Material[];
   onSelectMaterial: (material: Material) => void;
   onOpenWarehouseMap?: (shelfCode: string) => void;
+  onScanTray?: (trayCode: string) => void;
 }
 
 export const BarcodeQrScanModal: React.FC<BarcodeQrScanModalProps> = ({
@@ -38,6 +39,7 @@ export const BarcodeQrScanModal: React.FC<BarcodeQrScanModalProps> = ({
   materials,
   onSelectMaterial,
   onOpenWarehouseMap,
+  onScanTray,
 }) => {
   const [cameraActive, setCameraActive] = useState(false);
   const [isStartingCamera, setIsStartingCamera] = useState(false);
@@ -229,6 +231,43 @@ export const BarcodeQrScanModal: React.FC<BarcodeQrScanModalProps> = ({
   const handleDetectedCode = useCallback(
     (code: string) => {
       setScannedCode(code);
+
+      // Check if scanned code is a Warehouse Tray QR code
+      const isTrayQr =
+        code.includes('DNCT-WH-') ||
+        code.includes('action=tray') ||
+        code.includes('tray=');
+
+      if (isTrayQr && onScanTray) {
+        // Haptic feedback
+        try {
+          if (navigator.vibrate) {
+            navigator.vibrate([100, 50, 100]);
+          }
+        } catch {}
+
+        // Audio chime feedback
+        try {
+          const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+          const osc = audioCtx.createOscillator();
+          const gain = audioCtx.createGain();
+          osc.connect(gain);
+          gain.connect(audioCtx.destination);
+          osc.frequency.value = 1050;
+          gain.gain.value = 0.2;
+          osc.start();
+          setTimeout(() => {
+            osc.stop();
+            audioCtx.close();
+          }, 160);
+        } catch {}
+
+        stopCamera();
+        onClose();
+        onScanTray(code);
+        return;
+      }
+
       const mat = findMaterialByCode(code);
       if (mat) {
         setMatchedMaterial(mat);
@@ -262,7 +301,7 @@ export const BarcodeQrScanModal: React.FC<BarcodeQrScanModalProps> = ({
         setMatchedMaterial(null);
       }
     },
-    [findMaterialByCode, stopCamera]
+    [findMaterialByCode, stopCamera, onScanTray, onClose]
   );
 
   // Scan frame processing loop

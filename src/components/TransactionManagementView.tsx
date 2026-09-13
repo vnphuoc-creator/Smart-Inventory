@@ -2360,15 +2360,28 @@ export const TransactionManagementView: React.FC<TransactionManagementViewProps>
                                 );
                                 return (
                                   <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[11px] leading-tight">
-                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md font-semibold bg-blue-950/80 text-blue-300 border border-blue-600/40 shadow-sm">
-                                      <MapPin className="w-3 h-3 text-cyan-400 shrink-0" />
-                                      <span>
-                                        {formType === 'IMPORT' ? 'Xếp vào:' : 'Lấy tại:'}{' '}
-                                        <strong className="text-white">{loc.shelfName}</strong> • {loc.tierLabel} •{' '}
-                                        <strong className="text-cyan-300">{loc.compartmentName || loc.compartmentCode || 'Khay tiêu chuẩn'}</strong>
+                                    {loc.isAssigned ? (
+                                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md font-semibold bg-blue-950/90 text-cyan-300 border border-cyan-500/40 shadow-sm">
+                                        <MapPin className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+                                        <span>
+                                          {formType === 'IMPORT' ? 'Xếp vào:' : 'Lấy tại:'}{' '}
+                                          <strong className="text-white font-mono bg-blue-900/80 px-1.5 py-0.5 rounded border border-blue-500/40">{loc.shelfCode}</strong>
+                                          {' • '}
+                                          <span className="text-amber-300 font-semibold">Tầng {loc.tierNumber}</span>
+                                          {' • '}
+                                          <strong className="text-cyan-200 font-mono bg-blue-900/60 px-1.5 py-0.5 rounded">{loc.compartmentCode ? `Khay ${loc.compartmentCode}` : 'Khay chuẩn'}</strong>
+                                          {loc.compartmentName && loc.compartmentName !== loc.compartmentCode && (
+                                            <span className="text-slate-300 text-[10px] ml-1">({loc.compartmentName})</span>
+                                          )}
+                                        </span>
                                       </span>
-                                    </span>
-                                    {loc.visualType && (
+                                    ) : (
+                                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md font-medium bg-slate-900 text-slate-400 border border-slate-800 text-[10px]">
+                                        <MapPin className="w-3 h-3 text-slate-500 shrink-0" />
+                                        <span>Chưa phân vị trí trên sơ đồ kho</span>
+                                      </span>
+                                    )}
+                                    {loc.visualType && loc.isAssigned && (
                                       <span className="px-1.5 py-0.5 rounded text-[10px] bg-slate-900 text-slate-300 border border-slate-800">
                                         {loc.visualType === 'blue-bins'
                                           ? '🟦 Khay xanh'
@@ -2381,7 +2394,7 @@ export const TransactionManagementView: React.FC<TransactionManagementViewProps>
                                           : '🟫 Thùng carton'}
                                       </span>
                                     )}
-                                    {loc.qrCodeValue && (
+                                    {loc.qrCodeValue && loc.isAssigned && (
                                       <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono bg-slate-950 text-amber-300 border border-slate-800">
                                         <QrCode className="w-2.5 h-2.5 text-amber-400" />
                                         {loc.qrCodeValue}
@@ -2654,6 +2667,7 @@ export const TransactionManagementView: React.FC<TransactionManagementViewProps>
                     <th className="border border-slate-300 p-2 w-10">STT</th>
                     <th className="border border-slate-300 p-2 text-left">Mã Vật Tư (DN_*)</th>
                     <th className="border border-slate-300 p-2 text-left">Tên & Quy Cách Vật Tư</th>
+                    <th className="border border-slate-300 p-2 text-left w-36">Vị Trí Sơ Đồ Kho</th>
                     <th className="border border-slate-300 p-2 w-16">ĐVT</th>
                     <th className="border border-slate-300 p-2 text-right w-20">Số Lượng</th>
                     <th className="border border-slate-300 p-2 text-right w-28">Đơn Giá (VNĐ)</th>
@@ -2661,27 +2675,46 @@ export const TransactionManagementView: React.FC<TransactionManagementViewProps>
                   </tr>
                 </thead>
                 <tbody>
-                  {selectedTxForView.items.map((item, idx) => (
-                    <tr key={idx} className="border border-slate-300">
-                      <td className="border border-slate-300 p-2 text-center">{idx + 1}</td>
-                      <td className="border border-slate-300 p-2 font-mono font-bold text-blue-900">
-                        {item.materialCode}
-                      </td>
-                      <td className="border border-slate-300 p-2 font-medium">{item.materialName}</td>
-                      <td className="border border-slate-300 p-2 text-center">{item.unit}</td>
-                      <td className="border border-slate-300 p-2 text-right font-mono font-bold">
-                        {formatNumber(item.quantity)}
-                      </td>
-                      <td className="border border-slate-300 p-2 text-right font-mono">
-                        {formatNumber(item.unitPrice)}
-                      </td>
-                      <td className="border border-slate-300 p-2 text-right font-mono font-bold text-slate-950">
-                        {formatNumber(item.totalAmount)}
-                      </td>
-                    </tr>
-                  ))}
+                  {selectedTxForView.items.map((item, idx) => {
+                    const loc = resolveMaterialWarehouseLocation(
+                      {
+                        code: item.materialCode,
+                        name: item.materialName,
+                      },
+                      warehouseEntities
+                    );
+
+                    return (
+                      <tr key={idx} className="border border-slate-300">
+                        <td className="border border-slate-300 p-2 text-center">{idx + 1}</td>
+                        <td className="border border-slate-300 p-2 font-mono font-bold text-blue-900">
+                          {item.materialCode}
+                        </td>
+                        <td className="border border-slate-300 p-2 font-medium">{item.materialName}</td>
+                        <td className="border border-slate-300 p-2 font-mono text-[11px]">
+                          {loc.isAssigned ? (
+                            <span className="font-semibold text-blue-950">
+                              {loc.shelfCode} • T{loc.tierNumber} • {loc.compartmentCode}
+                            </span>
+                          ) : (
+                            <span className="text-slate-400 italic">Chưa xếp kệ</span>
+                          )}
+                        </td>
+                        <td className="border border-slate-300 p-2 text-center">{item.unit}</td>
+                        <td className="border border-slate-300 p-2 text-right font-mono font-bold">
+                          {formatNumber(item.quantity)}
+                        </td>
+                        <td className="border border-slate-300 p-2 text-right font-mono">
+                          {formatNumber(item.unitPrice)}
+                        </td>
+                        <td className="border border-slate-300 p-2 text-right font-mono font-bold text-slate-950">
+                          {formatNumber(item.totalAmount)}
+                        </td>
+                      </tr>
+                    );
+                  })}
                   <tr className="bg-slate-100 font-bold">
-                    <td colSpan={4} className="border border-slate-300 p-2 text-center uppercase">
+                    <td colSpan={5} className="border border-slate-300 p-2 text-center uppercase">
                       Tổng Cộng
                     </td>
                     <td className="border border-slate-300 p-2 text-right font-mono">
@@ -3041,8 +3074,11 @@ export const TransactionManagementView: React.FC<TransactionManagementViewProps>
                             <td style="border: 1px solid #cbd5e1; padding: 6px;"><strong>${mat?.name || ''}</strong><br/><small style="color: #64748b;">${mat?.specification || ''}</small></td>
                             <td style="border: 1px solid #cbd5e1; padding: 6px; text-align: right; font-weight: bold;">${fi.quantity} ${mat?.unit || ''}</td>
                             <td style="border: 1px solid #cbd5e1; padding: 6px; background-color: #f8fafc;">
-                              <strong style="color: #1e3a8a;">${loc.shelfName}</strong><br/>
-                              <span>${loc.tierLabel}</span> • <strong style="color: #0284c7;">${loc.compartmentName || loc.compartmentCode || 'Khay tiêu chuẩn'}</strong>
+                              ${loc.isAssigned ? `
+                                <strong style="color: #1e3a8a; font-family: monospace;">${loc.shelfCode}</strong> - <span style="font-size: 11px;">${loc.shelfName}</span><br/>
+                                <span style="font-weight: bold; color: #b45309;">Tầng ${loc.tierNumber}</span> • <strong style="color: #0284c7; font-family: monospace;">Khay ${loc.compartmentCode}</strong>
+                                ${loc.compartmentName && loc.compartmentName !== loc.compartmentCode ? `<br/><small style="color: #64748b;">(${loc.compartmentName})</small>` : ''}
+                              ` : `<span style="color: #94a3b8; font-style: italic;">Chưa phân vị trí trên sơ đồ kho</span>`}
                             </td>
                             <td style="border: 1px solid #cbd5e1; padding: 6px; font-family: monospace; font-size: 11px; text-align: center;">${loc.qrCodeValue || '-'}</td>
                           </tr>
@@ -3143,38 +3179,45 @@ export const TransactionManagementView: React.FC<TransactionManagementViewProps>
                               {fi.quantity} <span className="text-[11px] font-normal text-slate-400">{mat?.unit || ''}</span>
                             </td>
                             <td className="py-3 px-3">
-                              <div className="space-y-1">
-                                <div className="flex items-center gap-1.5">
-                                  <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-blue-950 text-blue-300 border border-blue-700/50">
-                                    {loc.shelfName}
-                                  </span>
-                                  <span className="text-slate-400 text-xs">•</span>
-                                  <span className="text-xs font-semibold text-slate-200">{loc.tierLabel}</span>
-                                </div>
-                                <div className="flex items-center gap-1.5 text-[11px]">
-                                  <span className="font-bold text-cyan-300">
-                                    {loc.compartmentName || loc.compartmentCode || 'Khay tiêu chuẩn'}
-                                  </span>
-                                  {loc.visualType && (
-                                    <span className="px-1.5 py-0.2 rounded text-[10px] bg-slate-800 text-slate-300 border border-slate-700">
-                                      {loc.visualType === 'blue-bins'
-                                        ? '🟦 Khay xanh'
-                                        : loc.visualType === 'clear-boxes'
-                                        ? '📦 Hộp quai đỏ'
-                                        : loc.visualType === 'cadivi-coils'
-                                        ? '🟡 Cuộn CADIVI'
-                                        : loc.visualType === 'tool-case'
-                                        ? '🧰 Hộp đồ nghề'
-                                        : '🟫 Thùng carton'}
+                              {loc.isAssigned ? (
+                                <div className="space-y-1">
+                                  <div className="flex items-center gap-1.5">
+                                    <span className="px-2 py-0.5 rounded text-[11px] font-mono font-bold bg-blue-950 text-cyan-300 border border-blue-700/50">
+                                      {loc.shelfCode}
                                     </span>
-                                  )}
-                                  {loc.isSuggested && (
-                                    <span className="px-1.5 py-0.2 rounded text-[9px] bg-amber-500/20 text-amber-300 border border-amber-500/30">
-                                      Gợi ý 5S
+                                    <span className="text-slate-400 text-xs">•</span>
+                                    <span className="text-xs font-semibold text-amber-300">Tầng {loc.tierNumber}</span>
+                                    <span className="text-slate-400 text-xs">•</span>
+                                    <span className="font-mono font-bold text-cyan-200">
+                                      Khay {loc.compartmentCode}
                                     </span>
-                                  )}
+                                  </div>
+                                  <div className="flex items-center gap-1.5 text-[11px]">
+                                    <span className="text-slate-300 text-xs">
+                                      {loc.shelfName}
+                                      {loc.compartmentName && loc.compartmentName !== loc.compartmentCode && ` (${loc.compartmentName})`}
+                                    </span>
+                                    {loc.visualType && (
+                                      <span className="px-1.5 py-0.2 rounded text-[10px] bg-slate-800 text-slate-300 border border-slate-700">
+                                        {loc.visualType === 'blue-bins'
+                                          ? '🟦 Khay xanh'
+                                          : loc.visualType === 'clear-boxes'
+                                          ? '📦 Hộp quai đỏ'
+                                          : loc.visualType === 'cadivi-coils'
+                                          ? '🟡 Cuộn CADIVI'
+                                          : loc.visualType === 'tool-case'
+                                          ? '🧰 Hộp đồ nghề'
+                                          : '🟫 Thùng carton'}
+                                      </span>
+                                    )}
+                                  </div>
                                 </div>
-                              </div>
+                              ) : (
+                                <span className="text-slate-500 text-xs italic flex items-center gap-1">
+                                  <MapPin className="w-3 h-3 text-slate-600" />
+                                  Chưa phân vị trí trên sơ đồ kho
+                                </span>
+                              )}
                             </td>
                             <td className="py-3 px-3 text-center">
                               {loc.qrCodeValue ? (

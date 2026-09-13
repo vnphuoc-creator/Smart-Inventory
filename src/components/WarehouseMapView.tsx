@@ -31,6 +31,7 @@ import {
 import { Material, CalculatedMaterialStock, WarehouseShelfEntity, User, ShelfTierInfo } from '../types';
 import { DEFAULT_WAREHOUSE_ENTITIES } from '../data/warehouseLayoutData';
 import { formatNumber } from '../utils/inventoryEngine';
+import { resolveMaterialWarehouseLocation } from '../utils/warehouseLocationHelper';
 
 interface WarehouseMapViewProps {
   materials: Material[];
@@ -63,6 +64,7 @@ export const WarehouseMapView: React.FC<WarehouseMapViewProps> = ({
   // State management
   const [selectedEntityId, setSelectedEntityId] = useState<string>('KE-01'); // Default to Shelf 1
   const [selectedTier, setSelectedTier] = useState<number | null>(null);
+  const [selectedCompartmentId, setSelectedCompartmentId] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'2D_MAP' | 'FRONT_ELEVATION' | 'ISOMETRIC_3D'>('2D_MAP');
   const [searchQuery, setSearchQuery] = useState('');
   const [filterType, setFilterType] = useState<'ALL' | 'SHELVES' | 'TOOL_CABINETS' | 'ELECTRICAL_UPS' | 'LOW_STOCK'>('ALL');
@@ -178,7 +180,19 @@ export const WarehouseMapView: React.FC<WarehouseMapViewProps> = ({
   // Filter materials for active entity
   const activeMaterials = useMemo(() => {
     let list = entityMaterialsMap[activeEntity.id] || [];
-    if (selectedTier !== null && activeEntity.tiers) {
+
+    if (selectedCompartmentId && activeEntity.tiers) {
+      let targetCodes: string[] = [];
+      activeEntity.tiers.forEach((t) => {
+        (t.compartments || []).forEach((c) => {
+          if (c.id === selectedCompartmentId || c.code === selectedCompartmentId) {
+            targetCodes = c.assignedMaterialCodes || [];
+          }
+        });
+      });
+      const codeSet = new Set(targetCodes);
+      list = list.filter((m) => codeSet.has(m.code));
+    } else if (selectedTier !== null && activeEntity.tiers) {
       const tierInfo = activeEntity.tiers.find((t) => t.tierNumber === selectedTier);
       if (tierInfo) {
         const compMaterialCodes = new Set<string>();
@@ -189,6 +203,7 @@ export const WarehouseMapView: React.FC<WarehouseMapViewProps> = ({
         list = list.filter((m) => compMaterialCodes.has(m.code));
       }
     }
+
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase().trim();
       list = list.filter(
@@ -200,7 +215,7 @@ export const WarehouseMapView: React.FC<WarehouseMapViewProps> = ({
       );
     }
     return list;
-  }, [entityMaterialsMap, activeEntity, selectedTier, searchQuery]);
+  }, [entityMaterialsMap, activeEntity, selectedTier, selectedCompartmentId, searchQuery]);
 
   // Entities highlighted by search query
   const matchedEntityIds = useMemo(() => {
@@ -578,48 +593,49 @@ export const WarehouseMapView: React.FC<WarehouseMapViewProps> = ({
                     </pattern>
                   </defs>
 
-                  {/* ROOM BACKGROUND (Sàn bê tông công nghiệp phủ Epoxy chống tĩnh điện) */}
-                  <rect x="15" y="15" width="930" height="510" fill="#0b1120" stroke="#334155" strokeWidth="3" rx="6" />
+                  {/* ROOM BACKGROUND (Mặt bằng kỹ thuật phòng nguồn & kho vật tư AHT 2D CAD) */}
+                  <rect x="15" y="15" width="930" height="510" fill="#040d1e" stroke="#38bdf8" strokeWidth="2.5" rx="4" />
                   <rect x="15" y="15" width="930" height="510" fill="url(#floorGrid)" />
 
-                  {/* 5S WALKWAY LINE (Vạch sơn trắng phân định lối đi bộ an toàn từ cửa vào) */}
-                  <path
-                    d="M 885 55 L 885 110 L 175 110 L 175 440 L 885 440"
-                    fill="none"
-                    stroke="#e2e8f0"
-                    strokeWidth="2"
-                    strokeDasharray="6 6"
-                    opacity="0.45"
-                  />
-                  <text x="210" y="103" fill="#94a3b8" fontSize="10" fontFamily="sans-serif" fontWeight="bold">
-                    🚶 LỐI ĐI BỘ AN TOÀN 5S
-                  </text>
+                  {/* L-SHAPED TECHNICAL CAD CORNER BRACKETS */}
+                  <path d="M 15 35 L 15 15 L 35 15" fill="none" stroke="#38bdf8" strokeWidth="2.5" />
+                  <path d="M 925 15 L 945 15 L 945 35" fill="none" stroke="#38bdf8" strokeWidth="2.5" />
+                  <path d="M 15 505 L 15 525 L 35 525" fill="none" stroke="#38bdf8" strokeWidth="2.5" />
+                  <path d="M 925 525 L 945 525 L 945 505" fill="none" stroke="#38bdf8" strokeWidth="2.5" />
 
-                  {/* SAFETY HAZARD STRIPES (Vạch sơn cảnh báo cách ly vàng - đen quanh cụm UPS và tủ điện) */}
-                  {/* Quanh Dãy Pin & Tủ New UPS Phía Tây */}
-                  <rect x="18" y="120" width="142" height="315" fill="none" stroke="url(#hazardStripe)" strokeWidth="4" rx="4" opacity="0.75" />
-                  {/* Quanh Cụm UPS 1 */}
-                  <rect x="455" y="135" width="465" height="130" fill="none" stroke="url(#hazardStripe)" strokeWidth="4" rx="4" opacity="0.75" />
-                  {/* Quanh Cụm UPS 2 */}
-                  <rect x="375" y="290" width="545" height="130" fill="none" stroke="url(#hazardStripe)" strokeWidth="4" rx="4" opacity="0.75" />
-                  {/* Quanh Dãy Tủ Phân Phối Tường Dưới */}
-                  <rect x="18" y="450" width="880" height="75" fill="none" stroke="url(#hazardStripe)" strokeWidth="4" rx="4" opacity="0.75" />
-
-                  {/* CỬA RA VÀO (Top-Right Door - Chuẩn bản vẽ phòng nguồn) */}
-                  <g id="entrance-door">
-                    <rect x="885" y="16" width="55" height="14" fill="#ef4444" rx="2" />
-                    <text x="912" y="27" fill="#ffffff" fontSize="8.5" fontWeight="900" textAnchor="middle">
-                      CỬA VÀO
+                  {/* CỬA RA VÀO 2 CÁNH PHÍA TƯỜNG PHẢI (Right Wall Double Swing Door) */}
+                  <g id="entrance-double-door">
+                    {/* Khuyết tường tại vị trí cửa */}
+                    <line x1="945" y1="35" x2="945" y2="115" stroke="#040d1e" strokeWidth="4" />
+                    {/* Cánh cửa 1 (trên) mở vào 90 độ */}
+                    <line x1="945" y1="35" x2="905" y2="35" stroke="#38bdf8" strokeWidth="2.5" strokeLinecap="round" />
+                    {/* Cung quay cánh cửa 1 */}
+                    <path d="M 945 75 A 40 40 0 0 1 905 35" fill="none" stroke="#38bdf8" strokeWidth="1.2" strokeDasharray="3 3" opacity="0.8" />
+                    {/* Cánh cửa 2 (dưới) mở vào 90 độ */}
+                    <line x1="945" y1="115" x2="905" y2="115" stroke="#38bdf8" strokeWidth="2.5" strokeLinecap="round" />
+                    {/* Cung quay cánh cửa 2 */}
+                    <path d="M 945 75 A 40 40 0 0 0 905 115" fill="none" stroke="#38bdf8" strokeWidth="1.2" strokeDasharray="3 3" opacity="0.8" />
+                    {/* Nhãn cửa */}
+                    <text x="932" y="75" fill="#38bdf8" fontSize="8" fontWeight="bold" fontFamily="monospace" textAnchor="middle" transform="rotate(-90 932 75)">
+                      CỬA VÀO (2 CÁNH)
                     </text>
                   </g>
 
-                  {/* BÌNH CHỮA CHÁY PCCC */}
+                  {/* BÌNH CHỮA CHÁY PCCC (Hộp đỏ PCCC tường phải gần cửa ra vào) */}
                   <g id="fire-extinguisher">
-                    <circle cx="868" cy="46" r="9" fill="#dc2626" />
-                    <text x="868" y="49" fill="#ffffff" fontSize="7" fontWeight="bold" textAnchor="middle">
+                    <rect x="916" y="125" width="22" height="22" rx="3" fill="#dc2626" stroke="#ffffff" strokeWidth="1.5" />
+                    <text x="927" y="139" fill="#ffffff" fontSize="7.5" fontWeight="900" textAnchor="middle">
                       PCCC
                     </text>
                   </g>
+
+                  {/* SAFETY HAZARD STRIPES: Vạch sơn cảnh báo an toàn điện CHỈ quanh 3 cụm thiết bị */}
+                  {/* Zone 1: Dãy Pin & Tủ New UPS Phía Tây */}
+                  <rect x="22" y="124" width="134" height="318" fill="none" stroke="url(#hazardStripe)" strokeWidth="3.5" rx="4" opacity="0.85" />
+                  {/* Zone 2: Cụm UPS 1 (UPS-1 EQPT + BATT.2 + BATT.1) */}
+                  <rect x="466" y="142" width="440" height="116" fill="none" stroke="url(#hazardStripe)" strokeWidth="3.5" rx="4" opacity="0.85" />
+                  {/* Zone 3: Cụm UPS 2 (UPS-2 EQPT + BATT.3 + BATT.2 + BATT.1) */}
+                  <rect x="386" y="302" width="520" height="116" fill="none" stroke="url(#hazardStripe)" strokeWidth="3.5" rx="4" opacity="0.85" />
 
                   {/* RENDER ALL INTERACTIVE WAREHOUSE ENTITIES */}
                   {WAREHOUSE_ENTITIES.map((entity) => {
@@ -628,11 +644,16 @@ export const WarehouseMapView: React.FC<WarehouseMapViewProps> = ({
                     const matCount = (entityMaterialsMap[entity.id] || []).length;
                     const isShelf = entity.type === 'SHELF_4_TIER';
                     const isTool = entity.type === 'TOOL_CABINET';
+                    const isDist = entity.type === 'DISTRIBUTION_BOARD';
                     const tierCount = entity.tiers?.length || 5;
 
-                    // Determine stroke color and glow
-                    let strokeColor = isSelected ? '#38bdf8' : isMatched ? '#f59e0b' : '#475569';
-                    let strokeW = isSelected ? 3.5 : isMatched ? 3 : 1.5;
+                    // Determine stroke color and width
+                    let strokeColor = isSelected ? '#38bdf8' : isMatched ? '#f59e0b' : '#38bdf8';
+                    let strokeW = isSelected ? 3.5 : isMatched ? 3 : 2;
+                    if (entity.type === 'UPS_CABINET' && !entity.code.includes('NEW UPS') && !entity.id.includes('UPS-')) {
+                      strokeColor = isSelected ? '#38bdf8' : isMatched ? '#f59e0b' : '#475569';
+                      strokeW = isSelected ? 3.5 : 1.5;
+                    }
 
                     return (
                       <g
@@ -642,6 +663,7 @@ export const WarehouseMapView: React.FC<WarehouseMapViewProps> = ({
                         onClick={() => {
                           setSelectedEntityId(entity.id);
                           setSelectedTier(null);
+                          setSelectedCompartmentId(null);
                         }}
                       >
                         {/* Radar Pulse Effect for Searched / Selected Shelf */}
@@ -668,21 +690,17 @@ export const WarehouseMapView: React.FC<WarehouseMapViewProps> = ({
                           height={entity.svgRect.height}
                           fill={
                             isShelf
-                              ? isSelected
-                                ? '#1e293b'
-                                : '#0f172a'
+                              ? '#071529'
                               : isTool
-                              ? '#1e3a8a'
-                              : entity.type === 'UPS_CABINET'
-                              ? '#334155'
-                              : entity.type === 'DISTRIBUTION_BOARD'
-                              ? '#f1f5f9'
-                              : '#1e293b'
+                              ? '#0284c7'
+                              : isDist
+                              ? '#e0f2fe'
+                              : '#0f172a'
                           }
                           stroke={strokeColor}
                           strokeWidth={strokeW}
                           rx="4"
-                          className="drop-shadow-lg transition-colors group-hover:fill-slate-800"
+                          className="drop-shadow-lg transition-colors group-hover:brightness-110"
                         />
 
                         {/* Visual Shelf Tier Dividers dynamically rendered for all tiers */}
@@ -696,19 +714,27 @@ export const WarehouseMapView: React.FC<WarehouseMapViewProps> = ({
                               y1={yOffset}
                               x2={entity.svgRect.x + entity.svgRect.width}
                               y2={yOffset}
-                              stroke="#334155"
+                              stroke="#1e293b"
                               strokeWidth="1"
                               strokeDasharray="2 2"
                             />
                           );
                         })}
 
-                        {/* Label Badge on Shelf */}
+                        {/* Top-left indicator dot */}
+                        <circle
+                          cx={entity.svgRect.x + 10}
+                          cy={entity.svgRect.y + 10}
+                          r="3"
+                          fill={isDist ? '#0284c7' : '#38bdf8'}
+                        />
+
+                        {/* Label Badge on Shelf / Cabinet */}
                         <text
                           x={entity.svgRect.x + entity.svgRect.width / 2}
-                          y={entity.svgRect.y + entity.svgRect.height / 2 - (isShelf ? 6 : 2)}
-                          fill={entity.type === 'DISTRIBUTION_BOARD' ? '#0f172a' : '#ffffff'}
-                          fontSize={isShelf || isTool ? 10.5 : 9}
+                          y={entity.svgRect.y + entity.svgRect.height / 2 - (isShelf || isTool ? 6 : 2)}
+                          fill={isDist ? '#0f172a' : '#ffffff'}
+                          fontSize={isShelf ? 13 : isTool ? 12 : isDist ? 11 : 9.5}
                           fontWeight="900"
                           fontFamily="monospace"
                           textAnchor="middle"
@@ -719,19 +745,25 @@ export const WarehouseMapView: React.FC<WarehouseMapViewProps> = ({
                         {/* Shelf specs or subtitle */}
                         <text
                           x={entity.svgRect.x + entity.svgRect.width / 2}
-                          y={entity.svgRect.y + entity.svgRect.height / 2 + 9}
-                          fill={entity.type === 'DISTRIBUTION_BOARD' ? '#334155' : '#94a3b8'}
-                          fontSize={isShelf ? 7.5 : 7}
+                          y={entity.svgRect.y + entity.svgRect.height / 2 + 10}
+                          fill={isDist ? '#0369a1' : isTool ? '#e0f2fe' : '#94a3b8'}
+                          fontSize={isShelf ? 8 : isTool ? 7.5 : isDist ? 7.5 : 7}
                           fontWeight="bold"
                           textAnchor="middle"
                         >
-                          {isShelf
-                            ? `${tierCount} TẦNG`
-                            : isTool
-                            ? 'TỦ ĐỒ NGHỀ'
-                            : entity.type === 'UPS_CABINET'
-                            ? (entity.code.includes('NEW UPS') ? 'Schneider' : 'SOCOMEC')
-                            : 'PRISMA'}
+                          {isShelf ? (
+                            `${tierCount} TẦNG`
+                          ) : isTool ? (
+                            'TỦ ĐỒ NGHỀ'
+                          ) : isDist ? (
+                            'TỦ ĐIỆN PHÂN PHỐI'
+                          ) : entity.code.includes('NEW UPS') ? (
+                            <tspan fill="#22c55e" fontWeight="bold">Schneider</tspan>
+                          ) : entity.id.includes('UPS-') ? (
+                            <tspan fill="#38bdf8" fontWeight="bold">SOCOMEC</tspan>
+                          ) : (
+                            'ẮC QUY'
+                          )}
                         </text>
 
                         {/* Material Count Pill on Shelves */}
@@ -743,14 +775,6 @@ export const WarehouseMapView: React.FC<WarehouseMapViewProps> = ({
                             </text>
                           </g>
                         )}
-
-                        {/* QR Code tiny badge on shelf corner */}
-                        <circle
-                          cx={entity.svgRect.x + 8}
-                          cy={entity.svgRect.y + 8}
-                          r="4"
-                          fill={isSelected ? '#38bdf8' : '#64748b'}
-                        />
                       </g>
                     );
                   })}
@@ -860,7 +884,15 @@ export const WarehouseMapView: React.FC<WarehouseMapViewProps> = ({
                               return (
                                 <div
                                   key={comp.id}
-                                  className="bg-slate-800/80 border-2 border-blue-500/50 hover:border-blue-400 rounded-lg p-2.5 flex flex-col justify-between min-h-[85px] shadow-md transition group/comp relative"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setSelectedCompartmentId(selectedCompartmentId === comp.id ? null : comp.id);
+                                  }}
+                                  className={`border-2 rounded-lg p-2.5 flex flex-col justify-between min-h-[85px] shadow-md transition group/comp relative cursor-pointer ${
+                                    selectedCompartmentId === comp.id
+                                      ? 'bg-blue-900/90 border-cyan-400 ring-2 ring-cyan-400/50 shadow-cyan-500/20'
+                                      : 'bg-slate-800/80 border-blue-500/50 hover:border-blue-400'
+                                  }`}
                                 >
                                   <div className="flex items-center justify-between text-[10px] text-blue-300 font-bold">
                                     <span className="bg-blue-900/60 px-1.5 py-0.5 rounded text-white font-mono">
@@ -1565,9 +1597,42 @@ export const WarehouseMapView: React.FC<WarehouseMapViewProps> = ({
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Package className="w-4 h-4 text-emerald-400" />
-                <h4 className="text-sm font-bold text-white">
-                  Danh Sách Vật Tư Tại Vị Trí Này
-                </h4>
+                <div>
+                  <h4 className="text-sm font-bold text-white">
+                    Danh Sách Vật Tư Tại Vị Trí Này
+                  </h4>
+                  <div className="text-[11px] text-cyan-300 font-mono font-medium flex items-center gap-1.5 mt-0.5">
+                    <span>{activeEntity.code}</span>
+                    {selectedTier !== null && (
+                      <span className="bg-slate-800 px-1.5 py-0.2 rounded text-amber-300">
+                        Tầng {selectedTier}
+                      </span>
+                    )}
+                    {selectedCompartmentId && (() => {
+                      let cCode = '';
+                      activeEntity.tiers?.forEach(t => t.compartments?.forEach(c => {
+                        if (c.id === selectedCompartmentId || c.code === selectedCompartmentId) cCode = c.code;
+                      }));
+                      return cCode ? (
+                        <span className="bg-blue-900/80 px-1.5 py-0.2 rounded text-cyan-200">
+                          Khay {cCode}
+                        </span>
+                      ) : null;
+                    })()}
+                    {(selectedTier !== null || selectedCompartmentId !== null) && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedTier(null);
+                          setSelectedCompartmentId(null);
+                        }}
+                        className="text-[10px] text-slate-400 hover:text-white underline ml-1"
+                      >
+                        (Hiện tất cả)
+                      </button>
+                    )}
+                  </div>
+                </div>
               </div>
               <span className="text-xs font-mono font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/30">
                 {activeMaterials.length} mã vật tư
@@ -1581,6 +1646,7 @@ export const WarehouseMapView: React.FC<WarehouseMapViewProps> = ({
                   const stock = stockMap[mat.code]?.currentStock ?? mat.initialStock;
                   const isLow = stock <= mat.minStock;
                   const isOut = stock <= 0;
+                  const loc = resolveMaterialWarehouseLocation(mat, WAREHOUSE_ENTITIES);
 
                   return (
                     <div
@@ -1593,6 +1659,11 @@ export const WarehouseMapView: React.FC<WarehouseMapViewProps> = ({
                           <span className="font-mono text-[11px] font-bold text-cyan-300">
                             {mat.code}
                           </span>
+                          {loc.isAssigned && (
+                            <span className="text-[9px] font-mono font-bold text-cyan-300 bg-blue-950/90 px-1.5 py-0.2 rounded border border-blue-600/40">
+                              T{loc.tierNumber} • {loc.compartmentCode}
+                            </span>
+                          )}
                           {mat.brand && (
                             <span className="text-[9px] font-bold text-slate-400 px-1.5 py-0.2 rounded bg-slate-800">
                               {mat.brand}

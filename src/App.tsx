@@ -16,6 +16,8 @@ import { UserGuideModal } from './components/UserGuideModal';
 import { MaterialImageModal } from './components/MaterialImageModal';
 import { BarcodeQrScanModal } from './components/BarcodeQrScanModal';
 import { WarehouseMapView } from './components/WarehouseMapView';
+import { WarehouseQRLabelModal } from './components/WarehouseQRLabelModal';
+import { TrayQuickActionModal } from './components/TrayQuickActionModal';
 import {
   INITIAL_USERS,
   INITIAL_MATERIALS,
@@ -35,6 +37,7 @@ import {
   CanvasMode,
   DEFAULT_THEME_CONFIG,
   WarehouseShelfEntity,
+  WarehouseCompartment,
 } from './types';
 import { DEFAULT_WAREHOUSE_ENTITIES, normalizeWarehouseEntities } from './data/warehouseLayoutData';
 import { calculateAllMaterialStocks, formatVND, isProposalMatch } from './utils/inventoryEngine';
@@ -260,7 +263,7 @@ export function App() {
 
   // Warehouse Master Layout (Customizable by Master Admin & synced to Cloud Firestore)
   const [warehouseEntities, setWarehouseEntities] = useState<WarehouseShelfEntity[]>(() => {
-    const saved = safeStorage.getItem('smart_warehouse_master_layout_v3');
+    const saved = safeStorage.getItem('smart_warehouse_master_layout_v4');
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
@@ -278,7 +281,7 @@ export function App() {
       if (cloudEntities && cloudEntities.length > 0) {
         const normalized = normalizeWarehouseEntities(cloudEntities);
         setWarehouseEntities(normalized);
-        safeStorage.setItem('smart_warehouse_master_layout_v3', JSON.stringify(normalized));
+        safeStorage.setItem('smart_warehouse_master_layout_v4', JSON.stringify(normalized));
       }
     }, DEFAULT_WAREHOUSE_ENTITIES);
     return () => unsubscribe();
@@ -298,6 +301,22 @@ export function App() {
   const [isSmartSearchOpen, setIsSmartSearchOpen] = useState(false);
   const [isBarcodeQrModalOpen, setIsBarcodeQrModalOpen] = useState(false);
   const [selectedVisualCardMaterial, setSelectedVisualCardMaterial] = useState<Material | null>(null);
+
+  // Warehouse Tray QR Printing & Quick Action Modals
+  const [isWarehouseQRLabelModalOpen, setIsWarehouseQRLabelModalOpen] = useState(false);
+  const [printModalShelfId, setPrintModalShelfId] = useState<string | undefined>(undefined);
+  const [printModalCompId, setPrintModalCompId] = useState<string | undefined>(undefined);
+  const [selectedTrayAction, setSelectedTrayAction] = useState<{
+    shelf: WarehouseShelfEntity;
+    tierNumber: number;
+    compartment: WarehouseCompartment;
+  } | null>(null);
+
+  const handleOpenPrintModal = (shelfId?: string, compId?: string) => {
+    setPrintModalShelfId(shelfId);
+    setPrintModalCompId(compId);
+    setIsWarehouseQRLabelModalOpen(true);
+  };
   const [isChangePasswordOpen, setIsChangePasswordOpen] = useState(false);
   const [isUserGuideOpen, setIsUserGuideOpen] = useState(false);
   const [appliedFilters, setAppliedFilters] = useState<NaturalSearchFilters | null>(null);
@@ -407,13 +426,81 @@ export function App() {
     };
   }, []);
 
-  // Deep-linking URL QR code scanner for shelf tags (Quét mã QR trên kệ mở ngay thẻ hình ảnh & quy cách kỹ thuật)
+  // Resolve a tray code from QR scanner or smartphone camera deep link
+  const handleResolveTrayCode = (rawCode: string): boolean => {
+    if (!rawCode || warehouseEntities.length === 0) return false;
+    let input = rawCode.trim();
+
+    if (input.includes('?')) {
+      try {
+        const url = new URL(input.startsWith('http') ? input : `http://dummy.com/${input}`);
+        const trayParam =
+          url.searchParams.get('tray') ||
+          url.searchParams.get('wh') ||
+          url.searchParams.get('comp') ||
+          url.searchParams.get('code') ||
+          url.searchParams.get('scan');
+        if (trayParam) input = trayParam.trim();
+      } catch {}
+    }
+
+    const cleanUpper = input.toUpperCase();
+
+    for (const shelf of warehouseEntities) {
+      for (const tier of shelf.tiers || []) {
+        for (const comp of tier.compartments || []) {
+          const qr = (comp.qrCodeValue || `DNCT-WH-${shelf.code}-T${tier.tierNumber}-${comp.code}`).toUpperCase();
+          const compId = comp.id.toUpperCase();
+          const compCode = comp.code.toUpperCase();
+          const fullPattern = `${shelf.code.toUpperCase()}-T${tier.tierNumber}-${compCode}`;
+
+          if (
+            cleanUpper === qr ||
+            cleanUpper === compId ||
+            cleanUpper.endsWith(compId) ||
+            cleanUpper.endsWith(qr) ||
+            cleanUpper.includes(fullPattern) ||
+            (cleanUpper.includes(shelf.code.toUpperCase()) &&
+              cleanUpper.includes(`T${tier.tierNumber}`) &&
+              (cleanUpper.includes(compCode) || cleanUpper.includes(comp.name.toUpperCase())))
+          ) {
+            setSelectedTrayAction({
+              shelf,
+              tierNumber: tier.tierNumber,
+              compartment: comp,
+            });
+            showToast(`Đã nhận diện Khay: ${shelf.code} • Tầng ${tier.tierNumber} • ${comp.name}`, 'success');
+            return true;
+          }
+        }
+      }
+    }
+    return false;
+  };
+
+  // Deep-linking URL QR code scanner for shelf tags & smartphone camera scans
   useEffect(() => {
-    if (typeof window === 'undefined' || materials.length === 0) return;
+    if (typeof window === 'undefined') return;
     try {
       const params = new URLSearchParams(window.location.search);
+      const action = params.get('action');
+      const trayParam = params.get('tray') || (action === 'tray' ? params.get('code') : null);
+
+      // Check if user scanned a tray QR code using standard smartphone camera
+      if (trayParam && warehouseEntities.length > 0) {
+        const handled = handleResolveTrayCode(trayParam);
+        if (handled) return;
+      }
+
       const scanCode = params.get('scan') || params.get('code') || params.get('mat') || params.get('id');
       if (scanCode) {
+        // If scanCode is a tray QR code
+        if (scanCode.includes('DNCT-WH-') && warehouseEntities.length > 0) {
+          const handled = handleResolveTrayCode(scanCode);
+          if (handled) return;
+        }
+
+        if (materials.length === 0) return;
         let input = scanCode.trim();
         const cleanUpper = input.toUpperCase();
         const cleanAlpha = cleanUpper.replace(/[^A-Z0-9]/g, '');
@@ -471,7 +558,7 @@ export function App() {
     } catch (e) {
       console.warn('URL scan param handling error:', e);
     }
-  }, [materials]);
+  }, [materials, warehouseEntities]);
 
   // Advanced UI Theme Configuration State
   const [themeConfig, setThemeConfig] = useState<UIThemeConfig>(() => {
@@ -1174,7 +1261,7 @@ export function App() {
               materials={materials}
               warehouseEntities={warehouseEntities}
               onOpenMasterEditor={() => setActiveTab('settings')}
-              onOpenPrintModal={() => setIsBarcodeQrModalOpen(true)}
+              onOpenPrintModal={handleOpenPrintModal}
               onOpenFullMap={() => setActiveTab('warehouse_map')}
               onNavigateTab={(tab, filter) => {
                 if (tab === 'transactions' || tab === 'transfers' || tab === 'requests') {
@@ -1202,6 +1289,7 @@ export function App() {
               allUsers={users}
               materials={materials}
               calculatedStocks={calculatedStocks}
+              warehouseEntities={warehouseEntities}
               onSaveMaterial={handleSaveMaterial}
               onDeleteMaterial={handleDeleteMaterial}
               onOpenStockCard={handleOpenStockCard}
@@ -1219,7 +1307,7 @@ export function App() {
               entities={warehouseEntities}
               currentUser={currentUser}
               onOpenMasterEditor={() => setActiveTab('settings')}
-              onOpenPrintModal={() => setIsBarcodeQrModalOpen(true)}
+              onOpenPrintModal={handleOpenPrintModal}
               onSelectMaterial={(mat) => {
                 setSelectedVisualCardMaterial(mat);
               }}
@@ -1424,6 +1512,46 @@ export function App() {
             setActiveTab('warehouse_map');
             showToast(`Đã chuyển tới sơ đồ kho cho vị trí "${shelfCode}"`);
           }}
+          onScanTray={handleResolveTrayCode}
+        />
+      )}
+
+      {/* Warehouse QR Code Label Printing Modal (Chuẩn 5S Nhà Ga T2) */}
+      <WarehouseQRLabelModal
+        isOpen={isWarehouseQRLabelModalOpen}
+        onClose={() => setIsWarehouseQRLabelModalOpen(false)}
+        entities={warehouseEntities}
+        initialShelfId={printModalShelfId}
+        initialCompartmentId={printModalCompId}
+        materials={materials}
+        calculatedStocks={calculatedStocks}
+      />
+
+      {/* Tray Quick Action Modal (Xuất / Nhập / In tem / Xem vật tư trong khay tức thì khi quét QR) */}
+      {selectedTrayAction && (
+        <TrayQuickActionModal
+          isOpen={true}
+          onClose={() => setSelectedTrayAction(null)}
+          shelf={selectedTrayAction.shelf}
+          tierNumber={selectedTrayAction.tierNumber}
+          compartment={selectedTrayAction.compartment}
+          materials={materials}
+          calculatedStocks={calculatedStocks}
+          onOpenCreateTransaction={(type, matCode) => {
+            setSelectedTrayAction(null);
+            handleOpenCreateTransaction(type, matCode);
+          }}
+          onOpenPrintModal={(shelfId, compId) => {
+            setSelectedTrayAction(null);
+            handleOpenPrintModal(shelfId, compId);
+          }}
+          onOpenFullMap={() => {
+            setSelectedTrayAction(null);
+            setActiveTab('warehouse_map');
+          }}
+          onUpdateWarehouseEntities={handleUpdateWarehouseEntities}
+          allEntities={warehouseEntities}
+          currentUser={currentUser}
         />
       )}
 

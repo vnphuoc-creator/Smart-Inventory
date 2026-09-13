@@ -53,7 +53,9 @@ export const DEFAULT_WAREHOUSE_ENTITIES: WarehouseShelfEntity[] = [
             visualType: 'cardboard-boxes',
             itemKeywords: ['acb', 'shunt trip', 'masterpact'],
             sampleItems: ['Cuộn đóng MX/XF 220VAC Schneider Masterpact NW'],
-            assignedMaterialCodes: ['DN_VT_CXV00_07', 'DN_VT_CXV00_08'],
+            assignedMaterialCodes: [
+              'DN_VT_CXV00_07', 'DN_VT_CXV00_08', 'DN_VT_TDIEN_01', 'DN_VT_TDIEN_07', 'DN_VT_MCBSC_10'
+            ],
             qrCodeValue: 'DNCT-WH-KE-05-T1-KH01',
           },
           {
@@ -63,7 +65,9 @@ export const DEFAULT_WAREHOUSE_ENTITIES: WarehouseShelfEntity[] = [
             visualType: 'cardboard-boxes',
             itemKeywords: ['tiếp điểm', 'mch', 'lên cót'],
             sampleItems: ['Motor nạp lò xo MCH 220VAC cho ACB'],
-            assignedMaterialCodes: ['DN_VT_CXV00_09'],
+            assignedMaterialCodes: [
+              'DN_VT_CXV00_09', 'DN_VT_MCBSC_11', 'DN_VT_MCBSC_12', 'DN_VT_MCBSC_13', 'DN_VT_MCBSC_16', 'DN_VT_MCBSC_17', 'DN_VT_MCBSC_18'
+            ],
             qrCodeValue: 'DNCT-WH-KE-05-T1-KH02',
           },
         ],
@@ -83,7 +87,9 @@ export const DEFAULT_WAREHOUSE_ENTITIES: WarehouseShelfEntity[] = [
             visualType: 'clear-boxes',
             itemKeywords: ['mccb 100a', 'nsx100'],
             sampleItems: ['MCCB NSX100F TMD 100A'],
-            assignedMaterialCodes: ['DN_VT_MCCBS_01', 'DN_VT_MCCBS_02'],
+            assignedMaterialCodes: [
+              'DN_VT_MCCBS_01', 'DN_VT_MCCBS_02', 'DN_VT_HTRLM_01', 'DN_VT_HTRLM_02', 'DN_VT_00MCT_07', 'DN_VT_HTCTB_01', 'DN_VT_MCBSC_21', 'DN_VT_MCBSC_22', 'DN_VT_MCBSC_23', 'DN_VT_MCBSC_24', 'DN_VT_MCBSC_25', 'DN_VT_MCBSC_26', 'DN_VT_MCBSC_27', 'DN_VT_MCBSC_28', 'DN_VT_MCBSC_29', 'DN_VT_MCBSC_30'
+            ],
             qrCodeValue: 'DNCT-WH-KE-05-T2-KH01',
           },
           {
@@ -93,7 +99,9 @@ export const DEFAULT_WAREHOUSE_ENTITIES: WarehouseShelfEntity[] = [
             visualType: 'clear-boxes',
             itemKeywords: ['mccb 160a', 'nsx160'],
             sampleItems: ['MCCB NSX160F TMD 160A'],
-            assignedMaterialCodes: ['DN_VT_MCCBS_03', 'DN_VT_MCCBS_04'],
+            assignedMaterialCodes: [
+              'DN_VT_MCCBS_03', 'DN_VT_MCCBS_04', 'DN_VT_MCBSC_31', 'DN_VT_MCBSC_32', 'DN_VT_MCBSC_33', 'DN_VT_MCBSC_34', 'DN_VT_MCCBS_05', 'DN_VT_MCCBS_06', 'DN_VT_MCCBS_13', 'DN_VT_MCCBS_14', 'DN_VT_MCCBS_18', 'DN_VT_MCCBS_19', 'DN_VT_MCCBS_20', 'DN_VT_MCCBS_21'
+            ],
             qrCodeValue: 'DNCT-WH-KE-05-T2-KH02',
           },
           {
@@ -123,7 +131,9 @@ export const DEFAULT_WAREHOUSE_ENTITIES: WarehouseShelfEntity[] = [
             visualType: 'clear-boxes',
             itemKeywords: ['nsx400', 'mccb 400a'],
             sampleItems: ['MCCB 3P 400A Schneider NSX400F'],
-            assignedMaterialCodes: ['DN_VT_MCCBS_09', 'DN_VT_MCCBS_10'],
+            assignedMaterialCodes: [
+              'DN_VT_MCCBS_09', 'DN_VT_MCCBS_10', 'DN_CC_HTVCB_01', 'DN_CC_HTVCB_02', 'DN_VT_HTDCN_01', 'DN_VT_CONTC_05', 'DN_VT_CONTC_06', 'DN_VT_CONTC_07', 'DN_VT_CONTC_08', 'DN_VT_CONTC_09', 'DN_VT_CONTC_10', 'DN_VT_CONTC_11', 'DN_VT_CONTC_12'
+            ],
             qrCodeValue: 'DNCT-WH-KE-05-T3-KH01',
           },
           {
@@ -153,7 +163,9 @@ export const DEFAULT_WAREHOUSE_ENTITIES: WarehouseShelfEntity[] = [
             visualType: 'clear-boxes',
             itemKeywords: ['shunt trip mx', 'cắt từ xa'],
             sampleItems: ['Cuộn Shunt Trip MX LV429387'],
-            assignedMaterialCodes: ['DN_VT_MCCBS_15'],
+            assignedMaterialCodes: [
+              'DN_VT_MCCBS_15', 'DN_VT_HTCDM_01', 'DN_VT_HTCHM_01', 'DN_VT_RCBOS_01', 'DN_VT_RCBOS_02', 'DN_VT_RCBOS_03', 'DN_VT_RCBOS_04', 'DN_VT_RCBOS_05', 'DN_VT_RCBOS_06', 'DN_VT_RCBOS_07'
+            ],
             qrCodeValue: 'DNCT-WH-KE-05-T4-KH01',
           },
           {
@@ -163,7 +175,9 @@ export const DEFAULT_WAREHOUSE_ENTITIES: WarehouseShelfEntity[] = [
             visualType: 'clear-boxes',
             itemKeywords: ['cuộn mn', 'thấp áp'],
             sampleItems: ['Cuộn Under-voltage release MN LV429407'],
-            assignedMaterialCodes: ['DN_VT_MCCBS_16'],
+            assignedMaterialCodes: [
+              'DN_VT_MCCBS_16', 'DN_VT_SPDSN_04', 'DN_VT_SPDSN_05'
+            ],
             qrCodeValue: 'DNCT-WH-KE-05-T4-KH02',
           },
           {
@@ -193,7 +207,9 @@ export const DEFAULT_WAREHOUSE_ENTITIES: WarehouseShelfEntity[] = [
             visualType: 'cadivi-coils',
             itemKeywords: ['cọc tiếp địa', 'd16', 'cọc đồng'],
             sampleItems: ['Cọc tiếp địa D16x2400mm kèm kẹp tiếp địa'],
-            assignedMaterialCodes: ['DN_VT_COTSC_13'],
+            assignedMaterialCodes: [
+              'DN_VT_COTSC_13', 'DN_VT_OCDNG_01', 'DN_VT_OCDNG_02', 'DN_VT_OCDNG_03', 'DN_VT_OCDNG_04', 'DN_VT_OCDNG_05', 'DN_VT_OCDNG_06', 'DN_VT_OCDNG_07', 'DN_VT_OCDNG_08', 'DN_VT_OCDNG_09', 'DN_VT_OCDNG_10', 'DN_VT_OCDNG_11', 'DN_VT_OCDNG_12', 'DN_VT_OCDNG_13'
+            ],
             qrCodeValue: 'DNCT-WH-KE-05-T5-KH01',
           },
           {
@@ -256,7 +272,9 @@ export const DEFAULT_WAREHOUSE_ENTITIES: WarehouseShelfEntity[] = [
             visualType: 'cardboard-boxes',
             itemKeywords: ['biến áp', 'cách ly', '500va'],
             sampleItems: ['Biến áp cách ly Standa/Lion 500VA'],
-            assignedMaterialCodes: ['DN_VT_DSTA0_01'],
+            assignedMaterialCodes: [
+              'DN_VT_DSTA0_01', 'DN_VT_ADTER_01', 'DN_VT_ADTER_03', 'DN_VT_DC12V_07', 'DN_VT_DNPAN_02', 'DN_VT_DNPAN_03', 'DN_VT_DNPAN_04', 'DN_VT_DNPAN_05', 'DN_VT_DNPAN_06', 'DN_VT_DNPAN_07', 'DN_VT_DNPAN_08', 'DN_VT_DNPAN_09', 'DN_VT_DNPAN_10'
+            ],
             qrCodeValue: 'DNCT-WH-KE-04-T1-KH01',
           },
           {
@@ -286,7 +304,9 @@ export const DEFAULT_WAREHOUSE_ENTITIES: WarehouseShelfEntity[] = [
             visualType: 'clear-boxes',
             itemKeywords: ['ndr-75', 'meanwell 75w'],
             sampleItems: ['Nguồn Meanwell NDR-75-24'],
-            assignedMaterialCodes: ['DN_VT_ROLEN_01'],
+            assignedMaterialCodes: [
+              'DN_VT_ROLEN_01', 'DN_VT_DC12V_03', 'DN_VT_DC12V_04', 'DN_VT_DC24V_04', 'DN_VT_DC24V_01', 'DN_VT_DC12V_06', 'DN_VT_ADTER_06', 'DN_VT_ADTER_07', 'DN_VT_DNDLT_04', 'DN_VT_DNDLT_05', 'DN_VT_DNDLT_06', 'DN_VT_DNDLT_07', 'DN_VT_DNDLT_08', 'DN_VT_DNDLT_09', 'DN_VT_DNDLT_10', 'DN_VT_DNDLT_11', 'DN_VT_DNDLT_12', 'DN_VT_DNDLT_13', 'DN_VT_DNDLT_14', 'DN_VT_DNDLT_15', 'DN_VT_DNDLT_16', 'DN_VT_DNDLT_17'
+            ],
             qrCodeValue: 'DNCT-WH-KE-04-T2-KH01',
           },
           {
@@ -326,7 +346,9 @@ export const DEFAULT_WAREHOUSE_ENTITIES: WarehouseShelfEntity[] = [
             visualType: 'clear-boxes',
             itemKeywords: ['lọc nhiễu', 'emi', 'filter'],
             sampleItems: ['Bộ lọc nguồn Delta 20A EMI Filter'],
-            assignedMaterialCodes: ['DN_VT_SPDSN_01'],
+            assignedMaterialCodes: [
+              'DN_VT_SPDSN_01', 'DN_VT_INVER_01', 'DN_VT_INVER_05', 'DN_VT_DNTUP_03', 'DN_VT_DNTUP_04', 'DN_VT_DNTUP_05', 'DN_VT_DNTUP_06', 'DN_VT_DNTUP_07', 'DN_VT_DNTUP_08', 'DN_VT_DNTUP_09'
+            ],
             qrCodeValue: 'DNCT-WH-KE-04-T3-KH01',
           },
           {
@@ -356,7 +378,9 @@ export const DEFAULT_WAREHOUSE_ENTITIES: WarehouseShelfEntity[] = [
             visualType: 'blue-bins',
             itemKeywords: ['sc16', 'sc25', 'sc35'],
             sampleItems: ['Cosse SC25-8 đồng mạ thiếc (100 cái/hộp)'],
-            assignedMaterialCodes: ['DN_VT_COTSC_01', 'DN_VT_COTSC_02'],
+            assignedMaterialCodes: [
+              'DN_VT_COTSC_01', 'DN_VT_COTSC_02', 'DN_VT_CDCOS_10', 'DN_VT_COSSC_02', 'DN_VT_CDCOS_12', 'DN_VT_0SC50_01', 'DN_VT_0SC70_01', 'DN_VT_DNEXT_01', 'DN_VT_DNEXT_02', 'DN_VT_DNEXT_03', 'DN_VT_DNEXT_04', 'DN_VT_DNEXT_05', 'DN_VT_DNEXT_06', 'DN_VT_DNEXT_07'
+            ],
             qrCodeValue: 'DNCT-WH-KE-04-T4-KH01',
           },
           {
@@ -376,7 +400,7 @@ export const DEFAULT_WAREHOUSE_ENTITIES: WarehouseShelfEntity[] = [
             visualType: 'blue-bins',
             itemKeywords: ['cosse pin', 'cosse ghim'],
             sampleItems: ['Đầu cos pin rỗng E2508 xanh dương'],
-            assignedMaterialCodes: ['DN_VT_COTSC_05', 'DN_VT_COTSC_06'],
+            assignedMaterialCodes: [ 'DN_VT_COTSC_05', 'DN_VT_COTSC_06', 'DN_VT_CDCOS_01', 'DN_VT_CDCOS_02', 'DN_VT_CDCOS_03', 'DN_VT_CDCOS_04', 'DN_VT_CDCOS_05' ],
             qrCodeValue: 'DNCT-WH-KE-04-T4-KH03',
           },
         ],
@@ -396,7 +420,9 @@ export const DEFAULT_WAREHOUSE_ENTITIES: WarehouseShelfEntity[] = [
             visualType: 'clear-boxes',
             itemKeywords: ['ống gen nhiệt', 'co nhiệt'],
             sampleItems: ['Cuộn co nhiệt phi 6 dài 100m'],
-            assignedMaterialCodes: ['DN_VT_ONGCO_01', 'DN_VT_ONGCO_02'],
+            assignedMaterialCodes: [
+              'DN_VT_ONGCO_01', 'DN_VT_ONGCO_02', 'DN_VT_DNPHA_01', 'DN_VT_DNPHA_02', 'DN_VT_DNPHA_03', 'DN_VT_DNPHA_04', 'DN_VT_DNPHA_05', 'DN_VT_DNPHA_06', 'DN_VT_DNPHA_07', 'DN_VT_DNPHA_08', 'DN_VT_DNPHA_09', 'DN_VT_DNPHA_10', 'DN_VT_DNPHA_11', 'DN_VT_DNPHA_12'
+            ],
             qrCodeValue: 'DNCT-WH-KE-04-T5-KH01',
           },
           {
@@ -449,7 +475,9 @@ export const DEFAULT_WAREHOUSE_ENTITIES: WarehouseShelfEntity[] = [
             visualType: 'cardboard-boxes',
             itemKeywords: ['cáp điều khiển', 'altek kabel'],
             sampleItems: ['Cuộn cáp Altek Kabel 4x1.5mm2 có lưới chống nhiễu'],
-            assignedMaterialCodes: ['DN_VT_CXV00_01', 'DN_VT_CXV00_02'],
+            assignedMaterialCodes: [
+              'DN_VT_CXV00_01', 'DN_VT_CXV00_02', 'DN_VT_ONGCO_05', 'DN_VT_ONGCO_06', 'DN_VT_ONGCO_07', 'DN_VT_ONGCO_08', 'DN_VT_ONGCO_09', 'DN_VT_ONGCO_10', 'DN_VT_ONGCO_11', 'DN_VT_ONGCO_12', 'DN_VT_ONGCO_13', 'DN_VT_ONGCO_14', 'DN_VT_ONGCO_15', 'DN_VT_DNRGT_01', 'DN_VT_DNRGT_02', 'DN_VT_RGTHP_03', 'DN_VT_DNRGT_03', 'DN_VT_RGTHP_04', 'DN_VT_DNRGT_04', 'DN_VT_RGTHP_05', 'DN_VT_DNRGT_05', 'DN_VT_RGTHP_06', 'DN_VT_DNRGT_06', 'DN_VT_MANGC_01', 'DN_VT_MANGC_02', 'DN_VT_MANGC_03', 'DN_VT_MANGC_04', 'DN_VT_MANGC_05', 'DN_VT_MANGC_06', 'DN_VT_MANGC_07'
+            ],
             qrCodeValue: 'DNCT-WH-KE-03-T1-KH01',
           },
           {
@@ -459,7 +487,9 @@ export const DEFAULT_WAREHOUSE_ENTITIES: WarehouseShelfEntity[] = [
             visualType: 'cardboard-boxes',
             itemKeywords: ['ruột gà', 'lõi thép'],
             sampleItems: ['Ống ruột gà lõi thép phi 25 Nippon Seam'],
-            assignedMaterialCodes: ['DN_VT_RGTHP_01', 'DN_VT_RGTHP_02'],
+            assignedMaterialCodes: [
+              'DN_VT_RGTHP_01', 'DN_VT_RGTHP_02', 'DN_VT_RUOTG_08', 'DN_VT_RUOTG_04', 'DN_VT_OPVCC_01', 'DN_VT_HPCHI_01', 'DN_VT_KEPON_01', 'DN_VT_OPVCC_02', 'DN_VT_HPCHI_02', 'DN_VT_KEPON_02', 'DN_VT_OPVCC_03', 'DN_VT_HPCHI_03', 'DN_VT_KEPON_03', 'DN_VT_OPVCC_04', 'DN_VT_HPCHI_04', 'DN_VT_KEPON_04', 'DN_VT_OPVCC_05', 'DN_VT_HPCHI_05', 'DN_VT_KEPON_05', 'DN_VT_OPVCC_06', 'DN_VT_HPCHI_06', 'DN_VT_KEPON_06'
+            ],
             qrCodeValue: 'DNCT-WH-KE-03-T1-KH02',
           },
         ],
@@ -479,7 +509,9 @@ export const DEFAULT_WAREHOUSE_ENTITIES: WarehouseShelfEntity[] = [
             visualType: 'blue-bins',
             itemKeywords: ['mcb 1p', 'ic60n 16a', 'ic60n 20a'],
             sampleItems: ['MCB 1P 16A iC60N 6kA', 'MCB 1P 20A iC60N 6kA'],
-            assignedMaterialCodes: ['DN_VT_MCBSC_01', 'DN_VT_MCBSC_02', 'DN_VT_MCBSC_03'],
+            assignedMaterialCodes: [
+              'DN_VT_MCBSC_01', 'DN_VT_MCBSC_02', 'DN_VT_MCBSC_03', 'DN_VT_00MCB_09', 'DN_VT_0RCBO_01', 'DN_VT_0MCCB_05', 'DN_VT_COTSC_07', 'DN_VT_COTSC_08', 'DN_VT_COTSC_09', 'DN_VT_COTSC_10', 'DN_VT_COTSC_11', 'DN_VT_COTSC_12'
+            ],
             qrCodeValue: 'DNCT-WH-KE-03-T2-KH01',
           },
           {
@@ -539,7 +571,9 @@ export const DEFAULT_WAREHOUSE_ENTITIES: WarehouseShelfEntity[] = [
             visualType: 'blue-bins',
             itemKeywords: ['rơ le nhiệt', 'lrd', 'quá tải'],
             sampleItems: ['Rơ le nhiệt LRD08 (2.5-4A)', 'Rơ le nhiệt LRD16 (9-13A)'],
-            assignedMaterialCodes: ['DN_VT_ROLEN_04', 'DN_VT_ROLEN_05'],
+            assignedMaterialCodes: [
+              'DN_VT_ROLEN_04', 'DN_VT_ROLEN_05', 'DN_VT_ROLEN_06', 'DN_VT_ROLEN_07', 'DN_VT_ROLEN_08', 'DN_VT_ROLEN_09', 'DN_VT_ROLEN_10', 'DN_VT_ROLEN_11', 'DN_VT_ROLEN_12'
+            ],
             qrCodeValue: 'DNCT-WH-KE-03-T3-KH03',
           },
         ],
@@ -559,7 +593,7 @@ export const DEFAULT_WAREHOUSE_ENTITIES: WarehouseShelfEntity[] = [
             visualType: 'blue-bins',
             itemKeywords: ['omron 8 chân', 'my2n'],
             sampleItems: ['Rơ le Omron MY2N 24VDC có đèn chỉ thị'],
-            assignedMaterialCodes: ['DN_VT_MCBSC_04', 'DN_VT_MCBSC_05'],
+            assignedMaterialCodes: [ 'DN_VT_MCBSC_04', 'DN_VT_MCBSC_05', 'DN_VT_0FUSE_02', 'DN_VT_0CCHI_01', 'DN_VT_0FUSE_03', 'DN_VT_DROLE_02' ],
             qrCodeValue: 'DNCT-WH-KE-03-T4-KH01',
           },
           {
@@ -569,7 +603,7 @@ export const DEFAULT_WAREHOUSE_ENTITIES: WarehouseShelfEntity[] = [
             visualType: 'blue-bins',
             itemKeywords: ['omron 14 chân', 'my4n'],
             sampleItems: ['Rơ le Omron MY4N 220VAC 4 cặp tiếp điểm'],
-            assignedMaterialCodes: ['DN_VT_MCBSC_06', 'DN_VT_MCBSC_07'],
+            assignedMaterialCodes: [ 'DN_VT_MCBSC_06', 'DN_VT_MCBSC_07', 'DN_VT_DMINO_04', 'DN_VT_DMINO_02', 'DN_VT_DMINO_05', 'DN_VT_DMINO_06' ],
             qrCodeValue: 'DNCT-WH-KE-03-T4-KH02',
           },
           {
@@ -599,7 +633,9 @@ export const DEFAULT_WAREHOUSE_ENTITIES: WarehouseShelfEntity[] = [
             visualType: 'cadivi-coils',
             itemKeywords: ['cadivi 1.5', 'dây 1.5'],
             sampleItems: ['Cuộn CADIVI CV 1.5mm² Đỏ 100m', 'Cuộn CADIVI CV 1.5mm² Xanh Dương 100m'],
-            assignedMaterialCodes: ['DN_VT_DDCV0_01', 'DN_VT_DDCV0_02', 'DN_VT_DDCV0_03'],
+            assignedMaterialCodes: [
+              'DN_VT_DDCV0_01', 'DN_VT_DDCV0_02', 'DN_VT_DDCV0_03', 'DN_VT_OPBVC_02', 'DN_VT_OPBVC_03', 'DN_VT_DDCV0_04', 'DN_VT_DDCV0_05', 'DN_VT_VCMD0_01', 'DN_VT_VCMD0_02', 'DN_VT_VCMD0_03', 'DN_VT_VCMD0_04', 'DN_VT_VCMD0_05', 'DN_VT_VCMD0_06'
+            ],
             qrCodeValue: 'DNCT-WH-KE-03-T5-KH01',
           },
           {
@@ -609,7 +645,9 @@ export const DEFAULT_WAREHOUSE_ENTITIES: WarehouseShelfEntity[] = [
             visualType: 'cadivi-coils',
             itemKeywords: ['cadivi 2.5', 'dây 2.5'],
             sampleItems: ['Cuộn CADIVI CV 2.5mm² Vàng 100m', 'Cuộn CADIVI CV 2.5mm² Đỏ 100m'],
-            assignedMaterialCodes: ['DN_VT_DDCV0_06', 'DN_VT_DDCV0_07', 'DN_VT_DDCV0_08'],
+            assignedMaterialCodes: [
+              'DN_VT_DDCV0_06', 'DN_VT_DDCV0_07', 'DN_VT_DDCV0_08', 'DN_VT_D25MM_01', 'DN_VT_D25MM_02', 'DN_VT_D25MM_03', 'DN_VT_D6MM2_01', 'DN_VT_D4MM2_15', 'DN_VT_DDCV0_09', 'DN_VT_DDCV0_10', 'DN_VT_SIG00_01', 'DN_VT_SIG00_02', 'DN_VT_SIG00_03', 'DN_VT_SIG00_04', 'DN_VT_SIG00_05', 'DN_VT_SIG00_06', 'DN_VT_SIG00_07', 'DN_VT_SIG00_08', 'DN_VT_SIG00_09', 'DN_VT_SIG00_10'
+            ],
             qrCodeValue: 'DNCT-WH-KE-03-T5-KH02',
           },
           {
@@ -619,7 +657,9 @@ export const DEFAULT_WAREHOUSE_ENTITIES: WarehouseShelfEntity[] = [
             visualType: 'cadivi-coils',
             itemKeywords: ['cadivi 4.0', 'cadivi 6.0'],
             sampleItems: ['Cuộn CADIVI CV 4.0mm² Đen 100m', 'Cuộn CADIVI CV 6.0mm² Đỏ 100m'],
-            assignedMaterialCodes: ['DN_VT_DDCV0_11', 'DN_VT_DDCV0_12', 'DN_VT_DDCV0_16'],
+            assignedMaterialCodes: [
+              'DN_VT_DDCV0_11', 'DN_VT_DDCV0_12', 'DN_VT_DDCV0_16', 'DN_VT_50MM2_01', 'DN_VT_70MM2_01', 'DO', 'VG', 'XD', 'DEN', 'PE', 'DN_VT_DDCV0_13', 'DN_VT_DDCV0_14', 'DN_VT_DDCV0_15', 'DN_VT_DDCV0_17', 'DN_VT_DDCV0_18', 'DN_VT_DDCV0_19', 'DN_VT_DDCV0_20', 'DN_VT_DDCV0_21', 'DN_VT_DDCV0_22', 'DN_VT_DDCV0_23', 'DN_VT_DDCV0_24', 'DN_VT_DDCV0_25', 'DN_VT_DDCV0_26', 'DN_VT_DDCV0_27', 'DN_VT_DDCV0_28', 'DN_VT_DDCV0_29', 'DN_VT_DDCV0_30', 'DN_VT_DDCV0_31', 'DN_VT_DDCV0_32', 'DN_VT_DDCV0_33', 'DN_VT_DDCV0_34', 'DN_VT_DDCV0_35', 'DN_VT_DDCV0_36', 'DN_VT_DDCV0_37', 'DN_VT_DDCV0_38', 'DN_VT_DDCV0_39', 'DN_VT_DDCV0_40', 'DN_VT_CXV00_03', 'DN_VT_CXV00_04', 'DN_VT_CXV00_05', 'DN_VT_CXV00_06', 'DN_VT_CXV00_10', 'DN_VT_CXV00_11', 'DN_VT_CXV00_12', 'DN_VT_CXV00_13', 'DN_VT_CXV00_14', 'DN_VT_CXV00_15', 'DN_VT_DSTA0_03', 'DN_VT_DSTA0_04', 'DN_VT_DSTA0_05', 'DN_VT_DSTA0_06', 'DN_VT_DSTA0_07', 'DN_VT_DSTA0_08', 'DN_VT_DSTA0_09', 'DN_VT_DSTA0_10', 'DN_VT_DSTA0_11', 'DN_VT_DSTA0_12', 'DN_VT_DSTA0_13', 'DN_VT_DSTA0_14', 'DN_VT_DSTA0_15', 'DN_VT_FRCXV_01', 'DN_VT_FRCXV_02', 'DN_VT_FRCXV_03', 'DN_VT_FRCXV_04', 'DN_VT_FRCXV_05', 'DN_VT_FRCXV_06', 'DN_VT_FRCXV_07', 'DN_VT_FRCXV_08', 'DN_VT_FRCXV_09', 'DN_VT_FRCXV_10', 'DN_VT_FRCXV_11', 'DN_VT_FRCXV_12', 'DN_VT_CHSET_01', 'DN_VT_CHSET_02', 'DN_VT_CHSET_03', 'DN_VT_CHSET_04', 'DN_VT_CHSET_05', 'DN_VT_CHSET_06', 'DN_VT_CHSET_07', 'DN_VT_CHSET_08', 'DN_VT_CHSET_09', 'DN_VT_CHSET_10', 'DN_VT_CHSET_11', 'DN_VT_CHSET_12', 'DN_VT_CHSET_13'
+            ],
             qrCodeValue: 'DNCT-WH-KE-03-T5-KH03',
           },
         ],
@@ -662,7 +702,7 @@ export const DEFAULT_WAREHOUSE_ENTITIES: WarehouseShelfEntity[] = [
             visualType: 'cardboard-boxes',
             itemKeywords: ['vòi cảm ứng', 'dle110an'],
             sampleItems: ['Vòi cảm ứng TOTO tự động ngắt nước kèm mắt đọc quang học'],
-            assignedMaterialCodes: ['DN_VT_TBVS0_01'],
+            assignedMaterialCodes: [ 'DN_VT_TBVS0_01', 'DN_VT_VOILA_01', 'DN_VT_BANCA_01', 'DN_VT_VTIEU_01', 'DN_VT_XIPHO_01' ],
             qrCodeValue: 'DNCT-WH-KE-02-T1-KH01',
           },
           {
@@ -692,7 +732,7 @@ export const DEFAULT_WAREHOUSE_ENTITIES: WarehouseShelfEntity[] = [
             visualType: 'clear-boxes',
             itemKeywords: ['van điện từ', 'solenoid', '6vdc'],
             sampleItems: ['Van điện từ Solenoid Valve 6VDC TOTO/Viglacera'],
-            assignedMaterialCodes: ['DN_VT_CO90P_01', 'DN_VT_CO90P_02'],
+            assignedMaterialCodes: [ 'DN_VT_CO90P_01', 'DN_VT_CO90P_02', 'DN_VT_LOIRO_02', 'DN_VT_PHAOD_01', 'DN_VT_00BXO_03', 'DN_VT_00BXO_04' ],
             qrCodeValue: 'DNCT-WH-KE-02-T2-KH01',
           },
           {
@@ -722,7 +762,9 @@ export const DEFAULT_WAREHOUSE_ENTITIES: WarehouseShelfEntity[] = [
             visualType: 'clear-boxes',
             itemKeywords: ['cột cấp', 'phao ngắt nước'],
             sampleItems: ['Cột cấp nước bồn cầu TOTO chính hãng'],
-            assignedMaterialCodes: ['DN_VT_TBVS0_03'],
+            assignedMaterialCodes: [
+              'DN_VT_TBVS0_03', 'DN_VT_0MUOI_01', 'DN_VT_000CL_01', 'DN_VT_00ANA_01', 'DN_VT_JAVEL_01', 'DN_VT_OXALI_01', 'DN_VT_TBVS0_11', 'DN_VT_TBVS0_12', 'DN_VT_TBVS0_13', 'DN_VT_TBVS0_14', 'DN_VT_TBVS0_15'
+            ],
             qrCodeValue: 'DNCT-WH-KE-02-T3-KH01',
           },
           {
@@ -762,7 +804,9 @@ export const DEFAULT_WAREHOUSE_ENTITIES: WarehouseShelfEntity[] = [
             visualType: 'blue-bins',
             itemKeywords: ['gioăng cao su', 'đệm két nước'],
             sampleItems: ['Gioăng xốp đen đệm chống rò rỉ nước két cầu'],
-            assignedMaterialCodes: ['DN_VT_VANNC_01'],
+            assignedMaterialCodes: [
+              'DN_VT_VANNC_01', 'DN_VT_0VANB_04', 'DN_VT_KHOAD_06', 'DN_VT_RACCO_08', 'DN_VT_TBVS0_16', 'DN_VT_TBVS0_17', 'DN_VT_TBVS0_18', 'DN_VT_TBVS0_19', 'DN_VT_TBVS0_20'
+            ],
             qrCodeValue: 'DNCT-WH-KE-02-T4-KH01',
           },
           {
@@ -792,7 +836,9 @@ export const DEFAULT_WAREHOUSE_ENTITIES: WarehouseShelfEntity[] = [
             visualType: 'clear-boxes',
             itemKeywords: ['dây cấp nước', 'epdm', 'inox 304'],
             sampleItems: ['Dây cấp nước mềm Inox 304 40cm ren 21'],
-            assignedMaterialCodes: ['DN_VT_OPPR0_02', 'DN_VT_OPPR0_03'],
+            assignedMaterialCodes: [
+              'DN_VT_OPPR0_02', 'DN_VT_OPPR0_03', 'DN_VT_0O100_01', 'DN_VT_00O50_01', 'DN_VT_00O32_01', 'DN_VT_00O25_01', 'DN_VT_00O20_01', 'DN_VT_OHDPE_01', 'DN_VT_TBVS0_21', 'DN_VT_TBVS0_22', 'DN_VT_TBVS0_23', 'DN_VT_TBVS0_24'
+            ],
             qrCodeValue: 'DNCT-WH-KE-02-T5-KH01',
           },
           {
@@ -843,29 +889,29 @@ export const DEFAULT_WAREHOUSE_ENTITIES: WarehouseShelfEntity[] = [
       {
         tierNumber: 1,
         label: 'Tầng 1 (Nóc Kệ Trên Cùng - Tận Dụng Để Vật Tư)',
-        categoryDesc: 'Nóc kệ: Thùng đèn LED đường chiếu sáng công nghiệp sân đỗ, đèn quang hợp tiểu cảnh, hộp vật tư lớn',
-        itemKeywords: ['đèn led', 'chiếu sáng', 'quang hợp', 'nóc'],
+        categoryDesc: 'Nóc kệ: Thùng găng tay cách điện, máy cấp khí Ozone và thiết bị bảo hộ',
+        itemKeywords: ['găng tay', 'cách điện', 'ozone', 'máy ozone'],
         visualType: 'cardboard-boxes',
-        sampleItems: ['Thùng đèn LED đường 50W IP66 Philips', 'Bóng đèn LED quang hợp Rạng Đông 30W', 'Hộp chấn lưu đèn LED cao áp'],
+        sampleItems: ['Thùng găng tay cách điện', 'Máy cấp khí Ozone 3g/h'],
         compartments: [
           {
             id: 'KE-01-T1-KH01',
             code: 'KH01',
-            name: 'Khay 1: Đèn LED đường chiếu sáng công nghiệp sân đỗ & phụ kiện gá',
+            name: 'Thùng 1: Găng tay cách điện',
             visualType: 'cardboard-boxes',
-            itemKeywords: ['đèn đường', 'chiếu sáng'],
-            sampleItems: ['Đèn LED đường 50W IP66 Philips'],
-            assignedMaterialCodes: ['DN_VT_DNDLT_01', 'DN_VT_DNDLT_02'],
+            itemKeywords: ['găng tay cách điện', 'bảo hộ'],
+            sampleItems: ['Găng tay cách điện hạ thế'],
+            assignedMaterialCodes: [],
             qrCodeValue: 'DNCT-WH-KE-01-T1-KH01',
           },
           {
             id: 'KE-01-T1-KH02',
             code: 'KH02',
-            name: 'Khay 2: Đèn LED quang hợp cây xanh tiểu cảnh sảnh nhà ga T2',
+            name: 'Thùng 2: Máy Ozone',
             visualType: 'cardboard-boxes',
-            itemKeywords: ['quang hợp', 'cây xanh'],
-            sampleItems: ['Bóng đèn LED quang hợp 30W Rạng Đông'],
-            assignedMaterialCodes: ['DN_VT_DNDLT_03'],
+            itemKeywords: ['ozone', 'máy ozone'],
+            sampleItems: ['Máy cấp khí Ozone 3g/h'],
+            assignedMaterialCodes: ['DN_VT_MOZON_01'],
             qrCodeValue: 'DNCT-WH-KE-01-T1-KH02',
           },
         ],
@@ -873,60 +919,100 @@ export const DEFAULT_WAREHOUSE_ENTITIES: WarehouseShelfEntity[] = [
       {
         tierNumber: 2,
         label: 'Tầng 2 (Mâm Lửng Trên)',
-        categoryDesc: 'Xi phông lavabo ruột gà Inox, ống thải chữ P thoát nước bồn rửa',
-        itemKeywords: ['xiphong', 'xi phông', 'lavabo', 'ống thải'],
-        visualType: 'clear-boxes',
-        sampleItems: ['Xi phông Inox ruột gà chống tràn', 'Bộ xả lavabo chữ P khử mùi', 'Đầu xả lật Inox 304'],
+        categoryDesc: 'Phụ kiện lavabo, roan su bồn cầu, lõi lọc màng RO và găng tay y tế',
+        itemKeywords: ['lavabo', 'roan su', 'màng ro', 'găng tay y tế'],
+        visualType: 'blue-bins',
+        sampleItems: ['Phụ kiện xả lavabo', 'Roan su bồn cầu', 'Lõi lọc màng RO 10 inch', 'Găng tay y tế'],
         compartments: [
           {
             id: 'KE-01-T2-KH01',
             code: 'KH01',
-            name: 'Khay 1: Xi phông lavabo ruột gà Inox chống tràn & ống thải chữ P',
-            visualType: 'clear-boxes',
-            itemKeywords: ['xiphong', 'xi phông', 'lavabo'],
-            sampleItems: ['Xi phông Inox ruột gà', 'Bộ xả lavabo chữ P'],
-            assignedMaterialCodes: ['DN_VT_DNTUP_01', 'DN_VT_DNTUP_02'],
+            name: 'Khay 1: Phụ kiện lavabo',
+            visualType: 'blue-bins',
+            itemKeywords: ['phụ kiện lavabo', 'lavabo', 'xiphong'],
+            sampleItems: ['Xi phông lavabo ruột gà Inox', 'Đầu xả lavabo'],
+            assignedMaterialCodes: [],
             qrCodeValue: 'DNCT-WH-KE-01-T2-KH01',
           },
           {
             id: 'KE-01-T2-KH02',
             code: 'KH02',
-            name: 'Khay 2: Đầu xả nhấn / xả lật bồn rửa mặt lavabo Inox 304',
-            visualType: 'clear-boxes',
-            itemKeywords: ['xả nhấn', 'xả lật'],
-            sampleItems: ['Đầu xả nhấn nắp sứ trắng/Inox'],
-            assignedMaterialCodes: ['DN_VT_DNPAN_01'],
+            name: 'Khay 2: Roan su bồn cầu',
+            visualType: 'blue-bins',
+            itemKeywords: ['roan su', 'bồn cầu', 'gioăng'],
+            sampleItems: ['Roan su chống rỉ nước két bồn cầu'],
+            assignedMaterialCodes: [],
             qrCodeValue: 'DNCT-WH-KE-01-T2-KH02',
+          },
+          {
+            id: 'KE-01-T2-KH03',
+            code: 'KH03',
+            name: 'Khay 3: Lõi lọc màng RO',
+            visualType: 'blue-bins',
+            itemKeywords: ['lõi lọc', 'màng ro', 'ro'],
+            sampleItems: ['Lõi lọc màng RO 50 GPD'],
+            assignedMaterialCodes: ['DN_VT_LOIRO_02'],
+            qrCodeValue: 'DNCT-WH-KE-01-T2-KH03',
+          },
+          {
+            id: 'KE-01-T2-KH04',
+            code: 'KH04',
+            name: 'Khay 4: Găng tay y tế',
+            visualType: 'blue-bins',
+            itemKeywords: ['găng tay', 'y tế'],
+            sampleItems: ['Hộp găng tay y tế cao su'],
+            assignedMaterialCodes: [],
+            qrCodeValue: 'DNCT-WH-KE-01-T2-KH04',
           },
         ],
       },
       {
         tierNumber: 3,
         label: 'Tầng 3 (Mâm Lửng Giữa)',
-        categoryDesc: 'Keo Silicon Apollo A500 trắng trong/sữa, Keo dán đa năng Titebond Heavy Duty',
-        itemKeywords: ['silicon', 'a500', 'titebond', 'keo'],
-        visualType: 'clear-boxes',
-        sampleItems: ['Chai keo Silicon Apollo A500', 'Tuýp keo dán Titebond Heavy Duty', 'Súng bắn keo silicon chuyên dụng'],
+        categoryDesc: 'Hộp giấy Inox, vòi xà phòng cảm ứng, vòi xà phòng cơ và máy sấy tay',
+        itemKeywords: ['hộp giấy', 'vòi xà phòng', 'máy sấy tay'],
+        visualType: 'blue-bins',
+        sampleItems: ['Hộp giấy Inox lau tay', 'Vòi xà phòng cảm ứng Viglacera', 'Vòi xà phòng cơ nhấn âm bàn', 'Máy sấy tay siêu tốc'],
         compartments: [
           {
             id: 'KE-01-T3-KH01',
             code: 'KH01',
-            name: 'Khay 1: Chai keo Silicon Apollo A500 trắng trong & trắng sữa',
-            visualType: 'clear-boxes',
-            itemKeywords: ['apollo a500', 'keo silicon'],
-            sampleItems: ['Chai keo Apollo A500 300ml'],
-            assignedMaterialCodes: ['DN_VT_TBVS0_05'],
+            name: 'Khay 1: Hộp giấy inox',
+            visualType: 'blue-bins',
+            itemKeywords: ['hộp giấy', 'inox'],
+            sampleItems: ['Hộp đựng giấy lau tay Inox 304'],
+            assignedMaterialCodes: [],
             qrCodeValue: 'DNCT-WH-KE-01-T3-KH01',
           },
           {
             id: 'KE-01-T3-KH02',
             code: 'KH02',
-            name: 'Khay 2: Tuýp keo đa năng Titebond Heavy Duty & Súng bắn keo',
-            visualType: 'clear-boxes',
-            itemKeywords: ['titebond', 'súng bắn keo'],
-            sampleItems: ['Keo Titebond vàng chuyên dán gỗ kính đá'],
-            assignedMaterialCodes: ['DN_VT_TBVS0_06'],
+            name: 'Khay 2: Vòi xà phòng cảm ứng',
+            visualType: 'blue-bins',
+            itemKeywords: ['vòi xà phòng', 'cảm ứng'],
+            sampleItems: ['Vòi xà phòng cảm ứng tự động'],
+            assignedMaterialCodes: [],
             qrCodeValue: 'DNCT-WH-KE-01-T3-KH02',
+          },
+          {
+            id: 'KE-01-T3-KH03',
+            code: 'KH03',
+            name: 'Khay 3: Vòi xà phòng',
+            visualType: 'blue-bins',
+            itemKeywords: ['vòi xà phòng', 'nhấn'],
+            sampleItems: ['Đầu vòi nhấn xà phòng âm bàn Inox'],
+            assignedMaterialCodes: [],
+            qrCodeValue: 'DNCT-WH-KE-01-T3-KH03',
+          },
+          {
+            id: 'KE-01-T3-KH04',
+            code: 'KH04',
+            name: 'Khay 4: Máy sấy tay',
+            visualType: 'blue-bins',
+            itemKeywords: ['máy sấy tay', 'sấy tay'],
+            sampleItems: ['Máy sấy tay cảm ứng gắn tường'],
+            assignedMaterialCodes: [],
+            qrCodeValue: 'DNCT-WH-KE-01-T3-KH04',
           },
         ],
       },
@@ -951,7 +1037,7 @@ export const DEFAULT_WAREHOUSE_ENTITIES: WarehouseShelfEntity[] = [
           {
             id: 'KE-01-T4-KH02',
             code: 'KH02',
-            name: 'Khay 2: Phễu thoát sàn ngăn mùi Inox 304 kích thước 100x100mm & 120x120mm',
+            name: 'Khay 2: Phễu thoát sàn ngăn mùi Inox 304',
             visualType: 'clear-boxes',
             itemKeywords: ['thoát sàn', 'ngăn mùi'],
             sampleItems: ['Phễu thoát sàn chống hôi bẫy nước Inox 304'],
@@ -1028,7 +1114,7 @@ export const DEFAULT_WAREHOUSE_ENTITIES: WarehouseShelfEntity[] = [
             visualType: 'tool-case',
             itemKeywords: ['khoan bosch', 'gbh 2-26'],
             sampleItems: ['Máy khoan Bosch 3 chức năng GBH 2-26 DRE kèm đầu kẹp'],
-            assignedMaterialCodes: ['DN_VT_KIMKH_11', 'DN_VT_KIMKH_12'],
+            assignedMaterialCodes: [ 'DN_VT_KIMKH_11', 'DN_VT_KIMKH_12', 'DN_VT_KHOAN_19' ],
             qrCodeValue: 'DNCT-WH-TDN-02-T1-KH01',
           },
           {
@@ -1619,11 +1705,36 @@ export function normalizeWarehouseEntities(entities: WarehouseShelfEntity[]): Wa
         const standardQr = `DNCT-WH-${cleanCode}-T${tierNum}-${cleanCompCode}`;
         const standardId = `${cleanCode}-T${tierNum}-${cleanCompCode}`;
 
+        // Find canonical default assignments for this compartment ONLY if comp has no defined codes
+        let defaultCodes: string[] = [];
+        if (comp.assignedMaterialCodes === undefined || comp.assignedMaterialCodes === null) {
+          for (const defEnt of DEFAULT_WAREHOUSE_ENTITIES) {
+            if (defEnt.code === cleanCode || defEnt.id === cleanCode) {
+              const defTier = (defEnt.tiers || []).find((t) => t.tierNumber === tierNum);
+              if (defTier) {
+                const defComp = (defTier.compartments || []).find(
+                  (c) => c.code === cleanCompCode || c.id === standardId
+                );
+                if (defComp && defComp.assignedMaterialCodes) {
+                  defaultCodes = defComp.assignedMaterialCodes;
+                }
+              }
+            }
+          }
+        }
+
+        // CRITICAL FIX: If assignedMaterialCodes was explicitly set by user (even if empty []),
+        // DO NOT merge defaultCodes into it! Respect user assignment 100%.
+        const assignedCodes = Array.isArray(comp.assignedMaterialCodes)
+          ? comp.assignedMaterialCodes
+          : defaultCodes;
+
         return {
           ...comp,
           id: standardId,
           code: cleanCompCode,
           qrCodeValue: standardQr,
+          assignedMaterialCodes: assignedCodes,
         };
       });
 
